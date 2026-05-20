@@ -31,7 +31,7 @@ class TestStructuredObservability(unittest.TestCase):
                 state="OPEN",
                 from_state="CLOSED",
                 failure_count=1,
-                error="Test Error",
+                error="Test Error"
             )
 
     def test_mt5_connector_logging(self):
@@ -45,11 +45,9 @@ class TestStructuredObservability(unittest.TestCase):
 
         from src.core.exceptions import MT5ConnectionError
 
-        with (
-            patch("src.trading.mt5_connector.logger") as mock_log,
-            patch("src.trading.mt5_connector.MT5_AVAILABLE", False),
-            patch("src.trading.mt5_connector.METAAPI_AVAILABLE", False),
-        ):
+        with patch("src.trading.mt5_connector.logger") as mock_log, \
+             patch("src.trading.mt5_connector.MT5_AVAILABLE", False), \
+             patch("src.trading.mt5_connector.METAAPI_AVAILABLE", False):
             with self.assertRaises(MT5ConnectionError):
                 connector.initialize()
 
@@ -58,7 +56,7 @@ class TestStructuredObservability(unittest.TestCase):
                 "mt5_connector_initialization_started",
                 mode="demo",
                 symbol="XAUUSD",
-                mt5_server="MockServer",
+                mt5_server="MockServer"
             )
 
     def test_main_loop_instrumentation(self):
@@ -80,7 +78,6 @@ class TestStructuredObservability(unittest.TestCase):
         # Test calling them (should not raise)
         monitor.log_execution_quality(latency_ms=100.0, slippage_pips=0.1, fill_rate=1.0)
         monitor.log_model_performance(accuracy=0.85, drift_score=0.05)
-
 
 if __name__ == "__main__":
     unittest.main()

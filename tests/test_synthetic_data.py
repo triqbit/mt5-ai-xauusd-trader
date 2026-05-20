@@ -1,7 +1,6 @@
 """
 Unit tests for the ScenarioGenerator.
 """
-
 import numpy as np
 import pandas as pd
 import pytest
@@ -18,7 +17,6 @@ def test_determinism():
 
     pd.testing.assert_frame_equal(df1, df2)
 
-
 def test_trending_regime():
     gen = ScenarioGenerator(seed=42)
     # Bullish trend
@@ -29,7 +27,6 @@ def test_trending_regime():
     df_bear = gen.generate(n_steps=100, regime="trending", trend_strength=-0.01)
     assert df_bear["close"].iloc[-1] < df_bear["close"].iloc[0]
 
-
 def test_ohlc_validity():
     gen = ScenarioGenerator(seed=42)
     df = gen.generate(n_steps=100, regime="ranging")
@@ -39,7 +36,6 @@ def test_ohlc_validity():
     assert (df["high"] >= df["close"]).all()
     assert (df["low"] <= df["open"]).all()
     assert (df["low"] <= df["close"]).all()
-
 
 def test_malformed_regime():
     gen = ScenarioGenerator(seed=42)
@@ -57,7 +53,6 @@ def test_malformed_regime():
     # Zero volume at index 3
     assert df.loc[3, "tick_volume"] == 0
 
-
 def test_whipsaw_regime():
     gen = ScenarioGenerator(seed=42)
     df = gen.generate(n_steps=100, regime="whipsaw")
@@ -68,7 +63,6 @@ def test_whipsaw_regime():
     assert df["close"].iloc[50] > df["close"].iloc[45]
     assert df["close"].iloc[55] < df["close"].iloc[50]
 
-
 def test_stale_regime():
     gen = ScenarioGenerator(seed=42)
     df = gen.generate(n_steps=50, regime="stale")
@@ -76,12 +70,10 @@ def test_stale_regime():
     # Actually _generate_base adds noise to open/high/low but close is exact
     assert (df["close"].diff().dropna() == 0).all()
 
-
 def test_invalid_regime():
     gen = ScenarioGenerator()
     with pytest.raises(ValueError, match="Unknown regime"):
         gen.generate(regime="invalid")
-
 
 def test_flash_crash_regime():
     gen = ScenarioGenerator(seed=42)
@@ -93,7 +85,6 @@ def test_flash_crash_regime():
     # Partial recovery follows
     # returns[55:60] = 0.02
     assert df["close"].iloc[59] > df["close"].iloc[54]
-
 
 def test_regime_shift_regime():
     gen = ScenarioGenerator(seed=42)

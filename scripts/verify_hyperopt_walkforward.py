@@ -18,11 +18,8 @@ from src.research.hyperopt_walkforward import (
 from src.research.reporting import ResearchOrchestrator, ResearchReporter
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("VerifyWalkForward")
-
 
 def generate_synthetic_xauusd(n_bars: int = 2000) -> pd.DataFrame:
     """Generate synthetic XAUUSD-like data with multiple regimes."""
@@ -48,18 +45,15 @@ def generate_synthetic_xauusd(n_bars: int = 2000) -> pd.DataFrame:
 
     close = np.concatenate([trend_up, ranging, trend_down, volatile])
 
-    df = pd.DataFrame(
-        {
-            "open": close + np.random.normal(0, 0.5, n_bars),
-            "high": close + np.abs(np.random.normal(2, 1, n_bars)),
-            "low": close - np.abs(np.random.normal(2, 1, n_bars)),
-            "close": close,
-            "tick_volume": np.random.randint(100, 1000, n_bars),
-        }
-    )
+    df = pd.DataFrame({
+        "open": close + np.random.normal(0, 0.5, n_bars),
+        "high": close + np.abs(np.random.normal(2, 1, n_bars)),
+        "low": close - np.abs(np.random.normal(2, 1, n_bars)),
+        "close": close,
+        "tick_volume": np.random.randint(100, 1000, n_bars)
+    })
 
     return df
-
 
 def run_verification():
     """Run the walk-forward optimization verification."""
@@ -79,13 +73,19 @@ def run_verification():
         n_trials=20,
         seed=42,
         robustness_weights=RobustnessWeights(
-            oos_mean=0.5, worst_oos=0.3, regime_consistency=0.2, stability=0.2
-        ),
+            oos_mean=0.5,
+            worst_oos=0.3,
+            regime_consistency=0.2,
+            stability=0.2
+        )
     )
 
     logger.info("Starting Walk-Forward Optimization...")
     optimizer = WalkForwardOptimizer(
-        data=data, strategy_factory=EMACrossoverStrategy, param_space=param_space, config=config
+        data=data,
+        strategy_factory=EMACrossoverStrategy,
+        param_space=param_space,
+        config=config
     )
 
     result = optimizer.run_optimization()
@@ -100,7 +100,7 @@ def run_verification():
     orchestrator = ResearchOrchestrator(
         title="Institutional Walk-Forward Optimization Report",
         executive_summary="Verification of the robustness-weighted walk-forward optimization framework using synthetic XAUUSD data across multiple market regimes.",
-        conclusion="The walk-forward process successfully identified parameter sets that maintain performance consistency across varying volatility and trend regimes.",
+        conclusion="The walk-forward process successfully identified parameter sets that maintain performance consistency across varying volatility and trend regimes."
     )
 
     # Add hyperparameter section
@@ -116,7 +116,6 @@ def run_verification():
 
     # Print terminal summary
     reporter.format_for_terminal(report)
-
 
 if __name__ == "__main__":
     run_verification()

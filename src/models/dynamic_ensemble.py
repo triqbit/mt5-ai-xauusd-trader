@@ -121,9 +121,7 @@ class DynamicEnsemble:
             confidence: Model's internal confidence score (0.0 to 1.0).
         """
         if model_name not in self.model_names:
-            logger.warning(
-                "Attempted to record prediction for unknown model", model_name=model_name
-            )
+            logger.warning("Attempted to record prediction for unknown model", model_name=model_name)
             return
 
         self._pending_predictions[model_name] = {

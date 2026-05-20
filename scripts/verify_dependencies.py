@@ -23,7 +23,6 @@ def parse_requirements(filepath):
                 requirements[package] = version
     return requirements
 
-
 def parse_pyproject(filepath):
     requirements = {}
     with open(filepath, "rb") as f:
@@ -47,7 +46,6 @@ def parse_pyproject(filepath):
 
     return requirements
 
-
 def main():
     root = Path(__file__).resolve().parents[1]
     req_files = list(root.glob("requirements*.txt"))
@@ -67,15 +65,13 @@ def main():
         for package, version in reqs.items():
             if package in all_requirements:
                 if all_requirements[package]["version"] != version:
-                    mismatches.append(
-                        {
-                            "package": package,
-                            "file1": all_requirements[package]["file"],
-                            "version1": all_requirements[package]["version"],
-                            "file2": req_file.name,
-                            "version2": version,
-                        }
-                    )
+                    mismatches.append({
+                        "package": package,
+                        "file1": all_requirements[package]["file"],
+                        "version1": all_requirements[package]["version"],
+                        "file2": req_file.name,
+                        "version2": version
+                    })
             else:
                 all_requirements[package] = {"version": version, "file": req_file.name}
 
@@ -87,11 +83,8 @@ def main():
             print(f"  {m['file2']}: {m['version2']}")
         sys.exit(1)
     else:
-        print(
-            "All overlapping dependencies are harmonized across requirements files and pyproject.toml."
-        )
+        print("All overlapping dependencies are harmonized across requirements files and pyproject.toml.")
         sys.exit(0)
-
 
 if __name__ == "__main__":
     main()

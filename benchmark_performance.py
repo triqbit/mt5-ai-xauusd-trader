@@ -1,10 +1,10 @@
+
 import time
 import pandas as pd
 import numpy as np
 from src.core.feature_engineering import FeatureEngineer
 from src.core.trade_logger import TradeLogger
 import os
-
 
 def benchmark_feature_engineering():
     print("Benchmarking Feature Engineering...")
@@ -14,7 +14,7 @@ def benchmark_feature_engineering():
         "high": np.random.randn(500) + 2002,
         "low": np.random.randn(500) + 1998,
         "close": np.random.randn(500) + 2000,
-        "tick_volume": np.random.randint(100, 1000, 500),
+        "tick_volume": np.random.randint(100, 1000, 500)
     }
     df = pd.DataFrame(data)
     df.index = pd.date_range(start="2024-01-01", periods=500, freq="5min")
@@ -26,7 +26,6 @@ def benchmark_feature_engineering():
         _ = fe.compute_features(df)
     end = time.perf_counter()
     print(f"Average Feature Engineering time: {(end - start) / 10 * 1000:.2f}ms")
-
 
 def benchmark_trade_logger():
     print("\nBenchmarking TradeLogger Performance Report...")
@@ -51,7 +50,6 @@ def benchmark_trade_logger():
 
     if os.path.exists(db_path):
         os.remove(db_path)
-
 
 if __name__ == "__main__":
     benchmark_feature_engineering()

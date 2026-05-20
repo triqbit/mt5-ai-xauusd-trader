@@ -1,3 +1,4 @@
+
 import os
 import sys
 
@@ -16,7 +17,7 @@ def verify_reporting():
         symbol="XAUUSD",
         model_family="RL",
         capital_cap=50000.0,
-        performance_multiplier=1.2,
+        performance_multiplier=1.2
     )
     allocator.add_strategy(s1)
     allocator.update_allocation("s1", 20000.0)
@@ -41,7 +42,6 @@ def verify_reporting():
     assert section.rejection_summary["STRATEGY_NOT_FOUND"] == 1
 
     print("Reporting integration verified successfully!")
-
 
 if __name__ == "__main__":
     try:

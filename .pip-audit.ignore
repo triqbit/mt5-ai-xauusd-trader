@@ -2,6 +2,5 @@
 python - socketio
 # Dependency of metaapi-cloud-sdk
 python - engineio
-# Legacy dependency with known false positive for this environment
-joblib
+# Known vulnerability in joblib 1.5.3, but required for this environment's scikit-learn version
 joblib

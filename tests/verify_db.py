@@ -43,7 +43,6 @@ def verify_db(db_url="sqlite:///trades.db"):
 
     return True
 
-
 if __name__ == "__main__":
     # Test with a temporary DB to ensure script works
     test_db = "sqlite:///test_verify.db"

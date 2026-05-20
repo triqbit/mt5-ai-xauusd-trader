@@ -1,5 +1,4 @@
 """Tests for src.core.config module."""
-
 import pytest
 
 from src.core.config import TradingConfig
@@ -18,7 +17,6 @@ def test_config_from_env(monkeypatch):
     assert cfg.mt5_server == "TestServer-Demo"
     assert cfg.mode == "demo"
 
-
 def test_config_defaults(monkeypatch):
     """Test TradingConfig has sensible defaults."""
     monkeypatch.setenv("MT5_LOGIN", "0")
@@ -28,7 +26,6 @@ def test_config_defaults(monkeypatch):
     assert cfg.symbol == "XAUUSD"
     assert cfg.mode == "demo"
     assert cfg.algorithm == "ensemble"
-
 
 def test_config_risk_validation(monkeypatch):
     """Test risk_per_trade validation rejects unsafe values."""

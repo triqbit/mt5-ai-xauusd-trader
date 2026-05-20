@@ -844,12 +844,11 @@ def test_bars_per_year_refined(sample_data):
     # We need to test if bars_per_year is used in Sharpe calculation.
     # _evaluate_strategy uses config.bars_per_year through BenchmarkEvaluator.
     def mock_predict(data):
-        return pd.Series(1, index=data.index)  # Always long
+        return pd.Series(1, index=data.index) # Always long
 
     # Manually trigger a calculation that uses bars_per_year
     # BenchmarkEvaluator calculates Sharpe as (mean/std) * sqrt(bars_per_year)
     from src.research.benchmarks import BenchmarkEvaluator
-
     _ = BenchmarkEvaluator(sample_data.iloc[:100], bars_per_year=config.bars_per_year)
 
     # We need to mock the returns inside the evaluator
@@ -867,9 +866,7 @@ def test_bars_per_year_refined(sample_data):
 
     # We can use a custom config to verify scaling
     config_small = WalkForwardConfig(bars_per_year=252)
-    optimizer_small = WalkForwardOptimizer(
-        sample_data, EMACrossoverStrategy, lambda t: {}, config_small
-    )
+    optimizer_small = WalkForwardOptimizer(sample_data, EMACrossoverStrategy, lambda t: {}, config_small)
 
     # consistency calculation doesn't directly return Sharpe, but uses it internally.
     # To really verify bars_per_year, we should check a method that returns a value scaled by it.

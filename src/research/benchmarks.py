@@ -316,7 +316,9 @@ class MomentumVolatilityStrategy:
     rolling volatility is within an acceptable range.
     """
 
-    def __init__(self, window: int = 14, threshold: float = 0.0, vol_threshold_pct: float = 0.02):
+    def __init__(
+        self, window: int = 14, threshold: float = 0.0, vol_threshold_pct: float = 0.02
+    ):
         """
         Initialize the Momentum Volatility strategy.
 
@@ -745,9 +747,7 @@ class LondonBreakoutStrategy:
 
     @property
     def name(self) -> str:
-        return (
-            f"London_Breakout_{self.range_start.replace(':', '')}_{self.range_end.replace(':', '')}"
-        )
+        return f"London_Breakout_{self.range_start.replace(':', '')}_{self.range_end.replace(':', '')}"
 
     def predict(self, df: pd.DataFrame) -> np.ndarray:
         """

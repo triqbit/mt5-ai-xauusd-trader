@@ -376,7 +376,7 @@ class LSTMModel(BaseModel):
                     batch_count += 1
                 if batch_count > 0:
                     self.logger.debug(
-                        f"Epoch {epoch + 1}/{epochs} - Loss: {running_loss / batch_count:.4f}"
+                        f"Epoch {epoch+1}/{epochs} - Loss: {running_loss/batch_count:.4f}"
                     )
 
         self.logger.info("LSTM training complete.")

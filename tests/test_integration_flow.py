@@ -217,7 +217,7 @@ def test_backtest_initialization():
         )
 
         # Should log info but not crash
-        assert main() == 0  # Verified health discovery fix
+        assert main() == 0  # Health discovery verified
 
 
 # --- Path 4: Resilience & Recovery ---

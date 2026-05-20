@@ -77,12 +77,8 @@ class WalkForwardConfig(BaseModel):
     min_oos_sharpe: float = Field(-float("inf"), description="Minimum allowed OOS Sharpe Ratio")
     max_oos_drawdown: float = Field(1.0, description="Maximum allowed OOS Drawdown (fraction)")
     min_trades_per_window: int = Field(5, description="Minimum trades required in each OOS window")
-    min_regime_consistency: float = Field(
-        0.0, description="Minimum required regime consistency score"
-    )
-    min_walk_forward_efficiency: float = Field(
-        0.0, description="Minimum required WFE (OOS / IS Sharpe)"
-    )
+    min_regime_consistency: float = Field(0.0, description="Minimum required regime consistency score")
+    min_walk_forward_efficiency: float = Field(0.0, description="Minimum required WFE (OOS / IS Sharpe)")
 
 
 class RobustnessMetrics(BaseModel):

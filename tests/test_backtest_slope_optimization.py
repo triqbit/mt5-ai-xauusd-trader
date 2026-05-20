@@ -1,3 +1,4 @@
+
 import numpy as np
 
 
@@ -46,7 +47,6 @@ def test_vectorized_slope_parity():
 
     assert len(vectorized_slopes) == n
     assert np.allclose(ref_slopes, vectorized_slopes)
-
 
 def test_vectorized_slope_small_n():
     """Ensures the vectorized slope handles n < window cases."""

@@ -22,7 +22,6 @@ def extract_version_pyproject(root: Path) -> str:
     match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
     return match.group(1) if match else "NOT_FOUND"
 
-
 def extract_version_init(root: Path) -> str:
     path = root / "src" / "__init__.py"
     if not path.exists():
@@ -31,7 +30,6 @@ def extract_version_init(root: Path) -> str:
     match = re.search(r'^__version__\s*=\s*"([^"]+)"', content, re.MULTILINE)
     return match.group(1) if match else "NOT_FOUND"
 
-
 def extract_version_changelog(root: Path) -> str:
     path = root / "CHANGELOG.md"
     if not path.exists():
@@ -39,14 +37,13 @@ def extract_version_changelog(root: Path) -> str:
     content = path.read_text()
     # Find the first header like ## [X.Y.Z] that is NOT [Unreleased]
     # We look for ## [ followed by something that isn't Unreleased
-    matches = re.finditer(r"## \[([^\]]+)\]", content)
+    matches = re.finditer(r'## \[([^\]]+)\]', content)
     for match in matches:
         version = match.group(1)
         if version.lower() != "unreleased":
             return version
 
     return "NOT_FOUND"
-
 
 def main():
     root = Path(__file__).resolve().parents[1]
@@ -104,7 +101,6 @@ def main():
 
     print("✅ SUCCESS: All version markers are synchronized.")
     sys.exit(0)
-
 
 if __name__ == "__main__":
     main()

@@ -1,7 +1,6 @@
 """
 Unit tests for the profiler with Prometheus integration.
 """
-
 import time
 from unittest.mock import MagicMock, patch
 

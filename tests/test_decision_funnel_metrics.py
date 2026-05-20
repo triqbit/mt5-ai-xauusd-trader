@@ -3,7 +3,6 @@ Tests for Decision Funnel Metrics.
 Ensures that signal rejections across RiskManager, ExecutionFilter, and CapitalAllocator
 are correctly recorded in Prometheus metrics.
 """
-
 import unittest
 from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
@@ -30,7 +29,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
         self.config.signal_flicker_window = 6
         self.config.max_signal_changes = 3
 
-        with patch("telegram.Bot"):
+        with patch('telegram.Bot'):
             self.monitor = Monitor(self.config)
 
     def test_audited_risk_manager_rejection_metrics_symbol(self):
@@ -47,7 +46,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             take_profit=2100.0,
             lot_size=0.1,
             algorithm="test",
-            confidence=0.8,
+            confidence=0.8
         )
 
         with patch.object(INTERNAL_REJECTION_COUNTER, "labels") as mock_labels:
@@ -72,7 +71,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             take_profit=2100.0,
             lot_size=0.1,
             algorithm="test",
-            confidence=0.1,
+            confidence=0.1
         )
 
         with patch.object(INTERNAL_REJECTION_COUNTER, "labels") as mock_labels:
@@ -99,7 +98,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             take_profit=2100.0,
             lot_size=0.1,
             algorithm="test",
-            confidence=0.4,  # Low confidence to trigger block
+            confidence=0.4 # Low confidence to trigger block
         )
 
         # Configure thresholds to trigger block
@@ -111,7 +110,7 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
             mock_labels.return_value = mock_counter
 
             # Use a fixed weekday timestamp to avoid SESSION_CLOSED rejections on weekends
-            weekday_ts = datetime(2026, 5, 13, 12, 0, 0, tzinfo=UTC)  # Wednesday
+            weekday_ts = datetime(2026, 5, 13, 12, 0, 0, tzinfo=UTC) # Wednesday
 
             # Mock market data as empty to avoid calculation errors
             ef.validate(signal, market_data=None, timestamp=weekday_ts)
@@ -129,11 +128,8 @@ class TestDecisionFunnelMetrics(unittest.TestCase):
 
             allocator.request_allocation("STRAT_1", 0.02)
 
-            mock_labels.assert_any_call(
-                component="capital_allocator", reason=RejectionCode.NO_BUDGET.value
-            )
+            mock_labels.assert_any_call(component="capital_allocator", reason=RejectionCode.NO_BUDGET.value)
             mock_counter.inc.assert_called()
-
 
 if __name__ == "__main__":
     unittest.main()

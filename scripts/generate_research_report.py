@@ -32,19 +32,16 @@ def generate_synthetic_data(n=1000):
     """Generate professional synthetic XAUUSD data."""
     np.random.seed(42)
     close = 2300 + np.cumsum(np.random.randn(n) * 2)
-    df = pd.DataFrame(
-        {
-            "open": close - np.random.randn(n),
-            "high": close + np.abs(np.random.randn(n) * 2),
-            "low": close - np.abs(np.random.randn(n) * 2),
-            "close": close,
-            "tick_volume": np.random.randint(100, 1000, n),
-            "spread": 0.2 + np.random.rand(n) * 0.2,
-        }
-    )
+    df = pd.DataFrame({
+        "open": close - np.random.randn(n),
+        "high": close + np.abs(np.random.randn(n) * 2),
+        "low": close - np.abs(np.random.randn(n) * 2),
+        "close": close,
+        "tick_volume": np.random.randint(100, 1000, n),
+        "spread": 0.2 + np.random.rand(n) * 0.2
+    })
     df.index = pd.date_range(start="2024-01-01", periods=n, freq="5min")
     return df
-
 
 def setup_mock_journal_db(db_url="sqlite:///mock_trades.db"):
     """Populate a mock database for journal mining."""
@@ -52,16 +49,14 @@ def setup_mock_journal_db(db_url="sqlite:///mock_trades.db"):
 
     # Add some signals and trades
     for i in range(10):
-        sig_id = logger.log_signal(
-            {
-                "symbol": "XAUUSD",
-                "direction": 1 if i % 2 == 0 else -1,
-                "entry_price": 2300.0 + i,
-                "algorithm": "PPO_Agent",
-                "confidence": 0.8,
-                "volatility": 0.0005,
-            }
-        )
+        sig_id = logger.log_signal({
+            "symbol": "XAUUSD",
+            "direction": 1 if i % 2 == 0 else -1,
+            "entry_price": 2300.0 + i,
+            "algorithm": "PPO_Agent",
+            "confidence": 0.8,
+            "volatility": 0.0005
+        })
 
         logger.log_trade(
             ticket=1000 + i,
@@ -69,31 +64,28 @@ def setup_mock_journal_db(db_url="sqlite:///mock_trades.db"):
             direction=1 if i % 2 == 0 else -1,
             entry_price=2300.0 + i,
             lot_size=0.1,
-            signal_id=sig_id,
+            signal_id=sig_id
         )
 
         # Close some trades with PnL
-        pnl = 50.0 if i < 7 else -100.0  # mostly wins, then some losses for clusters
-        logger.update_trade(ticket=1000 + i, exit_price=2300.0 + i + (pnl / 100), pnl=pnl)
+        pnl = 50.0 if i < 7 else -100.0 # mostly wins, then some losses for clusters
+        logger.update_trade(ticket=1000 + i, exit_price=2300.0 + i + (pnl/100), pnl=pnl)
 
     # Add risk events for blocked signal analysis
     for _ in range(3):
-        sig_id = logger.log_signal(
-            {
-                "symbol": "XAUUSD",
-                "direction": 1,
-                "entry_price": 2300.0,
-                "algorithm": "RL_Agent",
-                "confidence": 0.5,
-                "timestamp": datetime.now(timezone.utc) - timedelta(days=1),
-            }
-        )
+        sig_id = logger.log_signal({
+            "symbol": "XAUUSD",
+            "direction": 1,
+            "entry_price": 2300.0,
+            "algorithm": "RL_Agent",
+            "confidence": 0.5,
+            "timestamp": datetime.now(timezone.utc) - timedelta(days=1)
+        })
         logger.log_risk_event("SIGNAL_REJECTED", "Low confidence score", "XAUUSD", signal_id=sig_id)
 
     logger.log_risk_event("SPREAD_WIDENING", "Spread too wide during news", "XAUUSD")
 
     return db_url
-
 
 def main():
     print("🚀 Starting Institutional Research Report Generation...")
@@ -111,7 +103,7 @@ def main():
         conclusion=(
             "Deployment recommended with a 15% risk reduction during high-impact macro windows. "
             "Model drift is STABLE, but continued monitoring of feature importance shifts is advised."
-        ),
+        )
     )
 
     # 2. Market Regime Analysis
@@ -125,31 +117,25 @@ def main():
     strategy = EMACrossoverStrategy(9, 21)
     lab = StressLab(strategy, data)
     baseline_metrics = StressTestMetrics(
-        total_return=0.15,
-        max_drawdown=0.05,
-        sharpe_ratio=2.1,
-        win_rate=0.55,
-        num_trades=50,
-        execution_quality_score=0.98,
-        latency_impact=0.01,
+        total_return=0.15, max_drawdown=0.05, sharpe_ratio=2.1,
+        win_rate=0.55, num_trades=50, execution_quality_score=0.98, latency_impact=0.01
     )
     resilience_report = lab.run_standard_suite(baseline_metrics)
     orchestrator.add_section(resilience_report.to_report_section())
 
     # 4. Hyperparameter Robustness
     print("🧪 Optimizing Walk-Forward Robustness...")
-
     def ema_param_space(trial):
         return {
             "fast_window": trial.suggest_int("fast_window", 5, 20),
-            "slow_window": trial.suggest_int("slow_window", 21, 50),
+            "slow_window": trial.suggest_int("slow_window", 21, 50)
         }
 
     wf_optimizer = WalkForwardOptimizer(
         data=data,
         strategy_factory=EMACrossoverStrategy,
         param_space=ema_param_space,
-        config=WalkForwardConfig(n_trials=5, train_size=400, test_size=100, step_size=100),
+        config=WalkForwardConfig(n_trials=5, train_size=400, test_size=100, step_size=100)
     )
     wf_result = wf_optimizer.run_optimization()
     orchestrator.add_section(wf_result.to_report_section())
@@ -170,15 +156,10 @@ def main():
     # 7. Capital Allocation Insights
     print("💰 Evaluating Capital Allocation...")
     allocator = CapitalAllocator(total_budget=100000.0)
-    allocator.add_strategy(
-        StrategyConfig(
-            strategy_id="XAUUSD_PPO_V2",
-            symbol="XAUUSD",
-            model_family="RL",
-            capital_cap=50000.0,
-            performance_multiplier=1.2,
-        )
-    )
+    allocator.add_strategy(StrategyConfig(
+        strategy_id="XAUUSD_PPO_V2", symbol="XAUUSD", model_family="RL",
+        capital_cap=50000.0, performance_multiplier=1.2
+    ))
     allocator.update_allocation("XAUUSD_PPO_V2", 45000.0)
     orchestrator.add_section(allocator.to_report_section())
 
@@ -194,7 +175,7 @@ def main():
 
     rare_event_section = RareEventSection(
         scenarios=[flash_crash_res.to_report_summary(), vacuum_res.to_report_summary()],
-        insights="The strategy successfully navigated the liquidity vacuum but suffered 8% peak drawdown during the flash crash.",
+        insights="The strategy successfully navigated the liquidity vacuum but suffered 8% peak drawdown during the flash crash."
     )
     orchestrator.add_section(rare_event_section)
 
@@ -209,7 +190,7 @@ def main():
     exec_analyzer = ExecutionAnalyzer(db_url=db_url, connector=mock_connector)
     # We need to ensure we don't try to fetch from MT5 since it's not connected
     # In a real scenario, this would use a live connector.
-    with patch.object(exec_analyzer, "analyze_trade", return_value=None):
+    with patch.object(exec_analyzer, 'analyze_trade', return_value=None):
         exec_summary = exec_analyzer.generate_summary_report(days=7)
         # Manually fill some metrics for the demo if it came back empty
         if exec_summary.executed_trade_count == 0:
@@ -239,13 +220,12 @@ def main():
     print(f"   - HTML:     {os.path.abspath(html_path)}")
 
     # Print scannable version to terminal
-    print("\n" + "=" * 50)
+    print("\n" + "="*50)
     reporter.format_for_terminal(report)
 
     # Cleanup mock DB
     if os.path.exists("mock_trades.db"):
         os.remove("mock_trades.db")
-
 
 if __name__ == "__main__":
     main()
