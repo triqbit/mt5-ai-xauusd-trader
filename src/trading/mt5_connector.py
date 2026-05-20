@@ -513,6 +513,86 @@ class MT5Connector:
             raise MT5DataError(f"Unexpected tick retrieval error: {e}") from e
 
     @with_retry((MT5ExecutionError, MT5ConnectionError), max_retries=2)
+    def close_position(self, ticket: int) -> bool:
+        """
+        Close an existing position by its ticket ID.
+
+        Args:
+            ticket: Position ticket ID.
+
+        Returns:
+            bool: True if closed successfully.
+        """
+        return self.breaker(self._close_position_logic)(ticket)
+
+    def _close_position_logic(self, ticket: int) -> bool:
+        """Internal position closure logic."""
+        if not self._is_initialized:
+            self.initialize()
+
+        if not self.use_metaapi:
+            # Native MT5
+            positions = mt5.positions_get(ticket=ticket)
+            if positions is None or len(positions) == 0:
+                logger.warning("position_not_found_for_closure", ticket=ticket)
+                return False
+
+            position = positions[0]
+            symbol = position.symbol
+            lots = position.volume
+            # Reverse direction
+            order_type = (
+                ORDER_TYPE_SELL if position.type == ORDER_TYPE_BUY else ORDER_TYPE_BUY
+            )
+            price = (
+                self.get_tick(symbol)["bid"]
+                if order_type == ORDER_TYPE_SELL
+                else self.get_tick(symbol)["ask"]
+            )
+
+            request = {
+                "action": TRADE_ACTION_DEAL,
+                "position": ticket,
+                "symbol": symbol,
+                "volume": lots,
+                "type": order_type,
+                "price": price,
+                "magic": 20240419,
+                "comment": "Emergency Closure",
+                "type_time": ORDER_TIME_GTC,
+                "type_filling": ORDER_FILLING_IOC,
+            }
+
+            result = mt5.order_send(request)
+            if result is None or result.retcode != getattr(
+                mt5, "TRADE_RETCODE_DONE", 10009
+            ):
+                err_msg = (
+                    result.comment
+                    if result
+                    else f"Unknown error (code: {mt5.last_error()[0]})"
+                )
+                logger.error(
+                    "position_closure_failed",
+                    ticket=ticket,
+                    error=err_msg,
+                    retcode=getattr(result, "retcode", None),
+                )
+                raise MT5ExecutionError(f"Failed to close position {ticket}: {err_msg}")
+
+            logger.info("position_closure_success", ticket=ticket)
+            return True
+        else:
+            # MetaAPI
+            try:
+                self._run_async(self.metaapi_connection.close_position(str(ticket)))
+                logger.info("metaapi_position_closure_success", ticket=ticket)
+                return True
+            except Exception as e:
+                logger.error("metaapi_position_closure_failed", ticket=ticket, error=str(e))
+                raise MT5ExecutionError(f"MetaAPI position closure failed: {e}") from e
+
+    @with_retry((MT5ExecutionError, MT5ConnectionError), max_retries=2)
     def place_order(self, signal: TradeSignal) -> Optional[int]:
         """
         Execute a market order based on a validated trade signal.

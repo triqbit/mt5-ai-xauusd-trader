@@ -68,6 +68,7 @@ init:
 validate-config:
 	@echo "Validating configuration..."
 	$(PYTHON_EXEC) scripts/validate_env.py
+	$(PYTHON_EXEC) scripts/verify_connectivity.py
 
 backtest:
 	@echo "Running standardized backtest (Last 30 days)..."
@@ -84,9 +85,7 @@ status:
 
 emergency-stop:
 	@echo "EMERGENCY STOP INITIATED..."
-	@echo "Closing all positions and shutting down..."
-	# In production, this would call a dedicated RPC/API command to the bot process
-	$(PYTHON_EXEC) -c "import os; print('Triggering emergency flatten for all active symbols...')"
+	$(PYTHON_EXEC) scripts/emergency_flatten.py
 
 daily-summary:
 	@echo "Generating Daily Operator Summary..."
