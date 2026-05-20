@@ -6,6 +6,7 @@ from src.core.audit_log import AuditLogger, get_audit_logger
 from src.core.config import TradingConfig, get_config
 from src.core.decision_support import DecisionPacket, DecisionSupportSystem
 from src.core.explainability import SignalExplainer, SignalExplanation
+from src.core.health import HealthChecker, HealthReport, HealthStatus
 from src.core.monitor import Monitor
 from src.core.profiler import profile
 
@@ -18,6 +19,10 @@ else:
             from src.core.feature_engineering import FeatureEngineer
 
             return FeatureEngineer
+        if name == "health":
+            import src.core.health as health
+
+            return health
         raise AttributeError(f"module {__name__} has no attribute {name}")
 
 
@@ -26,6 +31,9 @@ __all__ = [
     "DecisionPacket",
     "DecisionSupportSystem",
     "FeatureEngineer",
+    "HealthChecker",
+    "HealthReport",
+    "HealthStatus",
     "Monitor",
     "SignalExplainer",
     "SignalExplanation",
