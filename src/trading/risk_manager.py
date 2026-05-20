@@ -172,6 +172,26 @@ class RiskManager:
         self.daily = DailyStats(peak_equity=self.balance)
         logger.info("Daily stats reset")
 
+    def reconcile_state(self, reconciliation_data: dict[str, Any]) -> None:
+        """
+        Restore internal risk state from historical data (e.g. after system restart).
+        """
+        self.daily.realised_pnl = reconciliation_data.get("realised_pnl", 0.0)
+        self.daily.trade_count = reconciliation_data.get("trade_count", 0)
+        self.daily.consecutive_losses = reconciliation_data.get("consecutive_losses", 0)
+
+        # Restore daily peak equity from balance if we have realized PnL
+        # Heuristic: initial_daily_balance = balance - realised_pnl
+        initial_daily_balance = self.balance - self.daily.realised_pnl
+        self.daily.peak_equity = max(self.balance, initial_daily_balance)
+
+        logger.info(
+            "RiskManager state reconciled | realised_pnl=%.2f | consecutive_losses=%d | peak_equity=%.2f",
+            self.daily.realised_pnl,
+            self.daily.consecutive_losses,
+            self.daily.peak_equity,
+        )
+
     # -- Private filter layers ----------------------------------------------
     def _check_consecutive_losses(self) -> bool:
         if self.daily.consecutive_losses >= self.cfg.max_losing_streak:
