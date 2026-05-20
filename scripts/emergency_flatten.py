@@ -9,6 +9,7 @@ Part of the "One-command workflow" for Incident Response.
 
 import os
 import sys
+from datetime import datetime
 
 import structlog
 
@@ -56,7 +57,7 @@ def main():
         print("\n--- Fencing Account ---")
         print("Setting lock file: .emergency_lock")
         with open(".emergency_lock", "w") as f:
-            f.write("Emergency shutdown triggered at " + os.popen("date").read())
+            f.write(f"Emergency shutdown triggered at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
 
         print("✅ Account fenced. Trading loop will refuse to start while .emergency_lock exists.")
 
