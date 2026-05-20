@@ -1,4 +1,5 @@
-# Upstream constraint from metaapi-cloud-sdk
-python-socketio
-# Dependency of metaapi-cloud-sdk
-python-engineio
+# Known upstream security risks from metaapi-cloud-sdk
+# python-socketio < 5.0.0 is required by metaapi-cloud-sdk
+GHSA-g8c6-8fjj-2r4m
+# python-engineio
+GHSA-q9m6-rv9c-9c76
