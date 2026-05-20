@@ -21,6 +21,7 @@ from src.models.regime_detector import MarketRegime, RegimeInfo
 from src.trading.capital_allocator import AllocationRequest, StrategyConfig
 
 if TYPE_CHECKING:
+    from src.core.trade_logger import TradeLogger
     from src.models.dynamic_ensemble import DynamicEnsemble
 
 
@@ -1561,3 +1562,60 @@ class EnsembleScenarioBuilder:
 
             ensemble.record_prediction(model_name, pred_dir, confidence)
             ensemble.record_outcome(model_name, actual_dir)
+
+
+class ReconciliationScenarioBuilder:
+    """
+    Populates a TradeLogger database with deterministic intraday states.
+    Used for testing risk state restoration after system restarts.
+    """
+
+    def __init__(self, trade_logger: TradeLogger):
+        self.logger = trade_logger
+
+    def populate_near_daily_loss(self, symbol: str = "XAUUSD") -> dict[str, Any]:
+        """
+        Populates trades that put the system near the daily loss limit.
+        """
+        # Create 3 trades with $150 loss each = $450 total loss
+        for i in range(3):
+            ticket = 5000 + i
+            self.logger.log_trade(ticket, symbol, 1, 2300.0, 0.1, status="OPEN")
+            self.logger.update_trade(ticket, 2285.0, -150.0)
+
+        return {"realised_pnl": -450.0, "trade_count": 3, "consecutive_losses": 3}
+
+    def populate_active_losing_streak(
+        self, n_losses: int = 4, symbol: str = "XAUUSD"
+    ) -> dict[str, Any]:
+        """
+        Populates a sequence of losses to test consecutive loss guarding.
+        """
+        for i in range(n_losses):
+            ticket = 6000 + i
+            self.logger.log_trade(ticket, symbol, 1, 2300.0, 0.1, status="OPEN")
+            self.logger.update_trade(ticket, 2295.0, -50.0)
+
+        return {
+            "realised_pnl": -50.0 * n_losses,
+            "trade_count": n_losses,
+            "consecutive_losses": n_losses,
+        }
+
+    def populate_mixed_outcomes(self, symbol: str = "XAUUSD") -> dict[str, Any]:
+        """
+        Populates a mix of wins and losses.
+        Streak should only count the latest consecutive losses.
+        """
+        # Loss, Loss, Win, Loss
+        outcomes = [-100.0, -100.0, 200.0, -50.0]
+        for i, pnl in enumerate(outcomes):
+            ticket = 7000 + i
+            self.logger.log_trade(ticket, symbol, 1, 2300.0, 0.1, status="OPEN")
+            self.logger.update_trade(ticket, 2300.0 + (pnl / 100.0), pnl)
+
+        return {
+            "realised_pnl": sum(outcomes),
+            "trade_count": len(outcomes),
+            "consecutive_losses": 1,
+        }
