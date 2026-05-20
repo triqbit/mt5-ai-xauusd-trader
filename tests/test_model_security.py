@@ -4,7 +4,6 @@ tests/test_model_security.py
 """
 
 import os
-from pathlib import Path
 
 import joblib
 import pandas as pd
@@ -14,7 +13,6 @@ from sklearn.preprocessing import StandardScaler
 
 from src.core.config import get_config
 from src.models.regime_detector import RegimeDetector
-from src.utils.security import sign_file
 
 
 @pytest.fixture

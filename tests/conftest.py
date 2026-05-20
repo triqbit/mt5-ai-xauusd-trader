@@ -1,7 +1,13 @@
+import os
 import sys
 from unittest.mock import MagicMock
 
 import numpy as np
+
+# Mock environment variables for config
+os.environ["MT5_PASSWORD"] = "test_password"
+os.environ["MT5_SERVER"] = "test_server"
+os.environ["MODEL_SIGNING_KEY"] = "test_signing_key"
 
 # Mock talib before any imports
 mock_talib = MagicMock()
@@ -120,12 +126,6 @@ sys.modules["talib"] = mock_talib
 # Mock MetaTrader5 (Windows only)
 mock_mt5 = MagicMock()
 sys.modules["MetaTrader5"] = mock_mt5
-
-# Mock environment variables for config
-import os
-os.environ["MT5_PASSWORD"] = "test_password"
-os.environ["MT5_SERVER"] = "test_server"
-os.environ["MODEL_SIGNING_KEY"] = "test_signing_key"
 
 # Add specific MT5 constants that might be used
 mock_mt5.TIMEFRAME_M5 = 5

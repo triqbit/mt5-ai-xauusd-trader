@@ -2,3 +2,6 @@
 python-socketio
 # Dependency of metaapi-cloud-sdk
 python-engineio
+
+# CVE-2025-61765: Acknowledged as upstream constraint
+GHSA-g8c6-8fjj-2r4m
