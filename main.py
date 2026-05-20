@@ -609,7 +609,7 @@ def run_live(
                                 audit_logger.log_blocked_trade(
                                     symbol=cfg.symbol,
                                     reason=f"Order execution failure: {e!s}",
-                                    context={"direction": direction, "lot_size": lot_size},
+                                    context={"direction": direction, "lot_size": signal.lot_size},
                                 )
                             ticket = None
 
@@ -631,7 +631,7 @@ def run_live(
                                     symbol=cfg.symbol,
                                     direction=direction,
                                     entry_price=price,
-                                    lot_size=lot_size,
+                                    lot_size=signal.lot_size,
                                     signal_id=signal_id,
                                 )
                 # 6. Check for closed positions to update logger

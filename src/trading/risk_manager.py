@@ -341,10 +341,14 @@ class RiskManager:
         if self.daily.peak_equity <= 0 or self.daily.realised_pnl >= 0:
             return 0
         loss_pct = abs(self.daily.realised_pnl) / self.daily.peak_equity
-        if loss_pct >= self.cfg.max_daily_loss: return 4
-        if loss_pct >= getattr(self.cfg, "daily_loss_lvl3", 0.04): return 3
-        if loss_pct >= getattr(self.cfg, "daily_loss_lvl2", 0.03): return 2
-        if loss_pct >= getattr(self.cfg, "daily_loss_lvl1", 0.02): return 1
+        if loss_pct >= self.cfg.max_daily_loss:
+            return 4
+        if loss_pct >= getattr(self.cfg, "daily_loss_lvl3", 0.04):
+            return 3
+        if loss_pct >= getattr(self.cfg, "daily_loss_lvl2", 0.03):
+            return 2
+        if loss_pct >= getattr(self.cfg, "daily_loss_lvl1", 0.02):
+            return 1
         return 0
 
     def get_size_multiplier_from_loss(self) -> float:
