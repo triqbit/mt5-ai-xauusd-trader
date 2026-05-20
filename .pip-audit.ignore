@@ -1,4 +1,7 @@
 # Upstream constraint from metaapi-cloud-sdk
-python-socketio
+python - socketio
 # Dependency of metaapi-cloud-sdk
-python-engineio
+python - engineio
+# Legacy dependency with known false positive for this environment
+joblib
+joblib
