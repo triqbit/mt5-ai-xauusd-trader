@@ -8,7 +8,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟢 95% | RC v1.1.0-rc5 verified and stable. |
 | **Lint Debt** | 🟡 4,400+ Issues | Primarily un-sorted imports and unused variables in tests. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (19 consecutive days). |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (22 consecutive days). |
 | **Evidence Maturity** | 🟡 Emerging | 1 verified audit; 5 upcoming enterprise scorecards. |
 
 ---
@@ -30,7 +30,7 @@ This dashboard provides real-time visibility into the technical health, process 
 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
-- **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes in trading and risk modules. Nineteenth consecutive day of history destruction recorded on 2026-05-17, with PR #1286 executing the latest system-wide swap.
+- **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes in trading and risk modules. Twenty-second consecutive day of history destruction recorded on 2026-05-20, with PR #1373 executing the latest system-wide swap.
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
