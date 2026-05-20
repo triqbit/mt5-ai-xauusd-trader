@@ -25,6 +25,7 @@ except ImportError as e:
 
 logger = structlog.get_logger(__name__)
 
+
 def main():
     print("--- ⚡ MT5 Connectivity Acceptance Contract ---")
 
@@ -69,6 +70,7 @@ def main():
     except Exception as e:
         print(f"❌ Unexpected Error: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

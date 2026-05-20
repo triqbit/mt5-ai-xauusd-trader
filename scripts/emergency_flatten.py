@@ -24,6 +24,7 @@ except ImportError as e:
 
 logger = structlog.get_logger(__name__)
 
+
 def main():
     print("!!! 🛑 EMERGENCY FLATTEN INITIATED 🛑 !!!")
 
@@ -66,6 +67,7 @@ def main():
     except Exception as e:
         print(f"❌ Error during emergency flatten: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
