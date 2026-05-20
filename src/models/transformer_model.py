@@ -85,6 +85,7 @@ class TimeSeriesTransformer(BaseModel):
         Args:
             features: Current observation (ignored if seq provided).
             **kwargs: Must contain 'seq' (np.ndarray) of shape (seq_len, input_dim).
+                Also accepts regime_info and other context.
 
         Returns:
             Signal: Consolidated signal.
