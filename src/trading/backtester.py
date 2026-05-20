@@ -114,10 +114,10 @@ class BacktestEngine:
         """
         start_wall_time = time.perf_counter()
         logger.info(
-            "Starting walk-forward backtest | train=%d test=%d step=%d",
-            train_window,
-            test_window,
-            step_size,
+            "Starting walk-forward backtest",
+            train=train_window,
+            test=test_window,
+            step=step_size,
         )
 
         try:
