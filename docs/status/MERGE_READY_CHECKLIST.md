@@ -3,30 +3,30 @@
 > [!IMPORTANT]
 > **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules.
 
-Generated on: 2026-05-19 18:00:00 UTC
+Generated on: 2026-05-20 13:24:57 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
-## 1. PR #1351: Institutional Research Reporting Enhancements
-- **Short scope summary**: Enhances the research reporting framework by improving Pydantic model validation for performance metrics and adding more granular analytics to generated reports.
-- **Domains touched**: analytics, docs, research, tests
+## 1. PR #1371: 🧬 Jules02: Synthetic test scenarios — Risk reconciliation scenarios
+- **Short scope summary**: Medium Risk update implementing '🧬 Jules02: Synthetic test scenarios — Risk reconciliation scenarios'
+- **Domains touched**: core architecture, core trading, other, tests
 - **CI status**: pending
-- **Missing items**: documentation for new reporting fields
-- **Recommendation**: Ready for detailed review once CI passes; focus on the impact on existing report formats.
+- **Missing items**: docs
+- **Recommendation**: Needs CI success before merge
 
-## 2. PR #1349: 📘 Jules02: Documentation and schema governance — Decision funnel unification
-- **Short scope summary**: Unifies decision-making schemas across models and trading filters, establishing a consistent "decision funnel" for better traceability and observability.
-- **Domains touched**: AI models, core architecture, core trading, database, tests
-- **CI status**: pending
-- **Missing items**: full regression suite for schema changes
-- **Recommendation**: High-risk infrastructure change; requires domain expert review of `src/core/` and `src/trading/` to ensure schema compatibility.
-
-## 3. PR #1353: Daily PR Intake & Risk Triage Dashboard [2026-05-19]
-- **Short scope summary**: Updates the daily triage dashboard and aligns the "Big Bang" logic with the latest monolithic history graft (PR #1350).
-- **Domains touched**: docs, infra/scripts
+## 2. PR #1372: 🔧 Jules05: Resolve cross-agent conflict in Risk Management and Model interfaces
+- **Short scope summary**: High Risk update implementing '🔧 Jules05: Resolve cross-agent conflict in Risk Management and Model interfaces'
+- **Domains touched**: AI models, core trading, docs, tests
 - **CI status**: pending
 - **Missing items**: None identified
-- **Recommendation**: Operational update; candidate for review to maintain process visibility after the recent system-wide swap.
+- **Recommendation**: High-risk — needs domain expert review
+
+## 3. PR #1369: 🔐 Jules02: Security hardening — HMAC-SHA256 signature verification for model files
+- **Short scope summary**: High Risk update implementing '🔐 Jules02: Security hardening — HMAC-SHA256 signature verification for model files'
+- **Domains touched**: AI models, core architecture, infra/CI, other, tests
+- **CI status**: pending
+- **Missing items**: docs
+- **Recommendation**: High-risk — needs domain expert review
 
 ---
 *Prepared by Jules06 (qufuwan) for Jules05 and human review.*
