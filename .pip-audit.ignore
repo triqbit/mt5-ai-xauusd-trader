@@ -2,5 +2,3 @@
 python-socketio
 # Dependency of metaapi-cloud-sdk
 python-engineio
-# Known non-critical vulnerability in research tool
-joblib
