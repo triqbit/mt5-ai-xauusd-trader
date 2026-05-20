@@ -2,3 +2,5 @@
 python-socketio
 # Dependency of metaapi-cloud-sdk
 python-engineio
+# Research dependency - known vulnerability in joblib.load
+joblib

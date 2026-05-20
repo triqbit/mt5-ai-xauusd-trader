@@ -1,9 +1,8 @@
-
 import os
 import sys
 
 # Add src to path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.research.rare_event_simulator import RareEventConfig, RareEventSimulator, RareEventType
 from src.research.reporting import RareEventSection, RareEventSummary
@@ -20,7 +19,7 @@ def verify_integration():
     summary = result.to_report_summary()
     assert isinstance(summary, RareEventSummary)
     assert summary.event_type == "flash_crash"
-    assert hasattr(summary, 'peak_impact_pct')
+    assert hasattr(summary, "peak_impact_pct")
     print(f"✓ RareEventResult.to_report_summary() produced {type(summary)}")
 
     # 2. Test RareEventSection population
@@ -31,6 +30,7 @@ def verify_integration():
     print(f"✓ RareEventSection correctly populated with {len(section.scenarios)} scenario(s)")
 
     print("\nIntegration verification SUCCESSFUL.")
+
 
 if __name__ == "__main__":
     try:
