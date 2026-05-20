@@ -154,7 +154,9 @@ class RiskManager:
         adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
 
         if adjusted_lots < self.cfg.min_lot_size:
-            return self._reject(f"Calculated lot size {adjusted_lots} below minimum", signal, signal_id)
+            return self._reject(
+                f"Calculated lot size {adjusted_lots} below minimum", signal, signal_id
+            )
 
         return RiskDecision(True, "Approved", adjusted_lots)
 

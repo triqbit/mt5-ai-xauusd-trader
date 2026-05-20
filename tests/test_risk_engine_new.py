@@ -39,19 +39,27 @@ def config():
         model_calibration_threshold=0.2,
     )
 
+
 @pytest.fixture
 def risk_manager(config):
     return RiskManager(config, 10000.0)
 
+
 def test_circuit_breaker(risk_manager):
     # Layer 1: Drawdown
     risk_manager.peak_equity = 10000.0
-    risk_manager.balance = 8000.0 # 20% drawdown > 15% limit
+    risk_manager.balance = 8000.0  # 20% drawdown > 15% limit
 
     # Simple signal
     sig = TradeSignal(
-        symbol="XAUUSD", direction=SignalDirection.BUY, entry_price=2300,
-        stop_loss=2290, take_profit=2320, lot_size=0.1, algorithm="test", confidence=0.8
+        symbol="XAUUSD",
+        direction=SignalDirection.BUY,
+        entry_price=2300,
+        stop_loss=2290,
+        take_profit=2320,
+        lot_size=0.1,
+        algorithm="test",
+        confidence=0.8,
     )
     # market_data
     df = pd.DataFrame({"atr": [1.0], "close": [2300.0]})
@@ -60,39 +68,60 @@ def test_circuit_breaker(risk_manager):
     assert not res.is_approved
     assert "Circuit breaker" in res.reason
 
+
 def test_daily_loss_limit(risk_manager):
-    risk_manager.daily.realised_pnl = -600.0 # 6% loss > 5% limit
+    risk_manager.daily.realised_pnl = -600.0  # 6% loss > 5% limit
     sig = TradeSignal(
-        symbol="XAUUSD", direction=SignalDirection.BUY, entry_price=2300,
-        stop_loss=2290, take_profit=2320, lot_size=0.1, algorithm="test", confidence=0.8
+        symbol="XAUUSD",
+        direction=SignalDirection.BUY,
+        entry_price=2300,
+        stop_loss=2290,
+        take_profit=2320,
+        lot_size=0.1,
+        algorithm="test",
+        confidence=0.8,
     )
     df = pd.DataFrame({"atr": [1.0], "close": [2300.0]})
     res = risk_manager.validate_signal(sig, df, [])
     assert not res.is_approved
     assert "Daily loss limit" in res.reason
 
+
 def test_directional_exposure(risk_manager):
     sig = TradeSignal(
-        symbol="XAUUSD", direction=SignalDirection.BUY, entry_price=2300,
-        stop_loss=2290, take_profit=2320, lot_size=0.1, algorithm="test", confidence=0.8
+        symbol="XAUUSD",
+        direction=SignalDirection.BUY,
+        entry_price=2300,
+        stop_loss=2290,
+        take_profit=2320,
+        lot_size=0.1,
+        algorithm="test",
+        confidence=0.8,
     )
     # Balance 10000, 30% limit = 3000
     # Gold 2300. 1 lot = 230000. 0.1 lot = 23000.
     # We need to hit > 3000. 0.02 lots is ~4600.
-    open_positions = [{"symbol": "XAUUSD", "volume": 0.02, "type": 0}] # type 0 = BUY
+    open_positions = [{"symbol": "XAUUSD", "volume": 0.02, "type": 0}]  # type 0 = BUY
     df = pd.DataFrame({"atr": [1.0], "close": [2300.0]})
 
     res = risk_manager.validate_signal(sig, df, open_positions)
     assert not res.is_approved
     assert "directional exposure" in res.reason.lower()
 
+
 def test_model_health_gate(risk_manager):
     sig = TradeSignal(
-        symbol="XAUUSD", direction=SignalDirection.BUY, entry_price=2300,
-        stop_loss=2290, take_profit=2320, lot_size=0.1, algorithm="test", confidence=0.8
+        symbol="XAUUSD",
+        direction=SignalDirection.BUY,
+        entry_price=2300,
+        stop_loss=2290,
+        take_profit=2320,
+        lot_size=0.1,
+        algorithm="test",
+        confidence=0.8,
     )
     df = pd.DataFrame({"atr": [1.0], "close": [2300.0]})
-    health = {"drift": 0.5} # > 0.3 threshold
+    health = {"drift": 0.5}  # > 0.3 threshold
 
     res = risk_manager.validate_signal(sig, df, [], model_health=health)
     assert not res.is_approved

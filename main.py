@@ -449,7 +449,9 @@ def run_live(
                         if risk_approved:
                             # Use the refined lot size from the institutional risk engine
                             # Re-create signal with the approved lot size
-                            signal = signal.model_copy(update={"lot_size": decision.adjusted_lot_size})
+                            signal = signal.model_copy(
+                                update={"lot_size": decision.adjusted_lot_size}
+                            )
 
                     if monitor and direction != 0:
                         monitor.record_signal_funnel(

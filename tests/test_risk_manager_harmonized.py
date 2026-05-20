@@ -37,20 +37,23 @@ def config():
         volatility_very_high_threshold=2.0,
         volatility_extreme_threshold=3.0,
         max_position_size_pct=0.1,
-        model_accuracy_floor=0.5
+        model_accuracy_floor=0.5,
     )
+
 
 @pytest.fixture
 def risk_manager(config):
     return RiskManager(config, account_balance=10000.0)
+
 
 @pytest.fixture
 def market_data():
     gen = ScenarioGenerator()
     df = gen.generate(n_steps=100, regime="ranging")
     df["atr"] = (df["high"] - df["low"]).rolling(14).mean()
-    df["close"] = df["close"].ffill() # Ensure no NaNs at the end
+    df["close"] = df["close"].ffill()  # Ensure no NaNs at the end
     return df
+
 
 @pytest.fixture
 def buy_signal(market_data):
@@ -64,8 +67,9 @@ def buy_signal(market_data):
         lot_size=0.1,
         algorithm="ensemble",
         confidence=0.8,
-        timestamp=datetime.datetime.now(datetime.timezone.utc)
+        timestamp=datetime.datetime.now(datetime.timezone.utc),
     )
+
 
 def test_drawdown_breaker(risk_manager, buy_signal, market_data):
     # Set peak equity high and current balance low to trigger drawdown
@@ -76,6 +80,7 @@ def test_drawdown_breaker(risk_manager, buy_signal, market_data):
     assert not decision.is_approved
     assert "circuit breaker" in decision.reason.lower()
 
+
 def test_daily_loss_limit(risk_manager, buy_signal, market_data):
     risk_manager.daily.peak_equity = 10000.0
     risk_manager.daily.realised_pnl = -600.0  # 6% loss
@@ -83,6 +88,7 @@ def test_daily_loss_limit(risk_manager, buy_signal, market_data):
     decision = risk_manager.validate_signal(buy_signal, market_data, [])
     assert not decision.is_approved
     assert "daily loss" in decision.reason.lower()
+
 
 def test_max_positions(risk_manager, buy_signal, market_data):
     open_positions = [
@@ -94,6 +100,7 @@ def test_max_positions(risk_manager, buy_signal, market_data):
     decision = risk_manager.validate_signal(buy_signal, market_data, open_positions)
     assert not decision.is_approved
     assert "max concurrent positions" in decision.reason.lower()
+
 
 def test_directional_exposure(risk_manager, buy_signal, market_data):
     # Max single direction is 30% of 10000 = 3000
@@ -107,6 +114,7 @@ def test_directional_exposure(risk_manager, buy_signal, market_data):
     assert not decision.is_approved
     assert "directional exposure" in decision.reason.lower()
 
+
 def test_atr_position_sizing(risk_manager, market_data):
     # Normal volatility
     market_data["atr"] = 1.0
@@ -118,6 +126,7 @@ def test_atr_position_sizing(risk_manager, market_data):
     # avg_atr remains approx 1.0. ratio = 4.0 > 3.0 (extreme threshold)
     size = risk_manager.calculate_position_size("XAUUSD", market_data)
     assert size == 0.0
+
 
 def test_full_approval(risk_manager, buy_signal, market_data):
     decision = risk_manager.validate_signal(buy_signal, market_data, [])
