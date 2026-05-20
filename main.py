@@ -214,9 +214,18 @@ def run_live(
     loop_count = 0
     last_price = None
     while True:
+        iteration_start = time.perf_counter()
         # 0. Generate unique trace ID for this iteration
         structlog.contextvars.clear_contextvars()
         structlog.contextvars.bind_contextvars(trace_id=str(uuid.uuid4()))
+
+        # Initialize iteration summary state
+        iteration_status = "processing"
+        final_direction = 0
+        final_confidence = 0.0
+        confluence_score = 0.0
+        market_regime = "unknown"
+        market_stability = 0.0
 
         # 0. Periodic Audit of Configuration State
         if loop_count % 100 == 0 and audit_logger:
@@ -310,13 +319,33 @@ def run_live(
                             monitor.alert_liquidity_crisis(cfg.symbol, spread_pips)
 
                     except MT5DataError as e:
+                        iteration_status = "failed_data"
                         log.error("Transient data retrieval error", error=str(e))
+                        if monitor:
+                            monitor.record_iteration_heartbeat()
+                            monitor.record_iteration_duration(time.perf_counter() - iteration_start)
+                        log.info(
+                            "iteration_summary",
+                            status=iteration_status,
+                            error=str(e),
+                            duration_ms=round((time.perf_counter() - iteration_start) * 1000, 2),
+                        )
                         time.sleep(poll_interval)
                         continue
                     except MT5ConnectionError:
+                        iteration_status = "failed_connection"
                         log.warning("Connection lost. Attempting reconnection...")
                         if monitor:
                             monitor.alert_broker_connection_lost()
+                            monitor.record_iteration_heartbeat()
+                            monitor.record_iteration_duration(time.perf_counter() - iteration_start)
+
+                        log.info(
+                            "iteration_summary",
+                            status=iteration_status,
+                            duration_ms=round((time.perf_counter() - iteration_start) * 1000, 2),
+                        )
+
                         try:
                             connector.connect()
                             log.info("Reconnection successful.")
@@ -344,6 +373,8 @@ def run_live(
                     df_features = feature_engineer.compute_features(df_raw)
                     obs = df_features.values[-1]  # Full 140+ features
                     regime_info = regime_detector.detect(df_raw)
+                    market_regime = regime_info.label.value
+                    market_stability = regime_info.confidence
 
                     # Optimization: Extract volatility from already-computed features if available
                     # RegimeDetector already calculates z-score (using rolling std), we can reuse it
@@ -364,6 +395,14 @@ def run_live(
 
                     direction = signal_obj.direction
                     confidence = signal_obj.confidence
+                    final_direction = direction
+                    final_confidence = confidence
+
+                    if hasattr(signal_obj, "metadata") and signal_obj.metadata:
+                        market_stability = signal_obj.metadata.get(
+                            "market_context_stability", market_stability
+                        )
+
                     if monitor:
                         monitor.check_confidence_degradation(confidence)
                         # Log model performance if available
@@ -540,9 +579,10 @@ def run_live(
                             regime_info=regime_data,
                             execution_data=execution_data,
                         )
+                        confluence_score = explanation.get_confluence_score()
 
                         if monitor:
-                            monitor.record_confluence(explanation.get_confluence_score())
+                            monitor.record_confluence(confluence_score)
 
                         # Log comprehensive decision trace for every non-hold signal
                         if audit_logger:
@@ -664,6 +704,26 @@ def run_live(
                     for sym in closed_tickets:
                         risk.open_positions.pop(sym)
 
+                iteration_status = "success"
+
+                # Emit structured iteration summary and record metrics
+                iteration_duration = time.perf_counter() - iteration_start
+                if monitor:
+                    monitor.record_iteration_heartbeat()
+                    monitor.record_iteration_duration(iteration_duration)
+                    monitor.record_market_stability(market_stability)
+
+                log.info(
+                    "iteration_summary",
+                    status=iteration_status,
+                    direction=final_direction,
+                    confidence=final_confidence,
+                    confluence=confluence_score,
+                    regime=market_regime,
+                    stability=market_stability,
+                    duration_ms=round(iteration_duration * 1000, 2),
+                )
+
                 # Wait for next interval with operator feedback
                 if console:
                     with console.status(
@@ -684,9 +744,19 @@ def run_live(
                     )
                 break
             except MT5ConnectionError as exc:
+                iteration_status = "error_connection"
                 log.error("Critical connection failure: %s. Re-initializing...", exc)
                 if monitor:
                     monitor.alert_broker_connection_lost()
+                    monitor.record_iteration_heartbeat()
+                    monitor.record_iteration_duration(time.perf_counter() - iteration_start)
+
+                log.info(
+                    "iteration_summary",
+                    status=iteration_status,
+                    error=str(exc),
+                    duration_ms=round((time.perf_counter() - iteration_start) * 1000, 2),
+                )
                 time.sleep(5)
                 try:
                     connector.connect()
@@ -695,7 +765,18 @@ def run_live(
                 except MT5ConnectionError:
                     log.error("Re-initialization failed during outer loop recovery.")
             except Exception as exc:
+                iteration_status = "error_unhandled"
                 log.exception("Unhandled error in trading loop: %s", exc)
+                if monitor:
+                    monitor.record_iteration_heartbeat()
+                    monitor.record_iteration_duration(time.perf_counter() - iteration_start)
+
+                log.info(
+                    "iteration_summary",
+                    status=iteration_status,
+                    error=str(exc),
+                    duration_ms=round((time.perf_counter() - iteration_start) * 1000, 2),
+                )
                 time.sleep(poll_interval)
 
 
