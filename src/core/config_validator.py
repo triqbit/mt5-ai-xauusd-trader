@@ -274,6 +274,18 @@ class ConfigValidator:
                 )
             )
 
+        # Check Model Signing Key
+        model_signing_key = self.config.model_signing_key.get_secret_value()
+        if not model_signing_key or any(p in model_signing_key.upper() for p in placeholders):
+            self.errors.append(
+                ValidationError(
+                    "MODEL_SIGNING_KEY",
+                    "Model signing key is missing or using placeholder.",
+                    True,
+                    "Set MODEL_SIGNING_KEY in your .env to a secure random string.",
+                )
+            )
+
     def _check_model_settings(self) -> None:
         """Verify model settings and path existence."""
         if self.config.mode != "backtest" and (

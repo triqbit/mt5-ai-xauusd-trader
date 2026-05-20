@@ -1,7 +1,13 @@
+import os
 import sys
 from unittest.mock import MagicMock
 
 import numpy as np
+
+# Mock environment variables for config
+os.environ["MT5_PASSWORD"] = "test_password"
+os.environ["MT5_SERVER"] = "test_server"
+os.environ["MODEL_SIGNING_KEY"] = "test_signing_key"
 
 # Mock talib before any imports
 mock_talib = MagicMock()

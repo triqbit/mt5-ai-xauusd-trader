@@ -40,6 +40,8 @@ from scipy import stats
 from sklearn.mixture import GaussianMixture
 from sklearn.preprocessing import StandardScaler
 
+from src.core.config import get_config
+
 logger = structlog.get_logger(__name__)
 
 
@@ -964,11 +966,13 @@ class RegimeDetector:
     def save_model(self, filepath: str) -> None:
         """
         Persists the GMM model and cluster mappings to disk.
+        Also generates a cryptographic signature to ensure integrity.
         """
         if self._gmm is None:
             logger.warning("No GMM model to save.")
             return
 
+        path = Path(filepath).resolve()
         state = {
             "gmm": self._gmm,
             "scaler": self._scaler,
@@ -977,27 +981,39 @@ class RegimeDetector:
             "window": self.window,
             "long_window": self.long_window,
         }
-        joblib.dump(state, filepath)
-        logger.info("model_saved", path=filepath)
+        joblib.dump(state, path)
+
+        # Generate signature
+        try:
+            from src.utils.security import sign_file
+
+            cfg = get_config()
+            key = cfg.model_signing_key.get_secret_value()
+            signature = sign_file(path, key)
+            sig_path = path.with_suffix(path.suffix + ".sig")
+            with open(sig_path, "w") as f:
+                f.write(signature)
+            logger.info("model_saved_with_signature", path=str(path), sig_path=str(sig_path))
+        except Exception as e:
+            logger.error("failed_to_sign_model", error=str(e), path=str(path))
 
     def load_model(self, filepath: str) -> None:
         """
         Loads a persisted GMM model and state from disk.
-        Institutional security: Validates path and permissions before deserialization.
+        Institutional security: Validates path, permissions, and HMAC signature before deserialization.
         """
         path = Path(filepath).resolve()
         if not path.exists():
             logger.error("Model file not found: %s", filepath)
             return
 
-        # Security: Path validation - restrict to project's models directory or /tmp
+        # 1. Path Validation - restrict to project's models directory or /tmp
         try:
             from src.core.config import ROOT
 
             models_dir = (ROOT / "models").resolve()
 
             # Robust path validation using is_relative_to (Python 3.9+)
-            # This prevents bypasses like /app/models_attacker/
             is_in_models = False
             with contextlib.suppress(ValueError):
                 is_in_models = path.is_relative_to(models_dir)
@@ -1011,19 +1027,46 @@ class RegimeDetector:
                     "Security violation: Attempted to load model from untrusted path: %s", path
                 )
                 return
-        except ImportError as e:
+        except Exception as e:
             # Fail-closed if security constraints cannot be verified
             logger.error("Security violation: Could not verify model path safety: %s", e)
             return
 
-        # Security: Permission check - ensure no world-writable/readable access (Linux/Mac)
-        # Aligned with ConfigValidator: check both group and others (0o077 mask)
+        # 2. Permission Check - ensure no world-writable/readable access (Linux/Mac)
         if os.name != "nt":
-            mode = os.stat(path).st_mode
-            if mode & (stat.S_IRWXG | stat.S_IRWXO):
-                logger.error("Security violation: Insecure permissions for model file: %s", path)
+            try:
+                mode = os.stat(path).st_mode
+                if mode & (stat.S_IRWXG | stat.S_IRWXO):
+                    logger.error("Security violation: Insecure permissions for model file: %s", path)
+                    return
+            except Exception as e:
+                logger.error("Security violation: Could not verify file permissions: %s", e)
                 return
 
+        # 3. HMAC Signature Verification
+        try:
+            from src.utils.security import verify_file_signature
+
+            cfg = get_config()
+            key = cfg.model_signing_key.get_secret_value()
+            sig_path = path.with_suffix(path.suffix + ".sig")
+
+            if not sig_path.exists():
+                logger.error("Security violation: Signature file missing for model: %s", path)
+                return
+
+            with open(sig_path, "r") as f:
+                signature = f.read().strip()
+
+            if not verify_file_signature(path, signature, key):
+                logger.error("Security violation: Invalid model signature for: %s", path)
+                return
+            logger.debug("model_signature_verified", path=str(path))
+        except Exception as e:
+            logger.error("Security violation: Signature verification failed: %s", e)
+            return
+
+        # 4. Deserialization
         try:
             state = joblib.load(path)
             self._gmm = state.get("gmm")
