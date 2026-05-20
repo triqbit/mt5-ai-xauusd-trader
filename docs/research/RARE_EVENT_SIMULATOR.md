@@ -8,7 +8,7 @@ The primary goal of the simulator is to enable serious rare-event strategy resea
 
 ## Key Features
 
-- **Plausible Scenarios**: Generates flash crashes, liquidity vacuums, gold gaps, and more using scientifically grounded models (Merton Jump-Diffusion, GARCH).
+- **Plausible Scenarios**: Generates flash crashes, liquidity vacuums, gold gaps, and more using scientifically grounded models (Merton Jump-Diffusion, GARCH). Implements stochastic return injections for increased realism in price path generation.
 - **Scenario Chaining**: Supports linking multiple rare events into a single, continuous OHLCV price path with guaranteed price and date continuity.
 - **Pipeline Compatible**: Produces DataFrames with standardized lowercase columns (`open`, `high`, `low`, `close`, `tick_volume`, `real_volume`, `spread`). Uses strict `float32` for prices and `int64` for volumes to match `FeatureEngineer` expectations.
 - **Numerical Stability**: Implements explicit casting for all DataFrame modifications to avoid pandas `FutureWarning` issues and ensure numerical consistency during high-fidelity simulations.
@@ -22,7 +22,7 @@ The primary goal of the simulator is to enable serious rare-event strategy resea
 3.  **Gold Gap**: Discontinuous price jumps (bullish or bearish) with follow-through volatility.
 4.  **Violent Reversal**: A strong trend followed by an abrupt, high-magnitude reversal.
 5.  **Dislocation**: A sudden price shift leading into a completely different market regime (higher volatility, different drift).
-6.  **Volatility Cluster**: An abnormal cluster of high volatility with multiple decaying shocks, approximated using GARCH(1,1) logic.
+6.  **Volatility Cluster**: An abnormal cluster of high volatility with multiple decaying shocks, approximated using GARCH(1,1) logic. Randomized shock locations ensure variability across simulation runs.
 7.  **Multi-Session Dislocation**: A sequence of regime shifts across multiple sessions, testing a strategy's multi-day adaptability.
 8.  **News Shock**: A violent directional move followed by sustained high volatility and erratic behavior. Calibrated to trigger the `NEWS_SHOCK` regime in the `RegimeDetector` (ER > 0.7, ATR Ratio > 2.0).
 9.  **Short Squeeze**: Rapid parabolic move up driven by buy-side liquidation, followed by a blow-off top. Tests resistance-breakout and stop-loss hunting logic.
