@@ -3,7 +3,6 @@ Tests for Risk Reconciliation logic and scenarios.
 """
 
 import os
-from datetime import datetime, timezone
 
 import pytest
 
@@ -59,21 +58,8 @@ def test_reconciliation_near_daily_loss(config, trade_logger, risk_builder):
     assert risk_manager.daily.peak_equity == 10450.0
 
     # 4. Verify limits are enforced
-    from src.core.schemas import TradeSignal
-    from src.core.constants import SignalDirection
-
     # Small trade that would push loss past $500 (5% of $10,450 is $522.5)
     # $450 + $100 loss = $550 > $522.5
-    signal = TradeSignal(
-        symbol="XAUUSD",
-        direction=SignalDirection.BUY,
-        entry_price=2300.0,
-        stop_loss=2200.0, # Large SL
-        take_profit=2500.0,
-        lot_size=0.1,
-        algorithm="test",
-        confidence=0.9
-    )
 
     # Mock realised PnL calculation for the next trade to see if it would breach
     # RiskManager._check_daily_loss uses realised_pnl / peak_equity

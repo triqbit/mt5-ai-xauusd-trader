@@ -20,7 +20,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
