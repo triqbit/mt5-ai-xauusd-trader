@@ -20,17 +20,15 @@ jobs:
     if: github.event.pull_request.draft == false
     outputs:
       risk_status: ${{ steps.risk-check.outputs.risk_status }}
-      violated_category: ${{ steps.risk-check.outputs.violated_category }}
+      violated_categories: ${{ steps.risk-check.outputs.violated_categories }}
       has_tests: ${{ steps.compliance-check.outputs.has_tests }}
       has_docs: ${{ steps.compliance-check.outputs.has_docs }}
       source_modified: ${{ steps.compliance-check.outputs.source_modified }}
-      coverage_pass: ${{ steps.coverage-check.outputs.coverage_pass }}
       observability_pass: ${{ steps.observability-check.outputs.observability_pass }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get changed files
         id: changed-files
@@ -39,67 +37,53 @@ jobs:
       - name: Check for High-Risk Files
         id: risk-check
         run: |
-          # Patterns that strictly block and escalate as per Jules05 mandate
-          # Category: Live Trading Execution Logic
-          EXECUTION_PATTERNS=(
-            "src/trading/executor.py"
-            "src/trading/mt5_connector.py"
-          )
-          # Category: Risk Parameters & Position Sizing
-          RISK_PATTERNS=(
-            "src/core/risk_engine.py"
-            "src/trading/risk_engine.py"
-            "src/trading/risk_manager.py"
-            "src/trading/audited_risk_manager.py"
-            "src/trading/capital_allocator.py"
-            "src/trading/execution_filter.py"
-          )
-          # Category: Credentials, Secrets, & Auth Surface
-          AUTH_PATTERNS=(
-            "config/secrets.*"
-            "\.env.*"
-            "src/core/config.py"
-          )
-          # Category: Docker & Infrastructure Control
-          INFRA_PATTERNS=(
-            "Dockerfile"
-            "docker-compose.yml"
-          )
-          # Category: CI/CD Workflows affecting deployment
-          CICD_PATTERNS=(
-            "\.github/workflows/deploy.*"
-          )
-          # Category: Destructive Database Migrations
-          DB_PATTERNS=(
-            "migrations/.*"
-          )
-
-          ALL_PATTERNS=("${EXECUTION_PATTERNS[@]}" "${RISK_PATTERNS[@]}" "${AUTH_PATTERNS[@]}" "${INFRA_PATTERNS[@]}" "${CICD_PATTERNS[@]}" "${DB_PATTERNS[@]}")
+          # Define high-risk patterns and their categories
+          declare -A PATTERNS
+          PATTERNS["src/trading/executor.py"]="Live Trading Execution Logic"
+          PATTERNS["src/trading/mt5_connector.py"]="Live Trading Execution Logic"
+          PATTERNS["src/core/risk_engine.py"]="Risk Parameters / Position Sizing"
+          PATTERNS["src/trading/risk_engine.py"]="Risk Parameters / Position Sizing"
+          PATTERNS["src/trading/risk_manager.py"]="Risk Parameters / Position Sizing"
+          PATTERNS["src/trading/audited_risk_manager.py"]="Risk Parameters / Position Sizing"
+          PATTERNS["src/trading/capital_allocator.py"]="Risk Parameters / Position Sizing"
+          PATTERNS["src/trading/execution_filter.py"]="Risk Parameters / Position Sizing"
+          PATTERNS["config/secrets.*"]="Credentials / Auth Surface"
+          PATTERNS[".env.*"]="Credentials / Auth Surface"
+          PATTERNS["src/core/config.py"]="Credentials / Auth Surface"
+          PATTERNS["Dockerfile"]="Docker / Infrastructure Control"
+          PATTERNS["docker-compose.yml"]="Docker / Infrastructure Control"
+          PATTERNS[".github/workflows/deploy.*"]="CI/CD Deployment Workflows"
+          PATTERNS["migrations/.*"]="Database Migrations"
 
           TOUCHED_HIGH_RISK=false
-          VIOLATED_CATEGORY=""
+          VIOLATED_CATEGORIES=()
 
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            for pattern in "${ALL_PATTERNS[@]}"; do
+            for pattern in "${!PATTERNS[@]}"; do
               if [[ "$file" =~ $pattern ]]; then
-                echo "🚨 HIGH-RISK FILE DETECTED: $file"
+                echo "🚨 HIGH-RISK FILE DETECTED: $file (Category: ${PATTERNS[$pattern]})"
                 TOUCHED_HIGH_RISK=true
-
-                # Determine category for better reporting
-                for p in "${EXECUTION_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Live Trading Execution Logic"; fi; done
-                for p in "${RISK_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Risk Parameters / Position Sizing"; fi; done
-                for p in "${AUTH_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Credentials / Auth Surface"; fi; done
-                for p in "${INFRA_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Docker / Infrastructure Control"; fi; done
-                for p in "${CICD_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="CI/CD Deployment Workflows"; fi; done
-                for p in "${DB_PATTERNS[@]}"; do if [[ "$file" =~ $p ]]; then VIOLATED_CATEGORY="Database Migrations"; fi; done
+                # Add category to list if not already present
+                PRESENT=false
+                for cat in "${VIOLATED_CATEGORIES[@]}"; do
+                  if [[ "$cat" == "${PATTERNS[$pattern]}" ]]; then
+                    PRESENT=true
+                    break
+                  fi
+                done
+                if [ "$PRESENT" = "false" ]; then
+                  VIOLATED_CATEGORIES+=("${PATTERNS[$pattern]}")
+                fi
               fi
             done
           done
 
           if [ "$TOUCHED_HIGH_RISK" = "true" ]; then
+            # Join categories with comma
+            JOINED_CATS=$(IFS=','; echo "${VIOLATED_CATEGORIES[*]}")
+            echo "violated_categories=$JOINED_CATS" >> $GITHUB_OUTPUT
             echo "risk_status=blocked" >> $GITHUB_OUTPUT
-            echo "violated_category=$VIOLATED_CATEGORY" >> $GITHUB_OUTPUT
-            echo "::error::High-risk files touched ($VIOLATED_CATEGORY). Auto-merge is strictly PROHIBITED and must be ESCALATED."
+            echo "::error::High-risk files touched. Auto-merge is strictly PROHIBITED and must be ESCALATED."
           else
             echo "risk_status=pass" >> $GITHUB_OUTPUT
             echo "✅ No high-risk files detected."
@@ -124,7 +108,6 @@ jobs:
       - name: Check Observability Standards
         id: observability-check
         run: |
-          # Scan changed files in src/ for plain print statements (non-structlog/non-rich)
           BAD_LOGGING=false
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
             if [[ "$file" =~ ^src/ ]]; then
@@ -141,13 +124,7 @@ jobs:
             echo "observability_pass=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Check Coverage
-        id: coverage-check
-        run: |
-          # Coverage enforcement is handled in ci.yml via --cov-fail-under=80
-          echo "coverage_pass=true" >> $GITHUB_OUTPUT
-
-      - name: Handle Violations
+      - name: Handle Violations & Escalation
         if: |
           steps.risk-check.outputs.risk_status == 'blocked' ||
           (steps.compliance-check.outputs.source_modified == 'true' &&
@@ -157,26 +134,49 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          REASON="The following auto-merge criteria were not met:"
+          REASON=$(cat <<EOF
+          ### 🚨 Auto-Merge Policy Violation
+
+          Auto-merge has been **BLOCKED** and this PR has been **ESCALATED** because the following criteria were not met:
+
+          EOF
+          )
+
           if [ "${{ steps.risk-check.outputs.risk_status }}" = "blocked" ]; then
-            CATEGORY="${{ steps.risk-check.outputs.violated_category }}"
-            REASON="$REASON\n- 🚨 **High-risk files modified in category: $CATEGORY.** (Must be ESCALATED and manually reviewed)"
-            gh pr edit $PR_NUMBER --add-label "escalated-risk" || echo "Failed to add label"
+            CATEGORIES="${{ steps.risk-check.outputs.violated_categories }}"
+            REASON="$REASON
+          - 🚨 **High-risk files modified in categories: $CATEGORIES.**"
+            gh pr edit $PR_NUMBER --add-label "escalated-risk" || true
           fi
+
           if [ "${{ steps.observability-check.outputs.observability_pass }}" = "false" ]; then
-            REASON="$REASON\n- ❌ **Observability standards not met (plain 'print' statements found).** Use \`structlog\` or Rich \`console.print\`."
+            REASON="$REASON
+          - ❌ **Observability standards not met.** Plain 'print' statements found in \`src/\`. Use \`structlog\` or Rich \`console.print\`."
           fi
+
           if [ "${{ steps.compliance-check.outputs.source_modified }}" = "true" ]; then
             if [ "${{ steps.compliance-check.outputs.has_tests }}" = "false" ]; then
-              REASON="$REASON\n- ❌ **Source code modified but no tests added/updated.**"
+              REASON="$REASON
+          - ❌ **Missing Tests.** Source code modified but no tests added/updated in \`tests/\`."
             fi
             if [ "${{ steps.compliance-check.outputs.has_docs }}" = "false" ]; then
-              REASON="$REASON\n- ❌ **Source code modified but no documentation updated.**"
+              REASON="$REASON
+          - ❌ **Missing Documentation.** Source code modified but no documentation updated in \`docs/\` or \`.md\` files."
             fi
           fi
 
-          gh pr comment $PR_NUMBER --body "### Auto-Merge Blocked\n$REASON\n\nManual review by code owners is required. Changes to trading logic, risk parameters, secrets, or infrastructure are automatically escalated."
+          REASON="$REASON
+
+          ---
+          **Escalation Procedure:**
+          1. A Lead Engineer must perform a deep-dive review.
+          2. Manual verification in a staging environment is mandatory if trading/risk logic was touched.
+          3. Two senior approvals are required to merge this PR."
+
+          gh pr comment $PR_NUMBER --body "$REASON"
           gh pr merge $PR_NUMBER --disable-auto || true
+
+          echo "::error::Auto-merge policy violations detected. PR escalated."
           exit 1
 
   enable-auto-merge:
