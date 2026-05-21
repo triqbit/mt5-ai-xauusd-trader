@@ -21,6 +21,7 @@ from src.models.regime_detector import MarketRegime, RegimeInfo
 from src.trading.capital_allocator import AllocationRequest, StrategyConfig
 
 if TYPE_CHECKING:
+    from src.core.trade_logger import TradeLogger
     from src.models.dynamic_ensemble import DynamicEnsemble
 
 
@@ -1497,6 +1498,57 @@ class ExecutionQualityScenarioBuilder:
                 "lot_size": 0.01,
             },
         ]
+
+
+class ReconciliationScenarioBuilder:
+    """
+    Populates TradeLogger with deterministic intraday states to test
+    risk reconciliation and recovery after restarts.
+    """
+
+    def __init__(self, seed: int = 42):
+        self.rng = np.random.default_rng(seed)
+
+    def populate_near_daily_loss(
+        self, logger: TradeLogger, balance: float = 10000.0, target_loss_pct: float = 0.045
+    ) -> None:
+        """
+        Populates closed losing trades to approach the daily loss limit.
+        Default target is 4.5% (system limit is 5%).
+        """
+        target_loss = balance * target_loss_pct
+        # Create 3 losing trades to reach the target loss
+        loss_per_trade = target_loss / 3
+
+        for i in range(3):
+            ticket = 5000 + i
+            logger.log_trade(
+                ticket=ticket,
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=2300.0,
+                lot_size=0.1,
+                status="OPEN",
+            )
+            # Update to CLOSED with specific loss
+            logger.update_trade(ticket=ticket, exit_price=2290.0, pnl=-loss_per_trade)
+
+    def populate_active_losing_streak(self, logger: TradeLogger, count: int = 2) -> None:
+        """
+        Populates a sequence of consecutive losing trades.
+        Default is 2 (system limit is 3).
+        """
+        for i in range(count):
+            ticket = 6000 + i
+            logger.log_trade(
+                ticket=ticket,
+                symbol="XAUUSD",
+                direction=1,
+                entry_price=2300.0,
+                lot_size=0.1,
+                status="OPEN",
+            )
+            logger.update_trade(ticket=ticket, exit_price=2295.0, pnl=-50.0)
 
 
 class EnsembleScenarioBuilder:
