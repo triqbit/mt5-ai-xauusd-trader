@@ -81,7 +81,7 @@ class EMACrossoverStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         fast_ema = df["close"].ewm(span=self.fast_window, adjust=False).mean()
         slow_ema = df["close"].ewm(span=self.slow_window, adjust=False).mean()
@@ -123,7 +123,7 @@ class MomentumStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         roc = df["close"].pct_change(periods=self.window)
         signals = np.zeros(len(df))
@@ -164,7 +164,7 @@ class VolatilityBreakoutStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         rolling_mean = df["close"].rolling(window=self.window).mean()
         rolling_std = df["close"].rolling(window=self.window).std()
@@ -197,7 +197,7 @@ class NaiveDirectionalStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         diff = df["close"].diff()
         signals = np.zeros(len(df))
@@ -226,7 +226,7 @@ class NaiveReversalStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         diff = df["close"].diff()
         signals = np.zeros(len(df))
@@ -294,7 +294,7 @@ class RiskFilteredBaseline:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         fast_ema = df["close"].ewm(span=self.fast_window, adjust=False).mean()
         slow_ema = df["close"].ewm(span=self.slow_window, adjust=False).mean()
@@ -343,7 +343,7 @@ class MomentumVolatilityStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         roc = df["close"].pct_change(periods=self.window)
         volatility = df["close"].rolling(window=self.window).std() / df["close"]
@@ -440,7 +440,7 @@ class MACDStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         exp1 = df["close"].ewm(span=self.fast_window, adjust=False).mean()
         exp2 = df["close"].ewm(span=self.slow_window, adjust=False).mean()
@@ -486,7 +486,7 @@ class MeanReversionStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         delta = df["close"].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=self.window).mean()
@@ -565,7 +565,7 @@ class DonchianChannelStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         upper_channel = df["high"].rolling(window=self.window).max()
         lower_channel = df["low"].rolling(window=self.window).min()
@@ -607,7 +607,7 @@ class ADXStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         try:
             import talib
@@ -684,7 +684,7 @@ class SuperTrendStrategy:
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         high = df["high"].values
         low = df["low"].values
@@ -757,7 +757,7 @@ class LondonBreakoutStrategy:
             df: OHLCV DataFrame with DatetimeIndex.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         if not isinstance(df.index, pd.DatetimeIndex):
             return np.zeros(len(df))
@@ -1230,7 +1230,7 @@ class EnsembleAdapter(AdapterBase):
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         import torch
 
@@ -1285,7 +1285,7 @@ class PPOAdapter(AdapterBase):
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         signals = np.zeros(len(df))
         feature_cols = self._get_feature_cols(df)
@@ -1341,7 +1341,7 @@ class TransformerAdapter(AdapterBase):
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         import torch
 
@@ -1414,7 +1414,7 @@ class LSTMAdapter(AdapterBase):
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         import torch
 
@@ -1480,7 +1480,7 @@ class DreamerAdapter(AdapterBase):
             df: OHLCV DataFrame.
 
         Returns:
-            np.ndarray: Signal array.
+            np.ndarray: ModelSignal array.
         """
         signals = np.zeros(len(df))
         feature_cols = self._get_feature_cols(df)

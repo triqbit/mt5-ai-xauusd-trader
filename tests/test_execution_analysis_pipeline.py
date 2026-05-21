@@ -3,7 +3,7 @@ MT5 AI/ML Trading Bot - Execution Analysis Pipeline Integration Test
 tests/test_execution_analysis_pipeline.py
 
 Verifies the high-value integration path:
-Signal Decision (Rejection/Approval) -> Risk Event / Trade Logging -> Execution Quality Analysis -> Reporting
+ModelSignal Decision (Rejection/Approval) -> Risk Event / Trade Logging -> Execution Quality Analysis -> Reporting
 """
 
 from datetime import datetime, timedelta, timezone
@@ -72,7 +72,7 @@ def mock_connector():
 
 def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
     """
-    E2E Path: Signal -> Logging -> Analysis -> Summary
+    E2E Path: ModelSignal -> Logging -> Analysis -> Summary
     Verifies that both rejected signals and executed trades are correctly analyzed.
     """
     # Initialize components
@@ -95,7 +95,7 @@ def test_e2e_execution_and_analysis_flow(test_db, mock_connector):
 
     risk_manager = AuditedRiskManager(cfg, account_balance=10000.0, logger_db=trade_logger)
 
-    # --- SCENARIO 1: Rejected Signal ---
+    # --- SCENARIO 1: Rejected ModelSignal ---
     signal_time = datetime.now(timezone.utc) - timedelta(hours=1)
     # Use model_construct to bypass R:R validation for rejection testing
     rejected_signal = TradeSignal.model_construct(

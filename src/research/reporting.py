@@ -655,7 +655,7 @@ class ResearchReporter:
             self.console.print(table)
 
             if report.trade_patterns.motifs:
-                self.console.print("[dim]Signal Motifs (Performance clusters):[/]")
+                self.console.print("[dim]ModelSignal Motifs (Performance clusters):[/]")
                 m_table = Table(box=None)
                 m_table.add_column("Algo")
                 m_table.add_column("Vol")
@@ -681,7 +681,7 @@ class ResearchReporter:
                 self.console.print(m_table)
 
             if report.trade_patterns.combinations:
-                self.console.print("[dim]Signal Combinations (Toxic vs Golden):[/]")
+                self.console.print("[dim]ModelSignal Combinations (Toxic vs Golden):[/]")
                 c_table = Table(box=None)
                 c_table.add_column("Pattern")
                 c_table.add_column("Type")

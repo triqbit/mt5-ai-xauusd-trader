@@ -12,7 +12,7 @@ import logging
 from typing import Optional
 
 from src.core.audit_log import get_audit_logger
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.trading.risk_manager import RiskManager
 
 logger = logging.getLogger(__name__)
@@ -29,10 +29,10 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns RiskDecision indicating approval status and reason.
         Logs the full decision chain to the audit log.
         """
         decision_chain = {
@@ -82,7 +82,7 @@ class AuditedRiskManager(RiskManager):
             rejection_reasons = [k for k, v in decision_chain.items() if not v]
             reason_str = ", ".join(rejection_reasons)
             logger.warning(
-                "Signal REJECTED | %s %s | Failed: %s",
+                "ModelSignal REJECTED | %s %s | Failed: %s",
                 signal.symbol,
                 signal.direction,
                 reason_str,
@@ -97,4 +97,6 @@ class AuditedRiskManager(RiskManager):
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+            return RiskDecision(is_approved=False, reason=f"Failed: {reason_str}")
+
+        return RiskDecision(is_approved=True, reason="Approved", adjusted_lot_size=signal.lot_size)

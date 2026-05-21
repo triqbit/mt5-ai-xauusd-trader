@@ -127,13 +127,13 @@ def test_cleanup_database_retention(test_env):
     now = datetime.now(timezone.utc)
 
     with TradeSession() as session:
-        # 1. Unlinked Signal (Old) -> Should be purged
+        # 1. Unlinked ModelSignal (Old) -> Should be purged
         old_unlinked = ModelSignal(symbol="XAUUSD", direction=1, entry_price=2000.0, created_at=now - timedelta(days=RETENTION_UNLINKED_SIGNALS + 1))
 
-        # 2. Linked Signal to Trade (Old) -> Should be preserved
+        # 2. Linked ModelSignal to Trade (Old) -> Should be preserved
         old_linked_signal = ModelSignal(symbol="XAUUSD", direction=1, entry_price=2000.0, created_at=now - timedelta(days=RETENTION_UNLINKED_SIGNALS + 1))
 
-        # 3. Linked Signal to RiskEvent (Old) -> Should be preserved
+        # 3. Linked ModelSignal to RiskEvent (Old) -> Should be preserved
         old_risk_linked_signal = ModelSignal(symbol="XAUUSD", direction=1, entry_price=2000.0, created_at=now - timedelta(days=RETENTION_UNLINKED_SIGNALS + 1))
 
         session.add_all([old_unlinked, old_linked_signal, old_risk_linked_signal])
@@ -147,7 +147,7 @@ def test_cleanup_database_retention(test_env):
         # Old Trade -> Should be archived and purged
         old_trade = Trade(ticket=456, symbol="XAUUSD", direction=1, entry_price=1900.0, lot_size=0.1, created_at=now - timedelta(days=RETENTION_TRADES + 1))
 
-        # Risk Event linked to signal (New) -> Signal should be preserved
+        # Risk Event linked to signal (New) -> ModelSignal should be preserved
         new_risk = RiskEvent(event_type="CIRCUIT_BREAKER", description="test", signal_id=old_risk_linked_signal_id, created_at=now)
 
         # Old Risk Event -> Should be archived and purged

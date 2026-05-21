@@ -39,7 +39,7 @@ class SimpleMockModel:
     def predict(self, obs, **kwargs):
         if isinstance(obs, pd.DataFrame):
             return np.full(len(obs), self.direction)
-        return type("Signal", (), {"direction": self.direction, "confidence": 0.9})
+        return type("ModelSignal", (), {"direction": self.direction, "confidence": 0.9})
 
 def test_backtest_to_reporting_flow(data_generator, feature_engineer, reporter, tmp_path):
     # 1. Generate Data

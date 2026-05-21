@@ -222,7 +222,7 @@ class DynamicEnsemble:
             metrics: Optional external dictionary mapping model names to metrics:
                 - accuracy: Normalized Sharpe or Win-rate (0.0 to 1.0).
                 - calibration_error: Deviation between confidence and success (0.0 to 1.0).
-                - drift_score: Signal of performance degradation (0.0 to 1.0).
+                - drift_score: ModelSignal of performance degradation (0.0 to 1.0).
                 If None, uses internal autonomous tracking.
             regime_info: Current market regime context for heuristic-based scoring adjustments.
             volatility_context: Optional manual override or additional volatility metric.

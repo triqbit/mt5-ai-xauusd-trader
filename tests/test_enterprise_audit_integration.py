@@ -78,10 +78,10 @@ def mock_cfg():
 
 def test_enterprise_audit_flow_double_rejection(mock_cfg, audit_logger):
     """
-    Scenario: Signal is generated, but fails both Execution Filter and Risk Manager.
+    Scenario: ModelSignal is generated, but fails both Execution Filter and Risk Manager.
     Verifies that BOTH components log their detailed traces to the audit DB.
     """
-    # 1. Setup Signal
+    # 1. Setup ModelSignal
     signal = TradeSignal(
         symbol="XAUUSD",
         direction=SignalDirection.BUY.value,
@@ -158,7 +158,7 @@ def test_enterprise_audit_flow_execution_pass_risk_fail(mock_cfg, audit_logger):
     Scenario: Execution filter passes but Risk Manager rejects.
     Verifies that the audit trail correctly distinguishes where the trade was blocked.
     """
-    # 1. Setup Signal
+    # 1. Setup ModelSignal
     signal = TradeSignal(
         symbol="XAUUSD",
         direction=SignalDirection.BUY.value,

@@ -798,7 +798,7 @@ class StressLab:
                 )
             delay = max(0, delay)
 
-            # Signal from 'delay' steps ago
+            # ModelSignal from 'delay' steps ago
             sig_idx = max(0, i - 1 - delay)
             current_sig = raw_signals[sig_idx]
 
@@ -806,7 +806,7 @@ class StressLab:
 
             # 2. Apply service failure
             if scenario.service_failure_prob > 0 and rng.random() < scenario.service_failure_prob:
-                current_sig = 0  # Signal blocked by infrastructure failure
+                current_sig = 0  # ModelSignal blocked by infrastructure failure
                 latency_hits += 1
 
             # 3. Calculate dynamic spread and slippage

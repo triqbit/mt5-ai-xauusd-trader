@@ -125,13 +125,13 @@ def test_compare_agents(trading_env):
 
 def test_signal_adapter_compatibility(trading_env):
     from src.core.constants import SignalDirection
-    from src.models.base_model import Signal
+    from src.core.schemas import ModelSignal
 
     evaluator = RLEvaluator(env=trading_env)
 
     class SignalAgent:
         def predict(self, observation):
-            return Signal(direction=SignalDirection.BUY, confidence=0.9)
+            return ModelSignal(direction=SignalDirection.BUY, confidence=0.9)
 
     # _get_prediction should return 1 for SignalDirection.BUY
     prediction = evaluator._get_prediction(SignalAgent(), np.zeros(52))
@@ -309,9 +309,9 @@ def test_get_prediction_robustness():
                 return [2, 0]
             if obs[0] == 3:
                 from src.core.constants import SignalDirection
-                from src.models.base_model import Signal
+                from src.core.schemas import ModelSignal
 
-                return Signal(direction=SignalDirection.SELL, confidence=0.8)
+                return ModelSignal(direction=SignalDirection.SELL, confidence=0.8)
             if obs[0] == 4:
 
                 class MockEnum:

@@ -25,7 +25,7 @@ from src.core.feature_engineering import FeatureEngineer
 from src.core.health import ComponentStatus, HealthStatus, init_health_checker
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import RiskEvent, Trade, TradeLogger
-from src.models.base_model import Signal
+from src.core.schemas import ModelSignal
 from src.trading.audited_risk_manager import AuditedRiskManager
 from src.trading.execution_filter import ExecutionFilter
 from src.trading.mt5_connector import MT5Connector
@@ -130,7 +130,7 @@ def test_full_system_bootstrap_and_execution_audit(system_env):
     feature_engineer = FeatureEngineer(base_timeframe=cfg.timeframe, timeframes=["M15", "H1"])
 
     mock_model = MagicMock()
-    mock_model.predict.return_value = Signal(
+    mock_model.predict.return_value = ModelSignal(
         direction=SignalDirection.BUY,
         confidence=0.85,
         metadata={"per_algo_votes": {"ppo": 1}, "weights": {"ppo": 1.0}}

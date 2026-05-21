@@ -7,26 +7,18 @@ Base interface for all AI/ML models.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, NamedTuple
+from typing import Any
 
 import numpy as np
 
-from src.core.constants import SignalDirection
-
-
-class Signal(NamedTuple):
-    """Standardized model output."""
-
-    direction: SignalDirection
-    confidence: float
-    metadata: dict[str, Any] | None = None
+from src.core.schemas import ModelSignal
 
 
 class BaseModel(ABC):
     """Abstract base class for all trading models."""
 
     @abstractmethod
-    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> ModelSignal:
         """
         Generate a trading signal from input features.
 
@@ -35,6 +27,6 @@ class BaseModel(ABC):
             **kwargs: Additional context (seq, regime_info, etc.).
 
         Returns:
-            A Signal object containing direction and confidence.
+            A ModelSignal object containing direction and confidence.
         """
         pass

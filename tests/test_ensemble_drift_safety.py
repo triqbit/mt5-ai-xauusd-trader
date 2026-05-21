@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from src.core.config import TradingConfig
 from src.core.constants import SignalDirection
-from src.models.base_model import Signal
+from src.core.schemas import ModelSignal
 from src.models.ensemble import EnsembleModel
 
 
@@ -22,9 +22,9 @@ class TestEnsembleDriftSafety(unittest.TestCase):
         """Verify that high drift triggers confidence penalties."""
         # Setup signals: all sub-models agree on BUY with 0.9 confidence
         signals = {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.9),
-            "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.9),
-            "lstm": Signal(direction=SignalDirection.BUY, confidence=0.9)
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.9),
+            "dreamer": ModelSignal(direction=SignalDirection.BUY, confidence=0.9),
+            "lstm": ModelSignal(direction=SignalDirection.BUY, confidence=0.9)
         }
 
         # 1. No drift scenario
@@ -59,9 +59,9 @@ class TestEnsembleDriftSafety(unittest.TestCase):
         """Verify that divergent sub-model confidence triggers entropy penalty."""
         # Sub-models agree on BUY but with highly divergent confidence
         signals = {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.95),
-            "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.45), # Divergent
-            "lstm": Signal(direction=SignalDirection.BUY, confidence=0.95)
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.95),
+            "dreamer": ModelSignal(direction=SignalDirection.BUY, confidence=0.45), # Divergent
+            "lstm": ModelSignal(direction=SignalDirection.BUY, confidence=0.95)
         }
 
         self.ensemble.dynamic_ensemble.calculate_metrics = MagicMock(return_value={
@@ -78,7 +78,7 @@ class TestEnsembleDriftSafety(unittest.TestCase):
 
         # Let's make it more divergent:
         # Use 0.41 to avoid Veto Power (threshold 0.40) but still trigger high entropy
-        signals["dreamer"] = Signal(direction=SignalDirection.BUY, confidence=0.41)
+        signals["dreamer"] = ModelSignal(direction=SignalDirection.BUY, confidence=0.41)
         # std([0.95, 0.41, 0.95]) = ~0.2545 (exceeds 0.25 trigger)
 
         result = self.ensemble.aggregate_signals(signals)
@@ -93,9 +93,9 @@ class TestEnsembleDriftSafety(unittest.TestCase):
     def test_combined_safeguards(self):
         """Verify both safeguards can apply simultaneously."""
         signals = {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.95),
-            "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.41),
-            "lstm": Signal(direction=SignalDirection.BUY, confidence=0.95)
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.95),
+            "dreamer": ModelSignal(direction=SignalDirection.BUY, confidence=0.41),
+            "lstm": ModelSignal(direction=SignalDirection.BUY, confidence=0.95)
         }
 
         # High drift

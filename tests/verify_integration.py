@@ -104,12 +104,12 @@ def test_full_pipeline_integration(mock_cfg, trade_logger, mock_monitor, mock_co
 
         # 3. Model Inference
         from src.core.constants import SignalDirection
-        from src.models.base_model import Signal
+        from src.core.schemas import ModelSignal
         model.ppo_agent = MagicMock()
-        model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.85)
+        model.ppo_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.85)
         signal_out = model.predict(obs, regime_info=regime_info)
 
-        # 4. Log Signal
+        # 4. Log ModelSignal
         signal_id = trade_logger.log_signal({
             "symbol": "XAUUSD",
             "direction": signal_out.direction,
@@ -309,9 +309,9 @@ def test_ensemble_intelligence_integration(sample_market_data):
 
     # 3. Decision
     from src.core.constants import SignalDirection
-    from src.models.base_model import Signal
+    from src.core.schemas import ModelSignal
     model.ppo_agent = MagicMock()
-    model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.85)
+    model.ppo_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.85)
 
     # Generate features for observation
     feature_eng = FeatureEngineer(base_timeframe="M5", timeframes=["M5", "M15"])

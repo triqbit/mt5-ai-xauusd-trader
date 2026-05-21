@@ -187,7 +187,7 @@ class TestDataCleanup(unittest.TestCase):
                 created_at=now - timedelta(days=3000),
             )
 
-            # 9. Blocked Signal Analysis for old unlinked signal (should be purged)
+            # 9. Blocked ModelSignal Analysis for old unlinked signal (should be purged)
             old_bsa = BlockedSignalAnalysis(
                 signal_id=old_unlinked.id,
                 opportunity_cost_pnl=50.0,
