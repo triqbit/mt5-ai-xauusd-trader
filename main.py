@@ -208,8 +208,13 @@ def run_live(
 
     log = structlog.get_logger("main.live")
     explainer = SignalExplainer()
-    log.info("Starting live trading loop", symbol=cfg.symbol, mode=cfg.mode)
-    poll_interval = 60  # seconds between signal evaluations
+    poll_interval = cfg.poll_interval
+    log.info(
+        "Starting live trading loop",
+        symbol=cfg.symbol,
+        mode=cfg.mode,
+        poll_interval=f"{poll_interval}s",
+    )
     last_reset_date = datetime.now(timezone.utc).date()
     loop_count = 0
     last_price = None
@@ -832,6 +837,11 @@ def run_setup_wizard() -> int:
     timeframe = Prompt.ask(
         "Default timeframe", choices=["M1", "M5", "M15", "M30", "H1", "H4", "D1"], default="M5"
     )
+    algorithm = Prompt.ask(
+        "AI Algorithm", choices=["ppo", "dreamer", "lstm", "ensemble"], default="ensemble"
+    )
+    risk_per_trade = Prompt.ask("Risk per trade (e.g. 0.01 for 1%)", default="0.01")
+    poll_interval = Prompt.ask("Polling interval (seconds)", default="60")
 
     # 2. MT5 Credentials
     console.print("\n[bold]2. MetaTrader 5 Credentials[/]")
@@ -897,6 +907,12 @@ def run_setup_wizard() -> int:
                     lines.append(f"TIMEFRAME={timeframe}\n")
                 elif line.startswith("MODE="):
                     lines.append(f"MODE={mode}\n")
+                elif line.startswith("ALGORITHM="):
+                    lines.append(f"ALGORITHM={algorithm}\n")
+                elif line.startswith("RISK_PER_TRADE="):
+                    lines.append(f"RISK_PER_TRADE={risk_per_trade}\n")
+                elif line.startswith("POLL_INTERVAL="):
+                    lines.append(f"POLL_INTERVAL={poll_interval}\n")
                 elif line.startswith("METAAPI_TOKEN=") and meta_token:
                     lines.append(f"METAAPI_TOKEN={meta_token.get_secret_value()}\n")
                 elif line.startswith("METAAPI_ACCOUNT_ID=") and meta_id:
@@ -912,6 +928,9 @@ def run_setup_wizard() -> int:
             f"SYMBOL={symbol}\n",
             f"TIMEFRAME={timeframe}\n",
             f"MODE={mode}\n",
+            f"ALGORITHM={algorithm}\n",
+            f"RISK_PER_TRADE={risk_per_trade}\n",
+            f"POLL_INTERVAL={poll_interval}\n",
             f"METAAPI_TOKEN={meta_token.get_secret_value() if meta_token else ''}\n",
             f"METAAPI_ACCOUNT_ID={meta_id}\n",
         ]
@@ -984,6 +1003,11 @@ Usage Examples:
         dest="confirm_live_trading",
         action="store_true",
         help="Explicitly acknowledge and confirm LIVE trading execution.",
+    )
+    execution.add_argument(
+        "--poll-interval",
+        type=int,
+        help="Seconds between signal evaluations (e.g., 60).",
     )
 
     # -- Backtest Group
@@ -1401,15 +1425,15 @@ def main() -> int:
 
             config_table.add_row(key, str(value), source)
 
-            if console:
-                console.print(
-                    RichPanel(
-                        config_table,
-                        title="[bold blue]System Config[/]",
-                        border_style="blue",
-                        expand=False,
-                    )
+        if console:
+            console.print(
+                RichPanel(
+                    config_table,
+                    title="[bold blue]System Config[/]",
+                    border_style="blue",
+                    expand=False,
                 )
+            )
         return 0
 
     # Re-verify if it was a Pydantic validation error if we somehow got past get_config()

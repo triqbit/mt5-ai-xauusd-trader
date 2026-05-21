@@ -69,6 +69,13 @@ class TradingConfig(BaseSettings):
         description="Execution mode: demo, live, or backtest",
         validation_alias="MODE",
     )
+    poll_interval: int = Field(
+        default=60,
+        ge=1,
+        le=86400,
+        description="Seconds between signal evaluations",
+        validation_alias="POLL_INTERVAL",
+    )
 
     # ── Risk Parameters (per RISK_LIMITS.md) ──────────────────────────────────
     max_positions: int = Field(
@@ -79,6 +86,7 @@ class TradingConfig(BaseSettings):
         ge=0.001,
         le=0.02,
         description="Fraction of account equity to risk per trade (e.g., 0.01 = 1%)",
+        validation_alias="RISK_PER_TRADE",
     )
     max_position_size_pct: float = Field(
         default=0.10, description="Max Position Size: 10% of account equity per trade"
@@ -157,7 +165,9 @@ class TradingConfig(BaseSettings):
 
     # ── Model ──────────────────────────────────────────────────────────────────
     algorithm: Literal["ppo", "dreamer", "lstm", "ensemble"] = Field(
-        default="ensemble", description="The ML algorithm architecture to use for signal generation"
+        default="ensemble",
+        description="The ML algorithm architecture to use for signal generation",
+        validation_alias="ALGORITHM",
     )
     model_path: Path = Field(
         default=ROOT / "models" / "trained" / "ensemble_latest.pt",
