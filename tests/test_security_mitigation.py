@@ -18,6 +18,10 @@ def mock_config(tmp_path):
     # Ensure env_file is in the tmp_path
     config.model_config = {"env_file": tmp_path / ".env"}
     config.mode = "demo"
+    config.database_url = MagicMock()
+    config.database_url.get_secret_value.return_value = "sqlite:///test.db"
+    config.model_signing_key = MagicMock()
+    config.model_signing_key.get_secret_value.return_value = "" # No signing for legacy tests
     return config
 
 def test_regime_detector_load_path_validation(tmp_path):
@@ -94,7 +98,7 @@ def test_config_validator_auto_hardening(tmp_path, mock_config):
     # Verify permissions are hardened to 0o600
     assert (os.stat(env_file).st_mode & 0o777) == 0o600
 
-def test_regime_detector_load_from_trusted_path(tmp_path):
+def test_regime_detector_load_from_trusted_path(tmp_path, mock_config):
     """Verify that RegimeDetector accepts models from the trusted models/ directory."""
     from src.core.config import ROOT
     trusted_dir = ROOT / "models" / "trained"
@@ -108,17 +112,18 @@ def test_regime_detector_load_from_trusted_path(tmp_path):
     os.chmod(trusted_path, 0o600)
 
     try:
-        detector = RegimeDetector()
-        detector.load_model(str(trusted_path))
+        with patch("src.core.config.get_config", return_value=mock_config):
+            detector = RegimeDetector()
+            detector.load_model(str(trusted_path))
 
-        # If it loaded, _gmm should not be None (it will be "mock_gmm")
-        assert detector._gmm == "mock_gmm"
+            # If it loaded, _gmm should not be None (it will be "mock_gmm")
+            assert detector._gmm == "mock_gmm"
     finally:
         if trusted_path.exists():
             trusted_path.unlink()
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission check only on Linux/Mac")
-def test_regime_detector_insecure_permissions(tmp_path):
+def test_regime_detector_insecure_permissions(tmp_path, mock_config):
     """Verify that RegimeDetector rejects models with insecure permissions."""
     from src.core.config import ROOT
     trusted_dir = ROOT / "models" / "trained"
@@ -132,9 +137,10 @@ def test_regime_detector_insecure_permissions(tmp_path):
     os.chmod(path, 0o644)
 
     try:
-        detector = RegimeDetector()
-        detector.load_model(str(path))
-        assert detector._gmm is None
+        with patch("src.core.config.get_config", return_value=mock_config):
+            detector = RegimeDetector()
+            detector.load_model(str(path))
+            assert detector._gmm is None
     finally:
         if path.exists():
             path.unlink()

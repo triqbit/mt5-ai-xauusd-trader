@@ -163,6 +163,11 @@ class TradingConfig(BaseSettings):
         default=ROOT / "models" / "trained" / "ensemble_latest.pt",
         description="Path to the serialized weights of the trained model",
     )
+    model_signing_key: SecretStr = Field(
+        default=SecretStr(""),
+        description="Key used for HMAC-SHA256 signature verification of model files",
+        validation_alias="MODEL_SIGNING_KEY",
+    )
     train_steps: int = Field(
         default=1_000_000, ge=100_000, description="Number of environment steps for model training"
     )

@@ -46,6 +46,7 @@ class ConfigValidator:
         self._check_margin_and_volatility_limits()
         self._check_execution_parameters()
         self._check_behavior_caps()
+        self._check_operational_parameters()
         self._check_incompatible_settings()
         self._check_file_permissions()
 
@@ -630,6 +631,22 @@ class ConfigValidator:
                     f"Max winning streak {self.config.max_winning_streak} exceeds recommended 5.",
                     False,
                     "Consider setting MAX_WINNING_STREAK to 5 as per policy.",
+                )
+            )
+
+    def _check_operational_parameters(self) -> None:
+        """Verify operational parameters for safe defaults."""
+        # Check model signing key (Enterprise Security)
+        signing_key = self.config.model_signing_key.get_secret_value()
+        placeholders = ["CHANGE_ME", "YOUR_KEY", "SIGNING_KEY", "DUMMY", "FAKE"]
+
+        if signing_key and any(p in signing_key.upper() for p in placeholders):
+            self.errors.append(
+                ValidationError(
+                    "MODEL_SIGNING_KEY",
+                    "Model signing key is using placeholder.",
+                    True,
+                    "Set MODEL_SIGNING_KEY in .env with a secure random string.",
                 )
             )
 
