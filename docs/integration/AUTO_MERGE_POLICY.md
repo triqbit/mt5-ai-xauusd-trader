@@ -19,7 +19,7 @@ Auto-merge is **ONLY** allowed when **ALL** of the following conditions are met:
 
 Automatically **BLOCK** and **ESCALATE** if any of these are true:
 
-- 🚨 **Changes to live trading execution logic:** Modification to `src/trading/executor.py`, `src/trading/mt5_connector.py`, or files interacting with MT5 order placement.
+- 🚨 **Changes to live trading execution logic:** Modification to `src/trading/executor.py`, `src/trading/mt5_connector.py`.
 - 🚨 **Modifications to risk parameters or position sizing:** Changes to `src/core/risk_engine.py`, `src/trading/risk_engine.py`, `src/trading/risk_manager.py`, `src/trading/audited_risk_manager.py`, `src/trading/capital_allocator.py`, or `src/trading/execution_filter.py`.
 - 🚨 **Credential, secret, or auth surface changes:** Any change to `config/secrets.*`, `.env.*`, or `src/core/config.py`.
 - 🚨 **Destructive database migrations:** Migrations in `migrations/` that alter historical trade data or schema.
@@ -30,9 +30,11 @@ Automatically **BLOCK** and **ESCALATE** if any of these are true:
 
 The following patterns trigger an automatic block and escalation:
 
-### Trading & Risk
+### Live Trading Execution Logic
 - `src/trading/executor.py`
 - `src/trading/mt5_connector.py`
+
+### Risk Parameters / Position Sizing
 - `src/core/risk_engine.py`
 - `src/trading/risk_engine.py`
 - `src/trading/risk_manager.py`
@@ -40,15 +42,19 @@ The following patterns trigger an automatic block and escalation:
 - `src/trading/capital_allocator.py`
 - `src/trading/execution_filter.py`
 
-### Security & Auth
+### Credentials / Auth Surface
 - `config/secrets.*`
 - `.env.*`
 - `src/core/config.py`
 
-### Infrastructure & CI/CD
+### Docker / Infrastructure Control
 - `Dockerfile`
 - `docker-compose.yml`
+
+### CI/CD Deployment Workflows
 - `.github/workflows/deploy.*`
+
+### Database Migrations
 - `migrations/.*`
 
 ## Escalation Procedure
@@ -63,6 +69,7 @@ The following patterns trigger an automatic block and escalation:
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-05-20 | N/A | Policy Update | 🤖 Jules05: Robust auto-merge policy with strict escalation logic | [System Change] |
 | 2026-05-18 | N/A | Policy Update | 🤖 Jules05: Strict auto-merge policy maintenance and pattern alignment | [System Change] |
 | 2026-05-15 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Unified with requirements) | [System Change] |
 | 2026-05-13 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Refined high-risk patterns & categories) | [System Change] |
