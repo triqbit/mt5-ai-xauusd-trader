@@ -1,6 +1,7 @@
 """
 Tests for Institutional Flow Scenario Generator.
 """
+
 import pytest
 
 from src.utils.synthetic_data import InstitutionalFlowGenerator
@@ -9,6 +10,7 @@ from src.utils.synthetic_data import InstitutionalFlowGenerator
 @pytest.fixture
 def institutional_builder():
     return InstitutionalFlowGenerator(seed=42)
+
 
 def test_stop_hunting_behavior(institutional_builder):
     n_steps = 100
@@ -27,6 +29,7 @@ def test_stop_hunting_behavior(institutional_builder):
     # Check for rapid recovery
     assert df["close"].iloc[dip_recovery] > df["close"].iloc[dip_bottom] * 1.02
 
+
 def test_iceberg_absorption_behavior(institutional_builder):
     n_steps = 100
     start_price = 2300.0
@@ -37,7 +40,7 @@ def test_iceberg_absorption_behavior(institutional_builder):
 
     # 1. Price should trend up to the iceberg level (approx 1.01 * start_price)
     iceberg_level = start_price * 1.01
-    assert df["close"].iloc[mid-1] > start_price
+    assert df["close"].iloc[mid - 1] > start_price
 
     # 2. Absorption phase should have multiple attempts but fail to sustain break above level
     # Since we capped it in logic, max price should be close to iceberg_level
@@ -52,6 +55,7 @@ def test_iceberg_absorption_behavior(institutional_builder):
     # Price progress should be stalled
     assert (absorption_closes <= iceberg_level * 1.001).all()
 
+
 def test_trend_exhaustion_behavior(institutional_builder):
     n_steps = 150
     df = institutional_builder.trend_exhaustion(n_steps=n_steps)
@@ -64,9 +68,9 @@ def test_trend_exhaustion_behavior(institutional_builder):
     assert ret1 > 0
 
     # 2. Second 1/3 should be parabolic (sharper)
-    ret2 = df["close"].iloc[2*one_third] / df["close"].iloc[one_third] - 1
+    ret2 = df["close"].iloc[2 * one_third] / df["close"].iloc[one_third] - 1
     assert ret2 > ret1
 
     # 3. Final 1/3 should be sharp collapse
-    ret3 = df["close"].iloc[-1] / df["close"].iloc[2*one_third] - 1
+    ret3 = df["close"].iloc[-1] / df["close"].iloc[2 * one_third] - 1
     assert ret3 < -0.05
