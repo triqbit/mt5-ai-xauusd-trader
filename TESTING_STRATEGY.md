@@ -18,7 +18,7 @@ Robust, multi-layered testing approach ensuring reliability, performance, and pr
 - **Feature Module**: Test feature engineering functions
 - **Model Module**: Test model initialization, inference, prediction
 - **Trading Module**: Test order placement, position sizing, risk checks
-- **Utils Module**: Test utility functions and helpers, including deterministic `ScenarioGenerator` for market regimes, `PortfolioScenarioBuilder` for institutional capital allocation testing, and `EnsembleScenarioBuilder` for multi-model decision logic validation.
+- **Utils Module**: Test utility functions and helpers, including deterministic `ScenarioGenerator` for market regimes, `PortfolioScenarioBuilder` for institutional capital allocation testing, `EnsembleScenarioBuilder` for multi-model decision logic validation, and `ReconciliationScenarioBuilder` for verifying risk state restoration and reconciliation after operational restarts.
 
 ### 1.3 Coverage Targets
 - **Overall Coverage**: Minimum 85%
