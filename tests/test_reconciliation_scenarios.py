@@ -3,9 +3,12 @@ Deterministic tests for ReconciliationScenarioBuilder.
 """
 
 import os
+
 import pytest
+
 from src.core.trade_logger import TradeLogger
 from src.utils.synthetic_data import ReconciliationScenarioBuilder
+
 
 @pytest.fixture
 def temp_logger():
@@ -17,14 +20,18 @@ def temp_logger():
     if os.path.exists(db_path):
         os.remove(db_path)
 
+
 @pytest.fixture
 def recon_builder():
     return ReconciliationScenarioBuilder(seed=42)
 
+
 def test_populate_near_daily_loss(temp_logger, recon_builder):
     balance = 10000.0
     target_loss_pct = 0.045
-    recon_builder.populate_near_daily_loss(temp_logger, balance=balance, target_loss_pct=target_loss_pct)
+    recon_builder.populate_near_daily_loss(
+        temp_logger, balance=balance, target_loss_pct=target_loss_pct
+    )
 
     report = temp_logger.read_performance_report()
 
@@ -41,10 +48,13 @@ def test_populate_near_daily_loss(temp_logger, recon_builder):
     # It doesn't have total pnl directly, but we can check profit_factor or expectancy
     # Or just query the DB directly for confirmation
     with temp_logger.Session() as session:
-        from src.core.trade_logger import Trade
         from sqlalchemy import func
+
+        from src.core.trade_logger import Trade
+
         total_pnl = session.query(func.sum(Trade.pnl)).scalar()
         assert abs(total_pnl + 450.0) < 0.01
+
 
 def test_populate_active_losing_streak(temp_logger, recon_builder):
     recon_builder.populate_active_losing_streak(temp_logger, count=2)
@@ -55,6 +65,7 @@ def test_populate_active_losing_streak(temp_logger, recon_builder):
 
     with temp_logger.Session() as session:
         from src.core.trade_logger import Trade
+
         trades = session.query(Trade).all()
         assert len(trades) == 2
         assert all(t.pnl < 0 for t in trades)
