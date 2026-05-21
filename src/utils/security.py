@@ -3,10 +3,11 @@ Cryptographic utilities for model integrity and technical trust.
 src/utils/security.py
 """
 
-import hmac
 import hashlib
+import hmac
 from pathlib import Path
 from typing import Union
+
 
 def compute_hmac(filepath: Union[str, Path], key: str) -> str:
     """
@@ -28,6 +29,7 @@ def compute_hmac(filepath: Union[str, Path], key: str) -> str:
             h.update(chunk)
 
     return h.hexdigest()
+
 
 def verify_hmac(filepath: Union[str, Path], key: str, expected_signature: str) -> bool:
     """
