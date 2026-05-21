@@ -1,0 +1,85 @@
+usage: pip-audit [-h] [-V] [-l] [-r REQUIREMENT] [-f FORMAT] [-s SERVICE] [-d]
+                 [-S] [--desc [{on,off,auto}]] [--aliases [{on,off,auto}]]
+                 [--cache-dir CACHE_DIR] [--progress-spinner {on,off}]
+                 [--timeout TIMEOUT] [--path PATH] [-v] [--fix]
+                 [--require-hashes] [--index-url INDEX_URL]
+                 [--extra-index-url URL] [--skip-editable] [--no-deps]
+                 [-o FILE] [--ignore-vuln ID] [--disable-pip]
+                 [project_path]
+
+audit the Python environment for dependencies with known vulnerabilities
+
+positional arguments:
+  project_path          audit a local Python project at the given path
+                        (default: None)
+
+options:
+  -h, --help            show this help message and exit
+  -V, --version         show program's version number and exit
+  -l, --local           show only results for dependencies in the local
+                        environment (default: False)
+  -r REQUIREMENT, --requirement REQUIREMENT
+                        audit the given requirements file; this option can be
+                        used multiple times (default: None)
+  -f FORMAT, --format FORMAT
+                        the format to emit audit results in (choices: columns,
+                        json, cyclonedx-json, cyclonedx-xml, markdown)
+                        (default: columns)
+  -s SERVICE, --vulnerability-service SERVICE
+                        the vulnerability service to audit dependencies
+                        against (choices: osv, pypi) (default: pypi)
+  -d, --dry-run         without `--fix`: collect all dependencies but do not
+                        perform the auditing step; with `--fix`: perform the
+                        auditing step but do not perform any fixes (default:
+                        False)
+  -S, --strict          fail the entire audit if dependency collection fails
+                        on any dependency (default: False)
+  --desc [{on,off,auto}]
+                        include a description for each vulnerability; `auto`
+                        defaults to `on` for the `json` format. This flag has
+                        no effect on the `cyclonedx-json` or `cyclonedx-xml`
+                        formats. (default: auto)
+  --aliases [{on,off,auto}]
+                        includes alias IDs for each vulnerability; `auto`
+                        defaults to `on` for the `json` format. This flag has
+                        no effect on the `cyclonedx-json` or `cyclonedx-xml`
+                        formats. (default: auto)
+  --cache-dir CACHE_DIR
+                        the directory to use as an HTTP cache for PyPI; uses
+                        the `pip` HTTP cache by default (default: None)
+  --progress-spinner {on,off}
+                        display a progress spinner (default: on)
+  --timeout TIMEOUT     set the socket timeout (default: 15)
+  --path PATH           restrict to the specified installation path for
+                        auditing packages; this option can be used multiple
+                        times (default: [])
+  -v, --verbose         run with additional debug logging; supply multiple
+                        times to increase verbosity (default: 0)
+  --fix                 automatically upgrade dependencies with known
+                        vulnerabilities (default: False)
+  --require-hashes      require a hash to check each requirement against, for
+                        repeatable audits; this option is implied when any
+                        package in a requirements file has a `--hash` option.
+                        (default: False)
+  --index-url INDEX_URL
+                        base URL of the Python Package Index; this should
+                        point to a repository compliant with PEP 503 (the
+                        simple repository API); this will be resolved by pip
+                        if not specified (default: None)
+  --extra-index-url URL
+                        extra URLs of package indexes to use in addition to
+                        `--index-url`; should follow the same rules as
+                        `--index-url` (default: [])
+  --skip-editable       don't audit packages that are marked as editable
+                        (default: False)
+  --no-deps             don't perform any dependency resolution; requires all
+                        requirements are pinned to an exact version (default:
+                        False)
+  -o FILE, --output FILE
+                        output results to the given file (default: stdout)
+  --ignore-vuln ID      ignore a specific vulnerability by its vulnerability
+                        ID; this option can be used multiple times (default:
+                        [])
+  --disable-pip         don't use `pip` for dependency resolution; this can
+                        only be used with hashed requirements files or if the
+                        `--no-deps` flag has been provided (default: False)

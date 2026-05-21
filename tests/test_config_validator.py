@@ -570,6 +570,7 @@ def test_validator_mt5_server_demo_live(monkeypatch, tmp_path):
     monkeypatch.setenv("CONFIRM_LIVE_TRADING", "YES")
     monkeypatch.setenv("DATABASE_URL", "postgresql://real:pass@host/db")
     monkeypatch.setenv("MODEL_PATH", str(model_file))
+    monkeypatch.setenv("MODEL_SIGNING_KEY", "secure_test_key")
 
     cfg = TradingConfig()
     result = ConfigValidator(cfg).validate()

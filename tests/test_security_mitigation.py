@@ -1,4 +1,3 @@
-
 import os
 import sys
 from pathlib import Path
@@ -18,7 +17,12 @@ def mock_config(tmp_path):
     # Ensure env_file is in the tmp_path
     config.model_config = {"env_file": tmp_path / ".env"}
     config.mode = "demo"
+    config.database_url = MagicMock()
+    config.database_url.get_secret_value.return_value = "sqlite:///test.db"
+    config.model_signing_key = MagicMock()
+    config.model_signing_key.get_secret_value.return_value = ""  # No signing for legacy tests
     return config
+
 
 def test_regime_detector_load_path_validation(tmp_path):
     """Verify that RegimeDetector rejects models from untrusted paths."""
@@ -40,6 +44,7 @@ def test_regime_detector_load_path_validation(tmp_path):
     with patch("src.models.regime_detector.Path.is_relative_to", return_value=False):
         detector.load_model(str(untrusted_path))
         assert detector._gmm is None
+
 
 def test_regime_detector_load_path_bypass_attempt(tmp_path):
     """Verify that RegimeDetector rejects models that attempt to bypass with string prefixes."""
@@ -64,6 +69,7 @@ def test_regime_detector_load_path_bypass_attempt(tmp_path):
         # and we must ensure it doesn't match /tmp (which it will if we don't mock it, because it IS in /tmp)
 
         real_is_relative_to = Path.is_relative_to
+
         def mock_is_relative(self, other):
             # Block the /tmp check specifically for this test to ensure it hits the models check logic
             if str(other) in ("/tmp", "/var/tmp"):
@@ -74,6 +80,7 @@ def test_regime_detector_load_path_bypass_attempt(tmp_path):
         with patch("src.models.regime_detector.Path.is_relative_to", mock_is_relative):
             detector.load_model(str(untrusted_path))
             assert detector._gmm is None
+
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission hardening only on Linux/Mac")
 def test_config_validator_auto_hardening(tmp_path, mock_config):
@@ -94,9 +101,11 @@ def test_config_validator_auto_hardening(tmp_path, mock_config):
     # Verify permissions are hardened to 0o600
     assert (os.stat(env_file).st_mode & 0o777) == 0o600
 
-def test_regime_detector_load_from_trusted_path(tmp_path):
+
+def test_regime_detector_load_from_trusted_path(tmp_path, mock_config):
     """Verify that RegimeDetector accepts models from the trusted models/ directory."""
     from src.core.config import ROOT
+
     trusted_dir = ROOT / "models" / "trained"
     trusted_dir.mkdir(parents=True, exist_ok=True)
 
@@ -108,19 +117,22 @@ def test_regime_detector_load_from_trusted_path(tmp_path):
     os.chmod(trusted_path, 0o600)
 
     try:
-        detector = RegimeDetector()
-        detector.load_model(str(trusted_path))
+        with patch("src.core.config.get_config", return_value=mock_config):
+            detector = RegimeDetector()
+            detector.load_model(str(trusted_path))
 
-        # If it loaded, _gmm should not be None (it will be "mock_gmm")
-        assert detector._gmm == "mock_gmm"
+            # If it loaded, _gmm should not be None (it will be "mock_gmm")
+            assert detector._gmm == "mock_gmm"
     finally:
         if trusted_path.exists():
             trusted_path.unlink()
 
+
 @pytest.mark.skipif(sys.platform == "win32", reason="Permission check only on Linux/Mac")
-def test_regime_detector_insecure_permissions(tmp_path):
+def test_regime_detector_insecure_permissions(tmp_path, mock_config):
     """Verify that RegimeDetector rejects models with insecure permissions."""
     from src.core.config import ROOT
+
     trusted_dir = ROOT / "models" / "trained"
     trusted_dir.mkdir(parents=True, exist_ok=True)
 
@@ -132,9 +144,10 @@ def test_regime_detector_insecure_permissions(tmp_path):
     os.chmod(path, 0o644)
 
     try:
-        detector = RegimeDetector()
-        detector.load_model(str(path))
-        assert detector._gmm is None
+        with patch("src.core.config.get_config", return_value=mock_config):
+            detector = RegimeDetector()
+            detector.load_model(str(path))
+            assert detector._gmm is None
     finally:
         if path.exists():
             path.unlink()

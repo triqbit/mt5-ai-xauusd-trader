@@ -964,6 +964,7 @@ class RegimeDetector:
     def save_model(self, filepath: str) -> None:
         """
         Persists the GMM model and cluster mappings to disk.
+        Automatically signs the model file if a signing key is configured.
         """
         if self._gmm is None:
             logger.warning("No GMM model to save.")
@@ -980,10 +981,26 @@ class RegimeDetector:
         joblib.dump(state, filepath)
         logger.info("model_saved", path=filepath)
 
+        # HMAC Signature generation
+        try:
+            from src.core.config import get_config
+            from src.utils.security import compute_hmac
+
+            cfg = get_config()
+            key = cfg.model_signing_key.get_secret_value()
+            if key:
+                signature = compute_hmac(filepath, key)
+                sig_path = f"{filepath}.sig"
+                with open(sig_path, "w") as f:
+                    f.write(signature)
+                logger.info("model_signed", sig_path=sig_path)
+        except Exception as e:
+            logger.warning("model_signing_failed", error=str(e))
+
     def load_model(self, filepath: str) -> None:
         """
         Loads a persisted GMM model and state from disk.
-        Institutional security: Validates path and permissions before deserialization.
+        Institutional security: Validates path, permissions, and HMAC signature before deserialization.
         """
         path = Path(filepath).resolve()
         if not path.exists():
@@ -1023,6 +1040,29 @@ class RegimeDetector:
             if mode & (stat.S_IRWXG | stat.S_IRWXO):
                 logger.error("Security violation: Insecure permissions for model file: %s", path)
                 return
+
+        # Security: Signature Verification
+        try:
+            from src.core.config import get_config
+            from src.utils.security import verify_hmac
+
+            cfg = get_config()
+            key = cfg.model_signing_key.get_secret_value()
+            if key:
+                sig_path = Path(f"{path}.sig")
+                if not sig_path.exists():
+                    logger.error("Security violation: Missing signature for model: %s", path)
+                    return
+
+                expected_signature = sig_path.read_text().strip()
+                if not verify_hmac(path, key, expected_signature):
+                    logger.error("Security violation: Invalid signature for model: %s", path)
+                    return
+                logger.info("model_signature_verified", path=str(path))
+        except Exception as e:
+            # Fail-closed if signature verification logic fails
+            logger.error("Security violation: Signature verification failed: %s", e)
+            return
 
         try:
             state = joblib.load(path)

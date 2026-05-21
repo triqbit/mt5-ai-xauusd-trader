@@ -44,13 +44,16 @@ def extract_config_fields(input_file: str):
                             else:
                                 default = ast.unparse(arg0)
 
-                    fields.append({
-                        "name": field_name,
-                        "type": type_hint,
-                        "description": description,
-                        "default": default
-                    })
+                    fields.append(
+                        {
+                            "name": field_name,
+                            "type": type_hint,
+                            "description": description,
+                            "default": default,
+                        }
+                    )
     return fields
+
 
 def generate_docs(input_file: str, output_file: str, version: str):
     fields = extract_config_fields(input_file)
@@ -60,20 +63,25 @@ def generate_docs(input_file: str, output_file: str, version: str):
 
     with open(output_file, "w") as f:
         f.write(f"# Configuration Reference (v{version})\n\n")
-        f.write("This document lists the available configuration fields, their types, and descriptions.\n\n")
+        f.write(
+            "This document lists the available configuration fields, their types, and descriptions.\n\n"
+        )
         f.write("| Field | Type | Description | Default |\n")
         f.write("| :--- | :--- | :--- | :--- |\n")
 
         for field in fields:
             # Clean up default value
-            clean_default = field['default'].replace("ROOT / ", "")
+            clean_default = field["default"].replace("ROOT / ", "")
             # Clean up quotes in paths or strings
-            clean_default = clean_default.replace("'", "").replace("\"", "")
+            clean_default = clean_default.replace("'", "").replace('"', "")
 
             if not clean_default:
                 clean_default = "None"
 
-            f.write(f"| `{field['name']}` | `{field['type']}` | {field['description']} | `{clean_default}` |\n")
+            f.write(
+                f"| `{field['name']}` | `{field['type']}` | {field['description']} | `{clean_default}` |\n"
+            )
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 4:
