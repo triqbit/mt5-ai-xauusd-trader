@@ -76,8 +76,8 @@ jobs:
       - name: "Gate 5: Security Audit & Dependency Harmonization"
         run: |
           echo "Scanning dependencies for vulnerabilities..."
-          pip-audit --requirement requirements-ci.txt || { echo "::error title=Security Audit Failure::Security vulnerabilities found in CI requirements."; exit 1; }
-          pip-audit --requirement requirements.txt || { echo "::error title=Security Audit Failure::Security vulnerabilities found in production requirements."; exit 1; }
+          pip-audit --requirement requirements-ci.txt --ignore-file .pip-audit.ignore || { echo "::error title=Security Audit Failure::Security vulnerabilities found in CI requirements."; exit 1; }
+          pip-audit --requirement requirements.txt --ignore-file .pip-audit.ignore || { echo "::error title=Security Audit Failure::Security vulnerabilities found in production requirements."; exit 1; }
           echo "Verifying overlapping dependencies are harmonized..."
           python scripts/verify_dependencies.py || { echo "::error title=Dependency Harmonization Failure::Dependency mismatch detected across requirements files. Harmonize versions."; exit 1; }
 

@@ -74,8 +74,9 @@ def test_model_loading_fails_without_signature(tmp_path, mock_config):
     os.chmod(model_path, 0o600)
 
     loader = RegimeDetector()
-    with patch("src.core.config.get_config", return_value=mock_config), patch(
-        "src.models.regime_detector.Path.is_relative_to", return_value=True
+    with (
+        patch("src.core.config.get_config", return_value=mock_config),
+        patch("src.models.regime_detector.Path.is_relative_to", return_value=True),
     ):
         loader.load_model(str(model_path))
         assert loader._gmm is None
@@ -93,8 +94,9 @@ def test_model_loading_fails_with_invalid_signature(tmp_path, mock_config):
     sig_path.write_text("invalid_signature")
 
     loader = RegimeDetector()
-    with patch("src.core.config.get_config", return_value=mock_config), patch(
-        "src.models.regime_detector.Path.is_relative_to", return_value=True
+    with (
+        patch("src.core.config.get_config", return_value=mock_config),
+        patch("src.models.regime_detector.Path.is_relative_to", return_value=True),
     ):
         loader.load_model(str(model_path))
         assert loader._gmm is None
@@ -116,8 +118,9 @@ def test_model_loading_fails_with_wrong_key(tmp_path, mock_config, signing_key):
     wrong_config.model_signing_key = SecretStr("wrong_key")
 
     loader = RegimeDetector()
-    with patch("src.core.config.get_config", return_value=wrong_config), patch(
-        "src.models.regime_detector.Path.is_relative_to", return_value=True
+    with (
+        patch("src.core.config.get_config", return_value=wrong_config),
+        patch("src.models.regime_detector.Path.is_relative_to", return_value=True),
     ):
         loader.load_model(str(model_path))
         assert loader._gmm is None
