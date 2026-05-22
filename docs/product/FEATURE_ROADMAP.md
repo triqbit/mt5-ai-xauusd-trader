@@ -1,18 +1,18 @@
-# 🗺️ Strategic Feature Roadmap - May 21, 2026
+# 🗺️ Strategic Feature Roadmap - May 22, 2026
 
-This roadmap defines the evolution of the MT5 AI XAUUSD Trader into an institutional-grade "Glass Box" system. It reflects the latest maturity assessment and identifies the critical path for resolving process integrity and safety gaps.
+This roadmap defines the evolution of the MT5 AI XAUUSD Trader into an institutional-grade "Glass Box" system. It reflects the latest maturity assessment and identifies the critical path for resolving process integrity, safety gaps, and technical drift.
 
 ---
 
-## 📊 Repo Maturity Assessment (May 21, 2026)
+## 📊 Repo Maturity Assessment (May 22, 2026)
 
 | Category | Maturity | Gaps & Observations |
 | :--- | :--- | :--- |
-| **Product Capability** | 🔴 8.5/10 | **Status:** RC v1.1.0-rc10 verified; 173 passing tests. **Gap:** **CRITICAL:** `main` branch remains in RED status due to consecutive history destruction (23 days). Forensic traceability is lost. |
+| **Product Capability** | 🔴 8.5/10 | **Status:** RC v1.1.0-rc10 verified; 173 passing tests. **Gap:** **CRITICAL:** 25th consecutive day of history destruction recorded. Forensic traceability is lost. |
 | **Usability** | 🟡 7.8/10 | **Status:** Decision Cockpit TUI functional. **Gap:** High setup friction (TA-Lib C-dependencies). "One-Command" Dockerized environment is proposed but missing. |
-| **Safety** | 🔴 8.5/10 | **Status:** 8-layer safety logic defined. **Gap:** **HIGH RISK:** "Risk API Drift" detected—harmonized tests fail against current `RiskManager`. Emergency Kill Switch (`scripts/emergency_flatten.py`) is missing. |
+| **Safety** | 🔴 8.5/10 | **Status:** 8-layer safety logic defined. **Gap:** **HIGH RISK:** "Risk API Drift" persists—`main.py` uses legacy `approve()` while harmonized tests fail. Emergency Kill Switch is missing. |
 | **Intelligence** | 🟢 9.6/10 | **Status:** Regime Detector and Calibration Engine are live. **Gap:** Real-time Macro Risk (FRED/YFinance) remains in simulation mode. |
-| **Market Differentiation** | 🟢 8.5/10 | **Status:** Signal Attribution and WFO are standards. **Gap:** XAUUSD-specific metrics like Hurst Exponent and Physical Gold Flows are in research phase. |
+| **Market Differentiation** | 🟢 8.5/10 | **Status:** Signal Attribution and WFO are standards. **Gap:** XAUUSD-specific metrics like Hurst Exponent and Physical Gold Flows are in research/acceptance phase. |
 
 ---
 
@@ -27,9 +27,9 @@ This roadmap defines the evolution of the MT5 AI XAUUSD Trader into an instituti
 ## Medium Priority (Weeks 3-4)
 
 - **Live Macro Intelligence Pipeline (FRED/YFinance)** — Score: 9.7/10 | Cost: M | Why: Integrates US Real Yields and DXY drivers to avoid fundamental "yield-trap" breakouts in XAUUSD. (Ready: 🟢, Leverage: Massive, Value: Alpha & Safety)
-- **Hardened Mode Gate (Account Safety)** — Score: 8.5/10 | Cost: S | Why: Prevents accidental live trading by verifying `trade_mode` against environment config at the connector level. (Ready: 🟢, Leverage: Medium, Value: Catastrophe Prevention)
-- **Institutional Sentiment Intelligence Alpha** — Score: 9.5/10 | Cost: M | Why: Deploy Alpha pipeline for CFTC COT and retail sentiment data integration. (Ready: 🟢, Leverage: High, Value: Market Insight)
+- **Institutional Gold Flow & Physical Demand Proxies** — Score: 9.5/10 | Cost: M | Why: Incorporates GLD/IAU flows and SGE premiums to distinguish physical demand from paper-market noise. (Ready: 🟢, Leverage: High, Value: XAUUSD Edge)
 - **Telegram Interactive Command Center** — Score: 9.4/10 | Cost: M | Why: Ports Decision Cockpit to Telegram with "Approve/Reject" buttons for remote management. (Ready: 🟡, Leverage: High, Value: Mobile Control)
+- **Hardened Mode Gate (Account Safety)** — Score: 8.5/10 | Cost: S | Why: Prevents accidental live trading by verifying `trade_mode` against environment config at the connector level. (Ready: 🟢, Leverage: Medium, Value: Catastrophe Prevention)
 
 ## Future Consideration
 
