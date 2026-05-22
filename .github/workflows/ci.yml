@@ -93,6 +93,11 @@ jobs:
         run: pip install -r requirements-ci.txt
       - name: Bootstrap validation (Smoke Test)
         run: python main.py --show-config
+        env:
+          MT5_LOGIN: "0"
+          MT5_PASSWORD: "test"
+          MT5_SERVER: "test"
+          MODE: "demo"
       - name: Run tests with coverage
         run: pytest tests/ --cov=src --cov-fail-under=80 -v
         env:

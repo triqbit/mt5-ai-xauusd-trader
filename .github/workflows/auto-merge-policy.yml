@@ -134,14 +134,15 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           # Wait for CI to finish if needed, but usually this runs after CI
-          CHECKS=$(gh pr checks $PR_NUMBER --json name,state,conclusion)
+          CHECKS=$(gh pr checks $PR_NUMBER --json name,state)
           # We expect 'Code Quality', 'Dependency Safety', and 'Tests' to pass.
           # 'Tests' includes coverage >= 80% check.
-          QUALITY_PASS=$(echo "$CHECKS" | jq -r '.[] | select(.name=="Code Quality") | .conclusion' | grep -E "success|skipped" || echo "failure")
-          SECURITY_PASS=$(echo "$CHECKS" | jq -r '.[] | select(.name=="Dependency Safety") | .conclusion' | grep -E "success|skipped" || echo "failure")
-          TESTS_PASS=$(echo "$CHECKS" | jq -r '.[] | select(.name=="Tests") | .conclusion' | grep -E "success|skipped" || echo "failure")
+          # State can be 'SUCCESS', 'PENDING', 'FAILURE', etc.
+          QUALITY_PASS=$(echo "$CHECKS" | jq -r '.[] | select(.name=="Code Quality") | .state' | grep -E "SUCCESS|SKIPPED" || echo "FAILURE")
+          SECURITY_PASS=$(echo "$CHECKS" | jq -r '.[] | select(.name=="Dependency Safety") | .state' | grep -E "SUCCESS|SKIPPED" || echo "FAILURE")
+          TESTS_PASS=$(echo "$CHECKS" | jq -r '.[] | select(.name=="Tests") | .state' | grep -E "SUCCESS|SKIPPED" || echo "FAILURE")
 
-          if [[ "$QUALITY_PASS" == "success" && "$SECURITY_PASS" == "success" && "$TESTS_PASS" == "success" ]]; then
+          if [[ "$QUALITY_PASS" == "SUCCESS" && "$SECURITY_PASS" == "SUCCESS" && "$TESTS_PASS" == "SUCCESS" ]]; then
             echo "ci_pass=true" >> $GITHUB_OUTPUT
           else
             echo "ci_pass=false" >> $GITHUB_OUTPUT
