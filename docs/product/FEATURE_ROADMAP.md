@@ -1,37 +1,41 @@
-# 🗺️ Strategic Feature Roadmap - May 20, 2026
+# 🗺️ Strategic Feature Roadmap - May 21, 2026
 
-This roadmap defines the evolution of the MT5 AI XAUUSD Trader into an institutional-grade "Glass Box" system. It reflects the latest maturity assessment following the assembly of Release Candidate v1.1.0-rc10 and the identified process integrity risks.
+This roadmap defines the evolution of the MT5 AI XAUUSD Trader into an institutional-grade "Glass Box" system. It reflects the latest maturity assessment and identifies the critical path for resolving process integrity and safety gaps.
 
 ---
 
-## 📊 Repo Maturity Assessment (May 20, 2026)
+## 📊 Repo Maturity Assessment (May 21, 2026)
 
 | Category | Maturity | Gaps & Observations |
 | :--- | :--- | :--- |
-| **Product Capability** | 🔴 8.5/10 | **Status:** RC v1.1.0-rc10 assembled with 173 passing tests. **Gap:** **CRITICAL:** `main` branch remains in RED status for process integrity due to history destruction. History Harmonization is the top priority. |
-| **Usability** | 🟡 7.8/10 | **Status:** Decision Cockpit TUI functional; setup/config improved. **Gap:** High setup friction (TA-Lib C-dependencies) persists for new users. "One-Command" Dockerized environment is missing. |
-| **Safety** | 🟢 9.0/10 | **Status:** 8-layer safety cascade integrated. **Gap:** Emergency "Flatten & Fence" (Kill Switch) implementation needs to be verified on the main branch. Missing "Hardened Mode Gate" for live/demo safety. |
-| **Intelligence** | 🟡 7.2/10 | **Status:** Regime Detector and Calibration Engine integrated. **Gap:** Real-time Macro Risk (FRED/YFinance) remains a simulation. Alpha discovery is manual. |
-| **Market Differentiation** | 🟢 8.5/10 | **Status:** Signal Attribution and WFO are standards. **Gap:** XAUUSD-specific metrics like Hurst Exponent and Physical Gold Flows are defined but not live. |
+| **Product Capability** | 🔴 8.5/10 | **Status:** RC v1.1.0-rc10 verified; 173 passing tests. **Gap:** **CRITICAL:** `main` branch remains in RED status due to consecutive history destruction (23 days). Forensic traceability is lost. |
+| **Usability** | 🟡 7.8/10 | **Status:** Decision Cockpit TUI functional. **Gap:** High setup friction (TA-Lib C-dependencies). "One-Command" Dockerized environment is proposed but missing. |
+| **Safety** | 🔴 8.5/10 | **Status:** 8-layer safety logic defined. **Gap:** **HIGH RISK:** "Risk API Drift" detected—harmonized tests fail against current `RiskManager`. Emergency Kill Switch (`scripts/emergency_flatten.py`) is missing. |
+| **Intelligence** | 🟢 9.6/10 | **Status:** Regime Detector and Calibration Engine are live. **Gap:** Real-time Macro Risk (FRED/YFinance) remains in simulation mode. |
+| **Market Differentiation** | 🟢 8.5/10 | **Status:** Signal Attribution and WFO are standards. **Gap:** XAUUSD-specific metrics like Hurst Exponent and Physical Gold Flows are in research phase. |
 
 ---
 
 ## High Priority (Next 2 Weeks)
-- **History Harmonization & Global Root Resolution** — Score: 10/10 | Cost: M | Why: Resolves the "Disconnected Root" crisis which is the primary blocker for all feature delivery. Restore forensic traceability and enables safe branch integration. (Ready: 🟢, Leverage: Critical, Value: Deterministic Updates)
-- **Production-Grade Emergency Kill Switch ("Flatten & Fence")** — Score: 9.9/10 | Cost: S | Why: Implementation of `scripts/emergency_flatten.py` and `MT5Connector.close_position` for foundational capital protection. Liquidates positions and fences the account instantly. (Ready: 🟢, Leverage: High, Value: Peace of Mind)
-- **One-Command Dev Environment (Dockerization)** — Score: 9.2/10 | Cost: M | Why: Eliminates 45+ minutes of setup friction and TA-Lib compilation failures by standardizing the environment for all contributors. (Ready: 🟢, Leverage: High, Value: Developer/Agent UX)
-- **Deterministic Merge Queue Implementation** — Score: 9.5/10 | Cost: S | Why: Automates the Jules05 governor role, enabling safe, high-velocity integration of intelligence and safety features. (Ready: 🟢, Leverage: High, Value: Delivery Velocity)
+
+- **Risk API Harmonization (Drift Resolution)** — Score: 10/10 | Cost: S | Why: Resolves the 100% failure rate in harmonized risk tests. Aligns `RiskManager.approve()` with `validate_signal()` and integrates ATR-based sizing. (Ready: 🟢, Leverage: High, Value: Safety Integrity)
+- **History Harmonization & Global Root Resolution** — Score: 10/10 | Cost: M | Why: Resolves the "Disconnected Root" crisis. Restores forensic traceability and enables safe branch integration for all agents. (Ready: 🟢, Leverage: Critical, Value: Deterministic Updates)
+- **Production-Grade Emergency Kill Switch ("Flatten & Fence")** — Score: 9.9/10 | Cost: S | Why: Implementation of `scripts/emergency_flatten.py` and `MT5Connector.close_position` for foundational capital protection. (Ready: 🟢, Leverage: High, Value: Peace of Mind)
+- **One-Command Dev Environment (Dockerization)** — Score: 9.2/10 | Cost: M | Why: Eliminates 45+ minutes of setup friction and TA-Lib compilation failures by standardizing the environment. (Ready: 🟢, Leverage: High, Value: Developer UX)
+- **Deterministic Merge Queue & CI Gates** — Score: 9.5/10 | Cost: S | Why: Automates the Jules05 governor role, enforcing history integrity and API compatibility checks before merge. (Ready: 🟢, Leverage: High, Value: Delivery Velocity)
 
 ## Medium Priority (Weeks 3-4)
-- **Live Macro Intelligence Pipeline (FRED/YFinance)** — Score: 9.7/10 | Cost: M | Why: Integrates US Real Yields and DXY drivers to avoid fundamental "yield-trap" breakouts in the XAUUSD market. (Ready: 🟢, Leverage: Massive, Value: Alpha & Safety)
-- **Institutional Sentiment Intelligence Alpha** — Score: 9.5/10 | Cost: M | Why: Deploy Alpha pipeline for CFTC COT and retail sentiment data integration to capture crowd positioning. (Ready: 🟢, Leverage: High, Value: Market Insight)
-- **Hardened Mode Gate (Account Safety)** — Score: 8.5/10 | Cost: S | Why: Verification that `trade_mode` matches environment configuration at the connector level to prevent accidental live trading. (Ready: 🟢, Leverage: Medium, Value: Catastrophe Prevention)
-- **Telegram Interactive Command Center (Human-in-the-Loop)** — Score: 9.4/10 | Cost: M | Why: Ports the Decision Cockpit to Telegram with "Approve/Reject" buttons, allowing remote management without a terminal. (Ready: 🟡, Leverage: High, Value: Mobile Control)
+
+- **Live Macro Intelligence Pipeline (FRED/YFinance)** — Score: 9.7/10 | Cost: M | Why: Integrates US Real Yields and DXY drivers to avoid fundamental "yield-trap" breakouts in XAUUSD. (Ready: 🟢, Leverage: Massive, Value: Alpha & Safety)
+- **Hardened Mode Gate (Account Safety)** — Score: 8.5/10 | Cost: S | Why: Prevents accidental live trading by verifying `trade_mode` against environment config at the connector level. (Ready: 🟢, Leverage: Medium, Value: Catastrophe Prevention)
+- **Institutional Sentiment Intelligence Alpha** — Score: 9.5/10 | Cost: M | Why: Deploy Alpha pipeline for CFTC COT and retail sentiment data integration. (Ready: 🟢, Leverage: High, Value: Market Insight)
+- **Telegram Interactive Command Center** — Score: 9.4/10 | Cost: M | Why: Ports Decision Cockpit to Telegram with "Approve/Reject" buttons for remote management. (Ready: 🟡, Leverage: High, Value: Mobile Control)
 
 ## Future Consideration
-- **Institutional Fractal Efficiency (Hurst Exponent)** — Score: 8.9/10 | Why: Mathematically distinguish persistent trends from mean-reverting noise specifically for XAUUSD market regimes.
-- **Trade Narrative Memory (LLM-Enhanced Post-Mortem)** — Score: 8.1/10 | Why: Qualitative analysis of "Why did this trade happen?" using LLM synthesis of system telemetry and market context.
-- **Adaptive Execution Feedback (Slippage-Aware)** — Score: 7.8/10 | Why: Uses realized slippage from `TradeLogger` to dynamically adjust execution filters and entry aggression.
+
+- **Institutional Fractal Efficiency (Hurst Exponent)** — Score: 8.9/10 | Why: Mathematically distinguish persistent trends from mean-reverting noise specifically for XAUUSD.
+- **Trade Narrative Memory (LLM-Enhanced Post-Mortem)** — Score: 8.1/10 | Why: Qualitative analysis of "Why did this trade happen?" using LLM synthesis of telemetry.
+- **Adaptive Execution Feedback (Slippage-Aware)** — Score: 7.8/10 | Why: Uses realized slippage from `TradeLogger` to dynamically adjust execution filters.
 
 ---
 *Roadmap curated by Jules05 — Autonomous Product Steward.*
