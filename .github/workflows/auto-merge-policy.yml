@@ -205,17 +205,17 @@ jobs:
 
           if [ "${{ steps.ci-check.outputs.ci_pass }}" = "false" ]; then
             REASON="$REASON
-          - ❌ **Required CI checks failing.** (Quality, Security, or Tests with Coverage < 80%)"
+          - ❌ **Required CI checks failing.** (Code Quality, Dependency Safety, or Tests with Coverage < 80%)"
           fi
 
           if [ "${{ steps.approval-check.outputs.approved }}" = "false" ]; then
             REASON="$REASON
-          - ❌ **Missing required approvals.**"
+          - ❌ **Missing required approvals.** At least one code owner approval is mandatory."
           fi
 
           if [ "${{ steps.mergeability-check.outputs.mergeable }}" = "false" ]; then
             REASON="$REASON
-          - ❌ **Merge conflicts detected.**"
+          - ❌ **Merge conflicts detected.** Please rebase or merge main."
           fi
 
           if [ "${{ steps.observability-check.outputs.observability_pass }}" = "false" ]; then
