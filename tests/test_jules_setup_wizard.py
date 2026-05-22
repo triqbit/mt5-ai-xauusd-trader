@@ -36,10 +36,10 @@ def test_setup_wizard_save_logic():
 
             assert result == 0
 
-            # Use writelines as in main.py
-            # Collect all lines from all writelines calls
+            # Use write as in main.py
+            # Collect all lines from all write calls
             written_lines = []
-            for call in m.return_value.writelines.call_args_list:
+            for call in m.return_value.write.call_args_list:
                 written_lines.extend(call.args[0])
 
             written_data = "".join(written_lines)

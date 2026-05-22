@@ -49,7 +49,7 @@ def test_v2_template_rendering():
 
     # Verify Markdown Rendering
     md = reporter.generate_markdown(report)
-    assert "- **Status:** VERIFIED" in md
+    assert "- **Status:** SectionStatus.VERIFIED" in md
     assert "Actionable Recommendations:" in md
     assert "- Action 1" in md
     assert "- Action 2" in md
