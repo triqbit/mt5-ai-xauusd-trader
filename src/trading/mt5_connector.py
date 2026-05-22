@@ -350,7 +350,7 @@ class MT5Connector:
             if isinstance(e, (MT5DataError, MT5ConnectionError)):
                 raise
             # For unexpected exceptions that might be connection-related
-            logger.exception("Unexpected error in get_rates: %s", e)
+            logger.exception("Unexpected error in get_rates", e=e)
             self._is_initialized = False
             raise MT5DataError(f"Unexpected data retrieval error: {e}") from e
 
@@ -400,7 +400,7 @@ class MT5Connector:
         except Exception as e:
             if isinstance(e, (MT5DataError, MT5ConnectionError)):
                 raise
-            logger.exception("Unexpected error in get_ticks_range: %s", e)
+            logger.exception("Unexpected error in get_ticks_range", e=e)
             self._is_initialized = False
             raise MT5DataError(f"Unexpected tick range retrieval error: {e}") from e
 
@@ -508,7 +508,7 @@ class MT5Connector:
         except Exception as e:
             if isinstance(e, (MT5DataError, MT5ConnectionError)):
                 raise
-            logger.exception("Unexpected error in get_tick: %s", e)
+            logger.exception("Unexpected error in get_tick", e=e)
             self._is_initialized = False
             raise MT5DataError(f"Unexpected tick retrieval error: {e}") from e
 

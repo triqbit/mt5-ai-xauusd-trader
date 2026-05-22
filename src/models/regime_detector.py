@@ -987,7 +987,7 @@ class RegimeDetector:
         """
         path = Path(filepath).resolve()
         if not path.exists():
-            logger.error("Model file not found: %s", filepath)
+            logger.error("Model file not found", filepath=filepath)
             return
 
         # Security: Path validation - restrict to project's models directory or /tmp
@@ -1007,13 +1007,11 @@ class RegimeDetector:
                 is_in_tmp = path.is_relative_to("/tmp") or path.is_relative_to("/var/tmp")
 
             if not (is_in_models or is_in_tmp):
-                logger.error(
-                    "Security violation: Attempted to load model from untrusted path: %s", path
-                )
+                logger.error("Security violation: Attempted to load model from untrusted path", path=path)
                 return
         except ImportError as e:
             # Fail-closed if security constraints cannot be verified
-            logger.error("Security violation: Could not verify model path safety: %s", e)
+            logger.error("Security violation: Could not verify model path safety", e=e)
             return
 
         # Security: Permission check - ensure no world-writable/readable access (Linux/Mac)
@@ -1021,7 +1019,7 @@ class RegimeDetector:
         if os.name != "nt":
             mode = os.stat(path).st_mode
             if mode & (stat.S_IRWXG | stat.S_IRWXO):
-                logger.error("Security violation: Insecure permissions for model file: %s", path)
+                logger.error("Security violation: Insecure permissions for model file", path=path)
                 return
 
         try:
@@ -1034,7 +1032,7 @@ class RegimeDetector:
             self.long_window = state.get("long_window", self.long_window)
             logger.info("model_loaded", path=str(path))
         except Exception as e:
-            logger.error("Failed to load model from %s: %s", filepath, e)
+            logger.error("Failed to load model from :", filepath=filepath, e=e)
 
     def _calculate_transition_matrix(self, features: pd.DataFrame) -> None:
         """Calculates transition probability matrix from fitted GMM on training data."""

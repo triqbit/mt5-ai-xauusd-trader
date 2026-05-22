@@ -44,18 +44,18 @@ def with_retry(
                     # Check if the exception is marked as non-retriable
                     if hasattr(e, "is_retriable") and not e.is_retriable:
                         logger.warning(
-                            "Caught non-retriable exception %s in %s. Failing immediately.",
-                            type(e).__name__,
-                            func.__name__,
+                            "Caught non-retriable exception. Failing immediately.",
+                            exception=type(e).__name__,
+                            function=func.__name__,
                         )
                         raise
 
                     if attempt == max_retries:
                         logger.error(
-                            "Max retries (%d) reached for %s. Last error: %s",
-                            max_retries,
-                            func.__name__,
-                            e,
+                            "Max retries reached. Last error recorded.",
+                            max_retries=max_retries,
+                            function=func.__name__,
+                            error=str(e),
                         )
                         raise
 
@@ -64,12 +64,12 @@ def with_retry(
                         current_delay *= 0.5 + random.random()
 
                     logger.warning(
-                        "Attempt %d/%d failed for %s: %s. Retrying in %.2fs...",
-                        attempt + 1,
-                        max_retries,
-                        func.__name__,
-                        e,
-                        current_delay,
+                        "Attempt failed. Retrying.",
+                        attempt=attempt + 1,
+                        max_retries=max_retries,
+                        function=func.__name__,
+                        error=str(e),
+                        delay=current_delay,
                     )
                     time.sleep(current_delay)
                     delay *= backoff_factor

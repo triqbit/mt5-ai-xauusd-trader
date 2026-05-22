@@ -14,7 +14,7 @@ import psutil
 import pytest
 
 from src.core.config import get_config
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import RiskEvent, TradeLogger
