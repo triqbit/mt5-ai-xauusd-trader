@@ -17,12 +17,12 @@ License: MIT
 
 from __future__ import annotations
 
-import structlog
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+import structlog
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -143,7 +143,9 @@ class RiskManager:
         if adjusted_lots < self.cfg.min_lot_size:
             return self._reject(f"Calculated lot size {adjusted_lots} below minimum", signal)
 
-        logger.info("Signal APPROVED", symbol=signal.symbol, direction=signal.direction, lots=adjusted_lots)
+        logger.info(
+            "Signal APPROVED", symbol=signal.symbol, direction=signal.direction, lots=adjusted_lots
+        )
         return RiskDecision(True, "Approved", adjusted_lots)
 
     def approve(

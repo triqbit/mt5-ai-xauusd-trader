@@ -8,10 +8,10 @@ License: MIT
 
 from __future__ import annotations
 
-import structlog
 from typing import Any, Dict, List, Optional
 
 import pandas as pd
+import structlog
 
 from src.core.audit_log import get_audit_logger
 from src.core.schemas import TradeSignal
@@ -71,9 +71,8 @@ class AuditedRiskManager(RiskManager):
         except (RuntimeError, ImportError):
             logger.debug("AuditLogger not available for risk decision logging")
 
-        if not decision.is_approved:
-            if self.monitor:
-                self.monitor.record_internal_rejection("risk_manager", decision.reason.upper())
+        if not decision.is_approved and self.monitor:
+            self.monitor.record_internal_rejection("risk_manager", decision.reason.upper())
 
         return decision
 
