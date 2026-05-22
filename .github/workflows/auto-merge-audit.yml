@@ -32,17 +32,23 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
-          # Patterns must match auto-merge-policy.yml
+          # Patterns must match auto-merge-policy.yml exactly
           HIGH_RISK_PATTERNS=(
-            "src/trading/executor.py"      # Live trading execution logic
-            "src/core/risk_engine.py"      # Core risk calculation engine
-            "src/trading/risk_engine.py"   # Core risk calculation engine
-            "src/trading/risk_manager.py"  # Risk parameters and position sizing
-            "config/secrets.*"             # Credentials and secrets
-            ".github/workflows/deploy.*"   # Deployment workflows
-            ".github/workflows/ci.yml"     # CI workflows affecting deployment
-            "Dockerfile"                   # Infrastructure control
-            "migrations/.*"                # Database migrations
+            "src/trading/executor.py"
+            "src/trading/mt5_connector.py"
+            "src/core/risk_engine.py"
+            "src/trading/risk_engine.py"
+            "src/trading/risk_manager.py"
+            "src/trading/audited_risk_manager.py"
+            "src/trading/capital_allocator.py"
+            "src/trading/execution_filter.py"
+            "config/secrets.*"
+            ".env.*"
+            "src/core/config.py"
+            "Dockerfile"
+            "docker-compose.yml"
+            ".github/workflows/deploy.*"
+            "migrations/.*"
           )
 
           TOUCHED_HIGH_RISK=false

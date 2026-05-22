@@ -37,7 +37,7 @@ jobs:
       - name: Check for High-Risk Files
         id: risk-check
         run: |
-          # Define high-risk patterns and their categories
+          # Define high-risk patterns and their categories as per strict policy
           declare -A PATTERNS
           PATTERNS["src/trading/executor.py"]="Live Trading Execution Logic"
           PATTERNS["src/trading/mt5_connector.py"]="Live Trading Execution Logic"
@@ -147,6 +147,8 @@ jobs:
             REASON="$REASON
           - 🚨 **High-risk files modified in categories: $CATEGORIES.**"
             gh pr edit $PR_NUMBER --add-label "escalated-risk" || true
+            # Fail the step to block auto-merge if risk status is blocked
+            BLOCK_MERGE=true
           fi
 
           if [ "${{ steps.observability-check.outputs.observability_pass }}" = "false" ]; then
@@ -175,6 +177,11 @@ jobs:
 
           gh pr comment $PR_NUMBER --body "$REASON"
           gh pr merge $PR_NUMBER --disable-auto || true
+
+          if [ "$BLOCK_MERGE" = "true" ]; then
+            echo "::error::Strict policy violation: High-risk files detected. Manual approval and escalation required."
+            exit 1
+          fi
 
           echo "::error::Auto-merge policy violations detected. PR escalated."
           exit 1
