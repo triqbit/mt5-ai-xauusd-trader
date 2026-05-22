@@ -3,16 +3,16 @@
 > [!IMPORTANT]
 > **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules.
 
-Generated on: 2026-05-21 14:15:00 UTC
+Generated on: 2026-05-22 13:26:02 UTC
 
-This checklist identifies top promising low-risk PRs for immediate review to assist Jules05 and human reviewers.
+This checklist identifies top promising PRs for immediate review.
 
-## 1. PR #1390: DX: improve developer onboarding and contribution experience
-- **Short scope summary**: Improves developer onboarding, setup clarity, and safe contribution pathways. Touches only documentation.
-- **Domains touched**: docs
-- **CI status**: pending (Global CI block due to history graft)
+## 1. PR #1395: 🤖 Jules05: Auto-merge policy update
+- **Short scope summary**: High Risk update implementing '🤖 Jules05: Auto-merge policy update'
+- **Domains touched**: AI models, core architecture, core trading, database, docs, infra/CI, infra/scripts, research, tests
+- **CI status**: pending
 - **Missing items**: None identified
-- **Recommendation**: Ready for detailed review (Low risk documentation update)
+- **Recommendation**: High-risk — needs domain expert review
 
 ---
 *Prepared by Jules06 (qufuwan) for Jules05 and human review.*
