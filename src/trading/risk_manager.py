@@ -269,3 +269,14 @@ class RiskManager:
 
 
 __all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager"]
+
+    def validate_signal(self, signal, market_data, open_positions):
+        from dataclasses import dataclass
+        @dataclass
+        class Decision:
+            is_approved: bool
+            reason: str
+            adjusted_lot_size: float
+
+        is_approved = self.approve(signal)
+        return Decision(is_approved=is_approved, reason="Approved" if is_approved else "Rejected", adjusted_lot_size=signal.lot_size if is_approved else 0.0)

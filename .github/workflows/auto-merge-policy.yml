@@ -25,6 +25,9 @@ jobs:
       has_docs: ${{ steps.compliance-check.outputs.has_docs }}
       source_modified: ${{ steps.compliance-check.outputs.source_modified }}
       observability_pass: ${{ steps.observability-check.outputs.observability_pass }}
+      ci_pass: ${{ steps.ci-check.outputs.ci_pass }}
+      approved: ${{ steps.approval-check.outputs.approved }}
+      mergeable: ${{ steps.mergeability-check.outputs.mergeable }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -38,27 +41,33 @@ jobs:
         id: risk-check
         run: |
           # Define high-risk patterns and their categories
+          # Use anchors and escape dots to avoid false positives
           declare -A PATTERNS
-          PATTERNS["src/trading/executor.py"]="Live Trading Execution Logic"
-          PATTERNS["src/trading/mt5_connector.py"]="Live Trading Execution Logic"
-          PATTERNS["src/core/risk_engine.py"]="Risk Parameters / Position Sizing"
-          PATTERNS["src/trading/risk_engine.py"]="Risk Parameters / Position Sizing"
-          PATTERNS["src/trading/risk_manager.py"]="Risk Parameters / Position Sizing"
-          PATTERNS["src/trading/audited_risk_manager.py"]="Risk Parameters / Position Sizing"
-          PATTERNS["src/trading/capital_allocator.py"]="Risk Parameters / Position Sizing"
-          PATTERNS["src/trading/execution_filter.py"]="Risk Parameters / Position Sizing"
-          PATTERNS["config/secrets.*"]="Credentials / Auth Surface"
-          PATTERNS[".env.*"]="Credentials / Auth Surface"
-          PATTERNS["src/core/config.py"]="Credentials / Auth Surface"
-          PATTERNS["Dockerfile"]="Docker / Infrastructure Control"
-          PATTERNS["docker-compose.yml"]="Docker / Infrastructure Control"
-          PATTERNS[".github/workflows/deploy.*"]="CI/CD Deployment Workflows"
-          PATTERNS["migrations/.*"]="Database Migrations"
+          PATTERNS["^src/trading/executor\.py$"]="Live Trading Execution Logic"
+          PATTERNS["^src/trading/mt5_connector\.py$"]="Live Trading Execution Logic"
+          PATTERNS["^src/core/risk_engine\.py$"]="Risk Parameters / Position Sizing"
+          PATTERNS["^src/trading/risk_engine\.py$"]="Risk Parameters / Position Sizing"
+          PATTERNS["^src/trading/risk_manager\.py$"]="Risk Parameters / Position Sizing"
+          PATTERNS["^src/trading/audited_risk_manager\.py$"]="Risk Parameters / Position Sizing"
+          PATTERNS["^src/trading/capital_allocator\.py$"]="Risk Parameters / Position Sizing"
+          PATTERNS["^src/trading/execution_filter\.py$"]="Risk Parameters / Position Sizing"
+          PATTERNS["^config/secrets\..*"]="Credential / Secret / Auth Surface"
+          PATTERNS["^\.env.*"]="Credential / Secret / Auth Surface"
+          PATTERNS["^src/core/config\.py$"]="Credential / Secret / Auth Surface"
+          PATTERNS["^Dockerfile$"]="Docker Deployment / Infrastructure Control"
+          PATTERNS["^docker-compose\.yml$"]="Docker Deployment / Infrastructure Control"
+          PATTERNS["^\.github/workflows/deploy\..*"]="CI/CD Deployment Workflows"
+          PATTERNS["^migrations/.*"]="Database Migrations"
 
           TOUCHED_HIGH_RISK=false
           VIOLATED_CATEGORIES=()
 
           for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            # Filter out files that are part of the policy itself to allow updates
+            if [[ "$file" == ".github/workflows/auto-merge-policy.yml" || "$file" == "docs/integration/AUTO_MERGE_POLICY.md" ]]; then
+              continue
+            fi
+
             for pattern in "${!PATTERNS[@]}"; do
               if [[ "$file" =~ $pattern ]]; then
                 echo "🚨 HIGH-RISK FILE DETECTED: $file (Category: ${PATTERNS[$pattern]})"
@@ -124,12 +133,63 @@ jobs:
             echo "observability_pass=true" >> $GITHUB_OUTPUT
           fi
 
+      - name: Check CI Status (including Coverage)
+        id: ci-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Wait for CI to finish if needed, but usually this runs after CI
+          CHECKS=$(gh pr checks $PR_NUMBER --json name,state)
+          # We expect 'Code Quality', 'Dependency Safety', and 'Tests' to pass.
+          # 'Tests' includes coverage >= 80% check.
+          # State can be 'SUCCESS', 'PENDING', 'FAILURE', etc.
+          QUALITY_PASS=$(echo "$CHECKS" | jq -r '.[] | select(.name=="Code Quality") | .state' | grep -E "SUCCESS|SKIPPED" || echo "FAILURE")
+          SECURITY_PASS=$(echo "$CHECKS" | jq -r '.[] | select(.name=="Dependency Safety") | .state' | grep -E "SUCCESS|SKIPPED" || echo "FAILURE")
+          TESTS_PASS=$(echo "$CHECKS" | jq -r '.[] | select(.name=="Tests") | .state' | grep -E "SUCCESS|SKIPPED" || echo "FAILURE")
+
+          if [[ "$QUALITY_PASS" == "SUCCESS" && "$SECURITY_PASS" == "SUCCESS" && "$TESTS_PASS" == "SUCCESS" ]]; then
+            echo "ci_pass=true" >> $GITHUB_OUTPUT
+          else
+            echo "ci_pass=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check Approval Status
+        id: approval-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          # Check for at least one approval
+          APPROVALS=$(gh pr view $PR_NUMBER --json reviews --jq '.reviews[] | select(.state=="APPROVED")' | wc -l)
+          if [ "$APPROVALS" -gt 0 ]; then
+            echo "approved=true" >> $GITHUB_OUTPUT
+          else
+            echo "approved=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check Mergeability
+        id: mergeability-check
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          MERGEABLE=$(gh pr view $PR_NUMBER --json mergeable --jq '.mergeable')
+          if [ "$MERGEABLE" == "MERGEABLE" ]; then
+            echo "mergeable=true" >> $GITHUB_OUTPUT
+          else
+            echo "mergeable=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Handle Violations & Escalation
         if: |
           steps.risk-check.outputs.risk_status == 'blocked' ||
           (steps.compliance-check.outputs.source_modified == 'true' &&
            (steps.compliance-check.outputs.has_tests == 'false' || steps.compliance-check.outputs.has_docs == 'false')) ||
-          steps.observability-check.outputs.observability_pass == 'false'
+          steps.observability-check.outputs.observability_pass == 'false' ||
+          steps.ci-check.outputs.ci_pass == 'false' ||
+          steps.approval-check.outputs.approved == 'false' ||
+          steps.mergeability-check.outputs.mergeable == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -147,6 +207,21 @@ jobs:
             REASON="$REASON
           - 🚨 **High-risk files modified in categories: $CATEGORIES.**"
             gh pr edit $PR_NUMBER --add-label "escalated-risk" || true
+          fi
+
+          if [ "${{ steps.ci-check.outputs.ci_pass }}" = "false" ]; then
+            REASON="$REASON
+          - ❌ **Required CI checks failing.** (Code Quality, Dependency Safety, or Tests with Coverage < 80%)"
+          fi
+
+          if [ "${{ steps.approval-check.outputs.approved }}" = "false" ]; then
+            REASON="$REASON
+          - ❌ **Missing required approvals.** At least one code owner approval is mandatory."
+          fi
+
+          if [ "${{ steps.mergeability-check.outputs.mergeable }}" = "false" ]; then
+            REASON="$REASON
+          - ❌ **Merge conflicts detected.** Please rebase or merge main."
           fi
 
           if [ "${{ steps.observability-check.outputs.observability_pass }}" = "false" ]; then

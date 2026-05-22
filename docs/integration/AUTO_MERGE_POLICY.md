@@ -42,12 +42,12 @@ The following patterns trigger an automatic block and escalation:
 - `src/trading/capital_allocator.py`
 - `src/trading/execution_filter.py`
 
-### Credentials / Auth Surface
+### Credential / Secret / Auth Surface
 - `config/secrets.*`
 - `.env.*`
 - `src/core/config.py`
 
-### Docker / Infrastructure Control
+### Docker Deployment / Infrastructure Control
 - `Dockerfile`
 - `docker-compose.yml`
 
@@ -69,6 +69,7 @@ The following patterns trigger an automatic block and escalation:
 
 | Date | PR # | Action | Reason | Result |
 | :--- | :--- | :--- | :--- | :--- |
+| 2026-05-21 | N/A | Policy Update | 🤖 Jules05: Strict auto-merge policy update and refinement | [System Change] |
 | 2026-05-20 | N/A | Policy Update | 🤖 Jules05: Robust auto-merge policy with strict escalation logic | [System Change] |
 | 2026-05-18 | N/A | Policy Update | 🤖 Jules05: Strict auto-merge policy maintenance and pattern alignment | [System Change] |
 | 2026-05-15 | N/A | Policy Update | Jules05: Strict auto-merge enforcement (Unified with requirements) | [System Change] |
