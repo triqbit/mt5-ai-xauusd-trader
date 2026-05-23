@@ -1,34 +1,34 @@
 # Executive Summary - Rolling 7-Day View
 
-**Current Date:** May 20, 2026
+**Current Date:** May 23, 2026
 
 ## Strategic Status
-The platform continues to advance in functional capability with **100% integration pass rates** verified on May 20. However, the system remains in **🔴 RED Process Integrity status** due to the ongoing **"History Fragmentation" crisis**. Resolving this to restore forensic traceability is now the #1 strategic priority on the roadmap, followed closely by the production deployment of the Emergency Kill Switch.
+The platform remains in **🔴 RED Process Integrity status** due to the ongoing **"History Fragmentation" crisis** and **"Risk API Drift"**. Integration testing on May 23 confirmed 13 failures and 4 errors in core paths (Risk, Security, UI), directly attributable to the lack of harmonized logic on the `main` branch. Resolving this via Priority 0 (#1372) is the absolute critical path.
 
-## Rolling 7-Day Accomplishments (May 14 - May 20)
-- **Integration Verification & Roadmap Update (May 20):** Achieved 100% pass rate on 5 critical integration paths and prioritized History Harmonization and Emergency Kill Switch on the strategic roadmap. Resolved lazy-loading `AttributeError` and stabilized dependencies.
-- **Intelligence Explosion & RC10 (May 19):** Delivered the Institutional Market Regime Detector, Model Calibration Engine, and finalized the Benchmarking Framework. Assembled RC v1.1.0-rc10.
+## Rolling 7-Day Accomplishments (May 17 - May 23)
+- **Integration Governance & Merge Queue Update (May 23):** Confirmed Risk API logic drift via comprehensive test suite. Updated the Deterministic Merge Queue to prioritize base stabilization.
+- **Critical Stability & PR Triage (May 22):** Documented 40 workflow friction points. Resolved Pydantic v2 validation regressions in stability tests.
+- **Emergency Automation & MT5 Hardening (May 21):** Implemented `MT5Connector.close_position` for native SDK and MetaAPI, unblocking the Emergency Kill Switch initiative.
+- **Integration Verification & Roadmap Update (May 20):** Achieved 100% pass rate on 5 critical integration paths (at that time). Resolved lazy-loading `AttributeError` and stabilized dependencies.
+- **Intelligence Explosion & RC10 (May 19):** Delivered the Institutional Market Regime Detector, Model Calibration Engine, and finalized the Benchmarking Framework.
 - **Workflow Simplification & Research Forensics (May 18):** Completed the comprehensive workflow automation strategy and merged the Institutional Trade Journal Mining Engine (#1331).
-- **WFO Deployment & Research Stability (May 17):** Completed the Institutional Walk-Forward Optimization framework and published the robustness audit report for the ensemble model.
-- **Integration Governance & Audit (May 16):** Identified critical "Disconnected Root" systemic risk; updated the Deterministic Merge Queue to prioritize architectural alignment.
-- **Framework Explosion & Core Unification (May 15):** Completed the "Big Bang" risk harmonization, integrated the Benchmarking and WFO frameworks, and launched the Explainability System.
-- **Risk Harmonization & Sentiment Definition (May 14):** Unified the 8-layer risk core and defined Feature #12 (Institutional Sentiment Intelligence).
+- **WFO Deployment & Research Stability (May 17):** Completed the Institutional Walk-Forward Optimization framework and published the robustness audit report.
 
 ## Key Performance Indicators (KPIs)
-- **System Stability:** 🟢 87.0% (Verified via 100% integration pass rate across 5 core paths).
-- **Architecture Maturity:** 🟡 8.5/10 (Functional 9.5; Forensic Integrity 1.0 due to fragmentation).
-- **Intelligence Score:** 🟢 9.6/10 (Regime Detector and Calibration Engine are live).
-- **Quality Debt:** **CRITICAL** (History fragmentation on 'main' remains the primary blocker for institutional compliance).
+- **System Stability:** 🔴 85.0% (13 failures in core Risk/Security tests due to API drift).
+- **Architecture Maturity:** 🟡 8.6/10 (Functional 9.6; Forensic Integrity 1.0 due to fragmentation).
+- **Intelligence Score:** 🟢 9.7/10 (Regime Detector, Calibration, and Signal Explainability are live).
+- **Quality Debt:** **CRITICAL** (History fragmentation and Risk API drift on 'main' are the primary blockers).
 
 ## Upcoming Strategic Milestones
-- **History Harmonization (May 21):** Execute the graft-resolution plan to restore Git ancestry.
-- **Emergency Kill Switch (May 21):** Production verification of the "Flatten & Fence" resilience module.
-- **Sentiment Intelligence Alpha (May 22):** Alpha deployment of the retail sentiment and CFTC COT data pipelines.
-- **v1.1.0 GA Release (May 23):** Target for the first institutional-grade General Availability release.
+- **History Harmonization (#1372 Merge) (Target May 24):** Restore Git ancestry and unify Risk/Model interfaces on `main`.
+- **Emergency Kill Switch Deployment (Target May 24):** Final production verification of the "Flatten & Fence" resilience module.
+- **Sentiment Intelligence Alpha (May 25):** Alpha deployment of the retail sentiment and CFTC COT data pipelines.
+- **v1.1.0 GA Release (May 26):** Target for the first institutional-grade General Availability release.
 
 ## Strategic Risks
-- **Disconnected Root Turbulence [CRITICAL]:** Monolithic history grafts destroy forensic traceability, creating an institutional compliance gap.
-- **Risk API Drift [HIGH]:** The 'main' branch remains disconnected from the harmonized 8-layer Risk API, delaying full safety deployment.
+- **Disconnected Root Turbulence [CRITICAL]:** Lack of unified history on `main` destroys forensic traceability.
+- **Risk API Drift [HIGH]:** Functional discrepancy between `main` and harmonized Risk logic in #1372 causing test failures.
 
 ---
 *Report generated by Jules05 — Autonomous Product Steward.*
