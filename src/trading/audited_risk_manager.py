@@ -170,13 +170,12 @@ class AuditedRiskManager(RiskManager):
         except (RuntimeError, ImportError):
             pass
 
-        if not passed:
-            if self.trade_logger:
-                reasons = [k for k, v in decision_chain.items() if not v]
-                self.trade_logger.log_risk_event(
-                    event_type="SIGNAL_REJECTED",
-                    description=f"Failed filters: {', '.join(reasons)}",
-                    symbol=signal.symbol,
-                    signal_id=signal_id,
-                )
+        if not passed and self.trade_logger:
+            reasons = [k for k, v in decision_chain.items() if not v]
+            self.trade_logger.log_risk_event(
+                event_type="SIGNAL_REJECTED",
+                description=f"Failed filters: {', '.join(reasons)}",
+                symbol=signal.symbol,
+                signal_id=signal_id,
+            )
         return passed

@@ -843,7 +843,9 @@ class MT5Connector:
                 err_code = result.retcode if result else -1
                 err_msg = result.comment if result else "Unknown error"
                 logger.error("position_close_failed", ticket=ticket, error=err_msg, code=err_code)
-                raise MT5ExecutionError(f"Failed to close position {ticket}: {err_msg}")
+                raise MT5ExecutionError(
+                    f"Failed to close position {ticket}: {err_msg}"
+                ) from None
 
             logger.info("position_close_success", ticket=ticket)
             return True
@@ -855,7 +857,7 @@ class MT5Connector:
                 return True
             except Exception as e:
                 logger.error("metaapi_position_close_failed", ticket=ticket, error=str(e))
-                raise MT5ExecutionError(f"MetaAPI failed to close position {ticket}: {e}")
+                raise MT5ExecutionError(f"MetaAPI failed to close position {ticket}: {e}") from e
 
 
 __all__ = ["TIMEFRAME_MAP", "MT5Connector"]
