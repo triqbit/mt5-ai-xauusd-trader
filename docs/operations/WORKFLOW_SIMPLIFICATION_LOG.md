@@ -200,5 +200,89 @@ This log identifies every point where the current repository workflow depends on
 **Risk level:** Low
 **Estimated time saved:** 20 minutes per config update
 
+### 29. Friction: Multi-Agent Context Re-Hydration
+**Current state:** Manual reading of `EXECUTIVE_SUMMARY.md` and `AGENTS.md` by agents to regain state. High risk of missing recent critical changes or PR status.
+**Proposed automation:** `One-command workflows`. Implement `make context` which generates a transient `.jules_context.json` containing the last 5 merged PR summaries, current branch status, and active "Critical Path" items from the roadmap.
+**Implementation owner:** Jules05
+**Risk level:** Low
+**Estimated time saved:** 15 minutes per agent session
+
+### 30. Friction: Automated Test-Case Generation from Logged Failures
+**Current state:** Manual reproduction of production errors in local tests. Often requires complex data setup and manual log parsing.
+**Proposed automation:** `Acceptance contracts`. Implement a "Failure Replay" utility in `src/core/health.py`. When a `TradingException` occurs, the system should dump a `failure_payload.json` containing the state, signal, and market context. A new command `make reproduce-failure` should auto-generate a pytest case from this payload.
+**Implementation owner:** Jules02
+**Risk level:** Medium
+**Estimated time saved:** 120 minutes per bug fix
+
+### 31. Friction: Standardized Feature Acceptance Scaffolding
+**Current state:** Manual creation of `docs/features/ACCEPTANCE_CRITERIA_*.md` files. Inconsistent structure leads to review delays.
+**Proposed automation:** `Templates`. Implement `scripts/generate_ac.py <feature_name>` which scaffolds a 4-pillar AC document with pre-populated institutional standards for technical and operational acceptance.
+**Implementation owner:** Jules05
+**Risk level:** Low
+**Estimated time saved:** 30 minutes per feature proposal
+
+### 32. Friction: Equity Log vs Account Balance Reconciliation
+**Current state:** Manual checking of MT5 terminal balance against `trades.db` logs to detect "ghost trades" or missing log entries.
+**Proposed automation:** `Self-service dashboards`. Implement `scripts/reconcile_equity.py` (integrated into `make status`) that performs a real-time diff between the MT5 `account_info().balance` and the sum of `TradeLogger` realized P&L. Discrepancies >0.01% trigger an immediate high-priority alert.
+**Implementation owner:** Jules03
+**Risk level:** Medium
+**Estimated time saved:** 45 minutes per week
+
+### 33. Friction: Strategic PR Dependency Mapping
+**Current state:** Manual tracking of which PRs must merge before others (e.g., Risk API before Model Promotion).
+**Proposed automation:** `Branch promotion logic`. Implement a `Depends-On: #PR_NUMBER` tag in PR descriptions. A CI check must verify that all dependency PRs are merged or included in the same merge train before allowing the target PR to proceed.
+**Implementation owner:** Jules05
+**Risk level:** Low
+**Estimated time saved:** 60 minutes per integration cycle
+
+### 34. Friction: Cross-Platform Environment Parity
+**Current state:** Manual troubleshooting of differences between Linux CI and Windows-native MT5 environments (e.g., path separators, timezone handling).
+**Proposed automation:** `Acceptance contracts`. Implement `scripts/verify_env_parity.py` that runs in both CI and local dev. It validates that `Path` objects are platform-agnostic and that `datetime` operations use the project-standard UTC enforcement.
+**Implementation owner:** Jules01
+**Risk level:** Low
+**Estimated time saved:** 30 minutes per cross-platform bug
+
+### 35. Friction: Automated Release Candidate Composition
+**Current state:** Manual selection of merged PRs to include in a release and manual updating of `CHANGELOG.md`.
+**Proposed automation:** `Branch promotion logic`. Implement `scripts/assemble_release.py` that aggregates all merged PRs since the last tag, categorizes them by conventional commit prefix, and auto-generates a release candidate PR with updated `VERSION` and `CHANGELOG.md`.
+**Implementation owner:** Jules03
+**Risk level:** Medium
+**Estimated time saved:** 90 minutes per release
+
+### 36. Friction: Automated History Gap Detection & Repair
+**Current state:** Manual identification of "History Destruction" events where forensic trade data or git lineage is lost.
+**Proposed automation:** `Merge gates`. Implement `scripts/verify_history_integrity.py` as a pre-commit and CI check. It verifies the continuity of the `trade_id` sequence in `trades.db` and the existence of the "Global Root" commit in the git DAG.
+**Implementation owner:** Jules01
+**Risk level:** High
+**Estimated time saved:** 180 minutes per recovery incident
+
+### 37. Friction: Secure Credential Rotation Lifecycle
+**Current state:** Manual rotation of MT5 passwords and MetaAPI keys. High risk of service interruption or credential exposure during the update.
+**Proposed automation:** `One-command workflows`. Implement `make rotate-credentials`. This script must validate the new credentials against the MT5 server *before* updating the `.env` or Vault, ensuring zero-downtime rotation.
+**Implementation owner:** Jules02
+**Risk level:** High
+**Estimated time saved:** 40 minutes per rotation
+
+### 38. Friction: Model Weight Staleness & Drift Alerts
+**Current state:** Manual monitoring of model performance over time. Models often stay in production too long after their "edge" has decayed.
+**Proposed automation:** `Self-service dashboards`. Implement a "Drift Sentinel" in `src/models/monitor.py`. If the 7-day rolling Sharpe ratio drops >25% below the backtest baseline, the system must automatically flag the model as `status:degraded` and trigger a re-training recommendation.
+**Implementation owner:** Jules04
+**Risk level:** Medium
+**Estimated time saved:** 60 minutes per performance review
+
+### 39. Friction: Automated Dependency License Audit
+**Current state:** Manual review of new library licenses to ensure they are compatible with the MIT license of the repo.
+**Proposed automation:** `Merge gates`. Implement `scripts/verify_licenses.py` in CI using `pip-licenses`. Block PRs that introduce dependencies with incompatible licenses (e.g., GPL-3.0) without an explicit legal override.
+**Implementation owner:** Jules03
+**Risk level:** Low
+**Estimated time saved:** 20 minutes per new dependency
+
+### 40. Friction: Semantic Change Impact Analysis
+**Current state:** Manual review of large diffs to understand if they change core architectural boundaries (e.g., moving logic out of `RiskManager`).
+**Proposed automation:** `Merge gates`. Implement `scripts/audit_architecture.py` that uses AST (Abstract Syntax Tree) parsing to detect changes to "Sensitive Zone" classes or method signatures. PRs that modify these zones are automatically labeled `arch-impact` and require a secondary review from the Architecture Owner.
+**Implementation owner:** Jules05
+**Risk level:** Medium
+**Estimated time saved:** 45 minutes per architecture review
+
 ---
 *Generated by Jules05 — Repository Anti-Friction Strategy.*
