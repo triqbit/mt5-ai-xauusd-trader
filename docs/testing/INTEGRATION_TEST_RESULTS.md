@@ -10,6 +10,7 @@ This document records the results of the end-to-end integration tests conducted 
 
 ---
 
+<a name="test-trading-flow-integration"></a>
 ### Test: Trading Flow Integration
 **Status:** ✅ Pass
 **Latency:** 1.29 / 1.42 / 1.49 ms (P50/P95/P99)
@@ -18,6 +19,7 @@ This document records the results of the end-to-end integration tests conducted 
 **Follow-up required:**
 - None.
 
+<a name="test-configuration--startup"></a>
 ### Test: Configuration & Startup
 **Status:** ✅ Pass
 **Latency:** < 10 ms (Startup validation)
@@ -45,6 +47,7 @@ This document records the results of the end-to-end integration tests conducted 
 - Harmonize Risk API (PR #1372).
 - Implement `MT5Connector.close_position` to support emergency flattening.
 
+<a name="test-intelligence--adaptive-weighting"></a>
 ### Test: Intelligence & Adaptive Weighting
 **Status:** ✅ Pass
 **Latency:** ~40-50 ms (Feature Engineering + Inference)
@@ -57,6 +60,7 @@ This document records the results of the end-to-end integration tests conducted 
 
 ## Technical Audit Findings
 
+<a name="1-data-consistency"></a>
 ### 1. Data Consistency
 - Verified that `signal_id` propagates correctly from `TradeLogger` to `RiskManager` and is stored in the `Trade` record.
 - Confirmed that `TradeSignal` (Pydantic) enforces strict price boundaries and Risk-Reward ratios (>= 1.5) at the schema level.
@@ -69,6 +73,7 @@ This document records the results of the end-to-end integration tests conducted 
 - **Memory Growth:** 0.00MB over 100 iterations (Verified via `psutil`).
 - **CPU Load:** Efficient; Feature Engineering latency remains stable under concurrent MTF calculations.
 
+<a name="4-observability"></a>
 ### 4. Observability
 - All integration events (rejections, approvals, executions) are traced in `audit.db`.
 - Confluence scores from the Decision Support System (DSS) are correctly calculated and logged.
