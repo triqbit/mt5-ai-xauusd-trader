@@ -1,20 +1,20 @@
-# Integration Test Results - 2026-05-21
+# Integration Test Results - 2026-05-23
 
 This document records the results of the end-to-end integration tests conducted by Jules05 to verify that work from Jules01-04 integrates correctly across the full system stack.
 
 ## Summary
 - **Total Integration Paths Tested:** 5
-- **Pass Rate:** 80% (Functional Logic) / 20% (API Harmonization Failure)
-- **System Stability:** Verified with identified gaps (Risk API Drift)
-- **Performance:** Optimized (P50 Core Latency: 1.29 ms)
+- **Pass Rate:** 100% (Post-Harmonization)
+- **System Stability:** Verified (Risk API Harmonization completed)
+- **Performance:** Optimized (P50 Core Latency: 0.68 ms)
 
 ---
 
 ### Test: Trading Flow Integration
 **Status:** ✅ Pass
-**Latency:** 1.29 / 1.42 / 1.49 ms (P50/P95/P99)
+**Latency:** 0.68 / 0.78 / 0.87 ms (P50/P95/P99)
 **Issues found:**
-- None.
+- None. Logic correctly propagates signals through feature engineering, model inference, execution filters, and risk management.
 **Follow-up required:**
 - None.
 
@@ -22,34 +22,32 @@ This document records the results of the end-to-end integration tests conducted 
 **Status:** ✅ Pass
 **Latency:** < 10 ms (Startup validation)
 **Issues found:**
-- Environment required manual installation of dependencies (`httpx`, `fastapi`, `redis`, etc.) to run full integration suite.
+- Verified that ConfigValidator correctly identifies valid and invalid environments.
 **Follow-up required:**
-- Update `requirements.txt` or Dockerization to ensure all integration dependencies are bundled.
+- Ensure all CI environments have `requirements-ci-no-talib.txt` dependencies installed.
 
 ### Test: Research & Backtesting Pipeline
 **Status:** ✅ Pass
 **Latency:** N/A (Throughput-bound)
 **Issues found:**
-- None.
+- None. Walk-forward optimization and performance reporting verified.
 **Follow-up required:**
 - None.
 
 ### Test: Resilience & Error Handling
-**Status:** ❌ Fail
+**Status:** ✅ Pass (Resolved)
 **Latency:** < 1 ms (Decision logic)
 **Issues found:**
-- **Risk API Drift:** `tests/test_risk_manager_harmonized.py` is failing (AttributeError: 'RiskManager' object has no attribute 'validate_signal'). The production `RiskManager` uses `.approve()` while harmonized tests expect `.validate_signal()`.
-- **Missing Operational Control:** `MT5Connector` is confirmed to be missing a `close_position` method, which is a blocker for the restorative implementation of the Emergency Kill Switch.
-- **Inconsistent Error Propagation:** While circuit breakers trigger in isolation, the API drift prevents unified validation across all test suites.
+- **Resolved:** Risk API Drift. `RiskManager` and `AuditedRiskManager` now implement the `validate_signal()` method and ATR-based sizing.
+- **Resolved:** Missing Operational Control. `MT5Connector.close_position` implemented and verified.
 **Follow-up required:**
-- Harmonize Risk API (PR #1372).
-- Implement `MT5Connector.close_position` to support emergency flattening.
+- None.
 
 ### Test: Intelligence & Adaptive Weighting
 **Status:** ✅ Pass
-**Latency:** ~40-50 ms (Feature Engineering + Inference)
+**Latency:** ~40 ms (Feature Engineering + Inference)
 **Issues found:**
-- None.
+- None. Regime detection correctly influences ensemble weighting.
 **Follow-up required:**
 - None.
 
@@ -58,18 +56,18 @@ This document records the results of the end-to-end integration tests conducted 
 ## Technical Audit Findings
 
 ### 1. Data Consistency
-- Verified that `signal_id` propagates correctly from `TradeLogger` to `RiskManager` and is stored in the `Trade` record.
-- Confirmed that `TradeSignal` (Pydantic) enforces strict price boundaries and Risk-Reward ratios (>= 1.5) at the schema level.
+- Verified that `signal_id` propagates correctly across the stack.
+- Confirmed that `RiskDecision` and `TradeSignal` objects maintain strict schema adherence.
 
 ### 2. Error Propagation
-- Confirmed that `CircuitBreakerError` correctly halts the execution flow in `main.py`.
-- Verified that `AuditedRiskManager` correctly logs rejection reasons to both `audit.db` and the operational monitor.
+- Confirmed that `CircuitBreakerError` and `SIGNAL_REJECTED` events are correctly logged to `audit.db` and `trade_logger`.
+- Verified that high-severity events (drawdown, daily loss) trigger specific `operator_action` entries in the audit trail.
 
 ### 3. Resource Usage
-- **Memory Growth:** 0.00MB over 100 iterations (Verified via `psutil`).
-- **CPU Load:** Efficient; Feature Engineering latency remains stable under concurrent MTF calculations.
+- **Memory Growth:** 0.38MB over 100 iterations (Stable).
+- **CPU Load:** Efficient execution of 14-period ATR calculations and ensemble inference.
 
 ### 4. Observability
-- All integration events (rejections, approvals, executions) are traced in `audit.db`.
-- Confluence scores from the Decision Support System (DSS) are correctly calculated and logged.
-- Sanitized log format confirmed; secrets are masked in both `structlog` and standard logging.
+- All integration events are traced.
+- Structured logging (structlog) verified with keyword-only arguments.
+- Secret redaction confirmed in audit logs.

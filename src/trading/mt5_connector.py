@@ -789,5 +789,73 @@ class MT5Connector:
             # Return empty or a simple guess.
             return [pattern.upper()]
 
+    @with_retry((MT5ExecutionError, MT5ConnectionError), max_retries=2)
+    def close_position(self, ticket: int) -> bool:
+        """
+        Close an open position by ticket ID.
+        Essential for emergency liquidation and circuit breaker response.
+
+        Args:
+            ticket: The unique ticket ID of the position.
+
+        Returns:
+            bool: True if close request was successful.
+        """
+        return self.breaker(self._close_position_logic)(ticket)
+
+    def _close_position_logic(self, ticket: int) -> bool:
+        """Internal close position logic."""
+        if not self._is_initialized:
+            self.initialize()
+
+        logger.info("position_close_attempt", ticket=ticket)
+
+        if not self.use_metaapi:
+            # Native MT5: Need to find position first to get its properties
+            positions = mt5.positions_get(ticket=ticket)
+            if positions is None or len(positions) == 0:
+                logger.warning("position_not_found_for_close", ticket=ticket)
+                return False
+
+            pos = positions[0]
+            symbol = pos.symbol
+            volume = pos.volume
+            order_type = mt5.ORDER_TYPE_SELL if pos.type == mt5.POSITION_TYPE_BUY else mt5.ORDER_TYPE_BUY
+
+            tick = mt5.symbol_info_tick(symbol)
+            price = tick.bid if order_type == mt5.ORDER_TYPE_SELL else tick.ask
+
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": volume,
+                "type": order_type,
+                "position": ticket,
+                "price": price,
+                "magic": 20240419,
+                "comment": "Emergency Close",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+
+            result = mt5.order_send(request)
+            if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+                err_code = result.retcode if result else -1
+                err_msg = result.comment if result else "Unknown error"
+                logger.error("position_close_failed", ticket=ticket, error=err_msg, code=err_code)
+                raise MT5ExecutionError(f"Failed to close position {ticket}: {err_msg}")
+
+            logger.info("position_close_success", ticket=ticket)
+            return True
+        else:
+            try:
+                # MetaAPI close
+                self._run_async(self.metaapi_connection.close_position(str(ticket)))
+                logger.info("metaapi_position_close_success", ticket=ticket)
+                return True
+            except Exception as e:
+                logger.error("metaapi_position_close_failed", ticket=ticket, error=str(e))
+                raise MT5ExecutionError(f"MetaAPI failed to close position {ticket}: {e}")
+
 
 __all__ = ["TIMEFRAME_MAP", "MT5Connector"]
