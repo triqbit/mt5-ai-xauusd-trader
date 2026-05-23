@@ -12,9 +12,9 @@ Before you start, be aware of two unique factors in this repository:
 
 ---
 
-## 🎯 Your Mission: Reduce the "Lint Debt"
+## 🎯 Your Mission: Enhance System Diagnostics
 
-The repository currently has a significant amount of "lint debt" (over 4,400 issues), primarily in the `tests/` directory. Since `tests/` is a defined **Safe Zone**, this is the perfect place for a first contribution.
+As an institutional-grade system, our "Time to First Success" is critical. Your mission is to improve the `scripts/doctor.py` tool by adding a new diagnostic check or improving an existing one. This is a high-impact, low-risk way to help every developer who joins after you.
 
 ### Step 1: Prepare Your Environment
 
@@ -23,49 +23,39 @@ The repository currently has a significant amount of "lint debt" (over 4,400 iss
 git checkout main
 git pull origin main
 
-# 2. Install development tools
-pip install ".[dev]"
-
-# 3. Create a cleanup branch
-git checkout -b refactor/cleanup-test-lint
+# 2. Create a feature branch
+git checkout -b feature/doctor-enhancement
 ```
 
-### Step 2: Identify Targets
+### Step 2: Identify a Diagnostic Gap
 
-Run the linter and filter for the `tests/` directory:
+Run the doctor script and look for missing checks that would be helpful for a new user:
 ```bash
-make lint | grep "tests/"
+make doctor
 ```
 
-You will likely see many errors like `F401 (unused-import)` or `F841 (unused-variable)`.
+**Ideas for first contributions:**
+- Add a check for available disk space (important for `trades.db`).
+- Add a check for the existence of the `data/` directory.
+- Improve the error message for a failing database connectivity check.
+- Add a check to verify that `docker` is installed if the user is in a Linux environment.
 
-### Step 3: Implement Fixes
+### Step 3: Implement the Check
 
-Choose a single test file (e.g., `tests/test_performance.py`) and fix the identified lint issues.
-
-**Pro Tip:** Use `ruff` to automatically fix what it can:
-```bash
-python -m ruff check tests/test_performance.py --fix
-```
+Open `scripts/doctor.py` and implement a new `DiagnosticCheck`. Use the existing functions like `check_python_version()` as a template.
 
 ### Step 4: Verify Your Changes
 
-Ensure the linter is happy with that specific file:
+Run the doctor script again to see your new check in action:
 ```bash
-python -m ruff check tests/test_performance.py
+make doctor
 ```
-
-**CRITICAL:** Ensure you haven't broken the tests themselves!
-```bash
-make test
-```
-*(Note: If `make test` fails globally due to environment issues, ensure it at least doesn't fail more than it did before your changes.)*
 
 ### Step 5: Submit for Review
 
-1.  **Commit with Conventional Commits:** `test: resolve lint issues in tests/test_performance.py`
+1.  **Commit with Conventional Commits:** `feat: add disk space check to doctor diagnostics`
 2.  **Rebase:** `git rebase main`
-3.  **Push and PR:** Open a PR and tag **Jules06 (@maintainer-quality)** for review.
+3.  **Push and PR:** Open a PR and tag **Jules06 (@qufuwan)** for review.
 
 ---
 

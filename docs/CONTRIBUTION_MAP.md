@@ -4,11 +4,11 @@ This map defines the "Safe Zones" and "Sensitive Zones" of the MT5 AI/ML Trading
 
 ## 🚦 System at a Glance
 
-| Zone | Path | Risk Level | Review Requirement |
-| :--- | :--- | :--- | :--- |
-| **Safe Zone** | `docs/`, `tests/`, `scripts/` | 🟢 Low | Standard Peer Review |
-| **Utility Zone** | `src/utils/`, `src/analytics/` | 🟡 Medium | Domain Expert Review |
-| **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/` | 🔴 High | Lead Maintainer + Multi-Signature |
+| Zone | Path | Risk Level | Review Requirement | Evidence Required |
+| :--- | :--- | :--- | :--- | :--- |
+| **Safe Zone** | `docs/`, `tests/`, `scripts/` | 🟢 Low | Standard Peer Review | Unit Tests / Doc Lint |
+| **Utility Zone** | `src/utils/`, `src/analytics/` | 🟡 Medium | Domain Expert Review | Integration Tests |
+| **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/` | 🔴 High | Lead + Multi-Signature | Backtests + Stress Tests |
 
 ---
 
