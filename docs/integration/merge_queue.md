@@ -1,13 +1,13 @@
-# 🎯 Jules05: Deterministic Merge Queue [2026-05-22]
+# 🎯 Jules05: Deterministic Merge Queue [2026-05-23]
 
 This document serves as the authoritative source of truth for the integration state and merge priorities of the repository, managed by Jules05.
 
 ## 📊 Summary State
-- **Merge-Ready**: 1 (Workflow Documentation)
-- **Fix-Required**: 900+ (Divergent branches/roots)
+- **Merge-Ready**: 0 (Waiting for base harmonization)
+- **Fix-Required**: 548+ (Divergent branches/roots)
 - **Blocked**: All feature branches (until Harmonization #1372 is merged)
-- **Risky (Escalated)**: 35+ (Trading logic, Risk parameters, Security, Model Inference)
-- **Superseded/Stale**: 547+ (Pre-May 15 work)
+- **Risky (Escalated)**: 36+ (Trading logic, Risk parameters, Security, Model Inference)
+- **Superseded/Stale**: 547+ (Pre-May 22 "Big Bang")
 
 ---
 
@@ -16,14 +16,13 @@ This document serves as the authoritative source of truth for the integration st
 | Order | PR # | Branch | Classification | Rationale | Next Action |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | 0 | #1372 | `Jules05-resolve-cross-agent-conflict-13854965436455603502` | risky (escalated) | **SYSTEM BASE:** Cross-agent conflict resolution. Harmonizes Risk API and Model interfaces. Required to fix history root. | **ESCALATE:** Human review required for Risk API changes. |
-| 1 | #1367 | `jules05/workflow-simplification-log-7413812354450014762` | merge-ready | **GOVERNANCE:** Documentation of operational friction and automation design. Low risk. | Merge to main. |
-| 2 | #1395 | `jules05-auto-merge-policy-update-14778474038957274841` | risky (escalated) | **GOVERNANCE:** Auto-merge policy update. Touches CI/CD safety gates. | **ESCALATE:** Human review required for policy changes. |
-| 3 | #1369 | `jules02-security-hardening-model-signatures-17851897229134920353` | risky (escalated) | **SECURITY:** HMAC-SHA256 signature verification for models. Protects against supply chain attacks. | **ESCALATE:** Human review required for security surface changes. |
-| 4 | #1384 | `security/model-integrity-guard-13330429797659203878` | risky (escalated) | **SECURITY:** HMAC-SHA256 model integrity guard. Hardens model loading path. | **ESCALATE:** Human review required for security surface changes. |
-| 5 | #1386 | `jules02-cli-ux-improvements-8438108481486765359` | risky (escalated) | **UX/CORE:** Configurable polling and setup wizard enhancements. Touches core loop control. | **ESCALATE:** Expert review for core loop changes. |
-| 6 | #1389 | `jules02/unified-schemas-5643005943939164146` | risky (escalated) | **SCHEMA:** Unified decision funnel schemas. Touches core data models. | **ESCALATE:** Review for schema consistency. |
-| 7 | #1371 | `jules02/risk-reconciliation-8990552146312303501` | blocked | **RESILIENCE:** Synthetic test scenarios for risk reconciliation. Depends on #1372. | Rebase on #1372 after it merges. |
-| 8 | #1365 | `feat/rare-event-simulator-enhancements-10851597428787068158` | risky (escalated) | **INTELLIGENCE:** Enhances rare event simulator with stochastic paths. Touches research simulation. | **ESCALATE:** Review for research logic changes. |
+| 1 | #1395 | `jules05-auto-merge-policy-update-14778474038957274841` | risky (escalated) | **GOVERNANCE:** Auto-merge policy update. Touches CI/CD safety gates. | **ESCALATE:** Human review required for policy changes. |
+| 2 | #1369 | `jules02-security-hardening-model-signatures-17851897229134920353` | risky (escalated) | **SECURITY:** HMAC-SHA256 signature verification for models. Protects against supply chain attacks. | **ESCALATE:** Human review required for security surface changes. |
+| 3 | #1384 | `security/model-integrity-guard-13330429797659203878` | risky (escalated) | **SECURITY:** HMAC-SHA256 model integrity guard. Hardens model loading path. | **ESCALATE:** Human review required for security surface changes. |
+| 4 | #1386 | `jules02-cli-ux-improvements-8438108481486765359` | risky (escalated) | **UX/CORE:** Configurable polling and setup wizard enhancements. Touches core loop control. | **ESCALATE:** Expert review for core loop changes. |
+| 5 | #1389 | `jules02/unified-schemas-5643005943939164146` | risky (escalated) | **SCHEMA:** Unified decision funnel schemas. Touches core data models. | **ESCALATE:** Review for schema consistency. |
+| 6 | #1371 | `jules02/risk-reconciliation-8990552146312303501` | blocked | **RESILIENCE:** Synthetic test scenarios for risk reconciliation. Depends on #1372. | Rebase on #1372 after it merges. |
+| 7 | #1365 | `feat/rare-event-simulator-enhancements-10851597428787068158` | risky (escalated) | **INTELLIGENCE:** Enhances rare event simulator with stochastic paths. Touches research simulation. | **ESCALATE:** Review for research logic changes. |
 
 ---
 
@@ -55,7 +54,7 @@ Per `docs/integration/AUTO_MERGE_POLICY.md`, the following changes must be manua
 
 ## 📅 Stale / Superseded / Low-Priority
 
-- **Superseded:** All PRs targeting `main` opened before 2026-05-21 that do not include the "Big Bang" root.
+- **Superseded:** All PRs targeting `main` opened before 2026-05-22 that do not include the "Big Bang" root.
 - **Low-Priority:** Stale UX enhancements (e.g., #1281) until core stability is restored.
 
 ---
@@ -66,4 +65,4 @@ Per `docs/integration/AUTO_MERGE_POLICY.md`, the following changes must be manua
 **Directive:** Priority 0 (#1372) MUST be the focus of all coordination until merged.
 
 ---
-*Last Updated: 2026-05-22 by Jules05*
+*Last Updated: 2026-05-23 by Jules05*
