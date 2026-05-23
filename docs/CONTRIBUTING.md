@@ -8,12 +8,12 @@ Thank you for your interest in contributing! As an institutional-grade trading s
 
 We use a role-based governance model where specific leads oversee different domains. You can identify the required reviewers in [.github/CODEOWNERS](../.github/CODEOWNERS).
 
-- **Jules01 (Trading Lead) — `@maintainer-trading`:** Oversees MT5 connectors, risk engines, and execution logic.
-- **Jules02 (Security & CI Lead) — `@xnessom`:** Manages dependency security, CI/CD hardening, and Docker infrastructure.
-- **Jules03 (Release & Governance Lead) — `@andonly1348`:** Final sign-off on releases, production readiness, and governance policy.
-- **Jules04 (ML/Quant Lead) — `@maintainer-models`:** Responsible for model architectures, feature engineering, and research.
-- **Jules05 (Product Lead) — `@andonly1348`:** Oversees product strategy, business logic, and enterprise delivery.
-- **Jules06 (Quality Lead) — `@maintainer-quality`:** Ensures testing rigour, code standards, and observability compliance.
+- **Jules01 (Core & Trading) — `@triqbit`:** Oversees core architecture, MT5/XAUUSD trading logic, and system performance.
+- **Jules02 (Security & Quality) — `@xnessom`:** Manages security, validation, CI quality, and system observability.
+- **Jules03 (Release & Reliability) — `@andonly1348`:** Oversees release reliability, enterprise delivery, and governance compliance.
+- **Jules04 (Quant & Research) — `@saysgrok`:** Responsible for model architectures, adaptive intelligence, and research simulations.
+- **Jules05 (Product & Integration) — `@yxynoty`:** Oversees product stewardship, integration governance, and feature portfolio.
+- **Jules06 (Developer Experience) — `@qufuwan`:** Owns the safe contribution pathway, developer runtime, and technical credibility.
 
 ---
 
