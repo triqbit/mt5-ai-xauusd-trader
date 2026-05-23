@@ -65,6 +65,7 @@ if [ ! -f ".env" ]; then
     if [ -f ".env.example" ]; then
         echo "Creating .env from template..."
         cp .env.example .env
+        chmod 600 .env
     else
         echo ".env.example not found, cannot create .env."
     fi

@@ -102,3 +102,7 @@ releases/
 archives/
 reports/*
 !reports/.gitkeep
+
+# Temporary Agent/Sandox artifacts
+file:*
+test_engine.db
