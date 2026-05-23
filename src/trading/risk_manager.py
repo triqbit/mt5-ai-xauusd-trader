@@ -123,9 +123,7 @@ class RiskManager:
 
         # Layer 6: Prediction Limits
         if not self._check_minimum_confidence(signal.confidence):
-            return RiskDecision(
-                False, f"Confidence {signal.confidence:.2f} below threshold"
-            )
+            return RiskDecision(False, f"Confidence {signal.confidence:.2f} below threshold")
 
         # Layer 7: Risk-Reward Validation
         if not self._check_risk_reward(signal):
@@ -294,9 +292,7 @@ class RiskManager:
             return False
         if accuracy < self.cfg.model_accuracy_floor:
             return False
-        if calibration > self.cfg.model_calibration_threshold:
-            return False
-        return True
+        return calibration <= self.cfg.model_calibration_threshold
 
     def _check_circuit_breaker(self) -> bool:
         if self.peak_equity <= 0:
