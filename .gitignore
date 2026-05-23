@@ -1,6 +1,5 @@
 # ============================================================
 # MT5 AI/ML Trading Bot - .gitignore
-# ============================================================
 
 # Python
 __pycache__/
@@ -102,3 +101,7 @@ releases/
 archives/
 reports/*
 !reports/.gitkeep
+
+# Temporary Agent/Sandbox artifacts
+file:*
+test_engine.db

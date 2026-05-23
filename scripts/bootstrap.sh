@@ -65,6 +65,8 @@ if [ ! -f ".env" ]; then
     if [ -f ".env.example" ]; then
         echo "Creating .env from template..."
         cp .env.example .env
+        sed -i "s|DATABASE_URL=.*|DATABASE_URL=sqlite:///data/trades.db|" .env
+        chmod 600 .env
     else
         echo ".env.example not found, cannot create .env."
     fi

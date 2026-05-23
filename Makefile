@@ -59,7 +59,7 @@ audit:
 	$(VENV_BIN)/pip-audit || pip-audit || echo "pip-audit failed or not available, skipping detailed security audit."
 
 demo:
-	$(PYTHON_EXEC) main.py --mode demo --symbol XAUUSD --verbose
+	$(PYTHON_EXEC) main.py --mode demo --symbol XAUUSD
 
 init:
 	@echo "Initializing system..."
