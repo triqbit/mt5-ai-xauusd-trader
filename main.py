@@ -17,7 +17,6 @@ import argparse
 import os
 import platform
 import sys
-import contextlib
 from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
@@ -150,35 +149,28 @@ def get_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         description="MT5 AI/ML Trading Bot - Enterprise Edition",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Usage Examples:
-  python main.py --setup
-  python main.py --check
-  python main.py --mode demo --symbol XAUUSD --algo ensemble
-  python main.py --mode backtest --start 2024-01-01 --end 2024-05-01 --algo ppo
-        """,
     )
     p.add_argument("--version", action="version", version=f"%(prog)s {get_system_version()}")
 
     execution = p.add_argument_group("Execution Options")
-    execution.add_argument("--mode", choices=["demo", "live", "backtest"], help="Start the bot in a specific mode (demo, live, backtest).")
-    execution.add_argument("--algo", dest="algorithm", choices=["ppo", "ensemble", "lstm", "transformer"], help="Select the AI algorithm architecture to use.")
-    execution.add_argument("--symbol", help="Specify the trading symbol ticker (e.g., XAUUSD).")
-    execution.add_argument("--timeframe", help="Specify the chart timeframe for analysis (e.g., M5, H1).")
+    execution.add_argument("--mode", choices=["demo", "live", "backtest"], help="Start the bot in a specific mode.")
+    execution.add_argument("--algo", dest="algorithm", choices=["ppo", "ensemble", "lstm", "transformer"], help="Select the AI algorithm to use.")
+    execution.add_argument("--symbol", help="Specify the trading symbol (e.g., XAUUSD).")
+    execution.add_argument("--timeframe", help="Specify the chart timeframe (e.g., M5, H1).")
     execution.add_argument("--confirm-live", dest="confirm_live_trading", action="store_true", help="Confirm live trading execution.")
 
     # -- Backtest Group
     backtest = p.add_argument_group("Backtesting & Simulation")
-    backtest.add_argument("--start", help="Historical start date for backtesting (YYYY-MM-DD).", default="2017-01-01")
-    backtest.add_argument("--end", help="Historical end date for backtesting (YYYY-MM-DD).", default="2026-03-30")
-    backtest.add_argument("--spread", type=float, default=0.0001, help="Specify a fixed simulated spread (as decimal).")
-    backtest.add_argument("--commission", type=float, default=7.0, help="Specify commission cost per round-turn lot.")
+    backtest.add_argument("--start", help="Historical start date (YYYY-MM-DD).", default="2017-01-01")
+    backtest.add_argument("--end", help="Historical end date (YYYY-MM-DD).", default="2026-03-30")
+    backtest.add_argument("--spread", type=float, default=0.0001, help="Fixed simulated spread.")
+    backtest.add_argument("--commission", type=float, default=7.0, help="Commission cost per lot.")
 
     setup = p.add_argument_group("Setup & Diagnostics")
-    setup.add_argument("--setup", action="store_true", help="Run the interactive configuration wizard to setup .env.")
-    setup.add_argument("--check", action="store_true", help="Perform comprehensive pre-flight health checks and exit.")
-    setup.add_argument("--doctor", action="store_true", help="Run the system diagnostic tool to verify environment.")
-    setup.add_argument("--show-config", action="store_true", help="Display the current sanitized configuration and exit.")
+    setup.add_argument("--setup", action="store_true", help="Run the interactive configuration wizard.")
+    setup.add_argument("--check", action="store_true", help="Perform pre-flight health checks and exit.")
+    setup.add_argument("--doctor", action="store_true", help="Run system diagnostics.")
+    setup.add_argument("--show-config", action="store_true", help="Display current sanitized configuration.")
 
     return p
 
@@ -190,36 +182,12 @@ def main() -> int:
         from rich.table import Table as RichTable
     except ImportError:
         RichConsole = None
-        RichPanel = None
-        RichTable = None
 
     diagnostic_flags = ["--help", "-h", "--version", "--doctor", "--setup"]
     is_diagnostic = any(arg in sys.argv for arg in diagnostic_flags)
 
-    # 1. Secure directory initialization
-    for d in ["data", "logs", "models/trained"]:
-        p = Path(d)
-        if os.name != "nt":
-            p.mkdir(parents=True, exist_ok=True, mode=0o700)
-            if p.exists():
-                os.chmod(p, 0o700)
-        else:
-            p.mkdir(parents=True, exist_ok=True)
-
     if not HAS_DEPENDENCIES and not is_diagnostic:
-        print("=" * 70)
-        print("CRITICAL: BOOTSTRAP FAILURE - MISSING CORE DEPENDENCIES")
-        print("=" * 70)
-        print(f"Details: {BOOTSTRAP_ERROR}")
-        print(f"Platform: {platform.system()} {platform.release()}")
-        print(f"Python:   {sys.version.split()[0]}")
-        print("\nREMEDIATION STEPS:")
-        print("1. [Recommended] Run 'python3 scripts/doctor.py' to perform deep diagnostics.")
-        print("2. Run 'pip install -r requirements.txt' to install all required libraries.")
-        if platform.system() == "Linux":
-            print("3. On Linux, if TA-Lib is missing, ensure the C-library is installed:")
-            print("   'sudo apt-get install libta-lib0' or equivalent.")
-        print("-" * 70)
+        print(f"CRITICAL: BOOTSTRAP FAILURE - {BOOTSTRAP_ERROR}")
         return 1
 
     parser = get_parser()
@@ -237,11 +205,7 @@ def main() -> int:
     try:
         cfg = get_config()
     except Exception as exc:
-        if RichConsole:
-            console = RichConsole()
-            console.print(f"[bold red]CRITICAL: Configuration load failed:[/] {exc}")
-        else:
-            print(f"CRITICAL: Config load failed: {exc}")
+        print(f"CRITICAL: Config load failed: {exc}")
         return 1
 
     configure_logging(cfg.log_level)
@@ -314,10 +278,6 @@ def main() -> int:
 
     try:
         if cfg.mode in ("demo", "live"):
-            if cfg.mode == "live" and cfg.confirm_live_trading != "YES":
-                log.critical("LIVE trading attempted without --confirm-live or MT5_CONFIRM_LIVE_TRADING=YES")
-                return 1
-
             executor = TradingExecutor(
                 config=cfg, connector=connector, risk=risk, model=model,
                 execution_filter=ex_filter, event_intelligence=events,
@@ -330,13 +290,7 @@ def main() -> int:
             from src.trading.backtester import BacktestEngine
             start_date = datetime.strptime(args.start, "%Y-%m-%d")
             end_date = datetime.strptime(args.end, "%Y-%m-%d")
-
-            with console.status("[bold green]Fetching historical data for backtest...") if console else contextlib.nullcontext():
-                df_raw = connector.get_rates_range(cfg.symbol, cfg.timeframe, start_date, end_date)
-
-            if df_raw.empty:
-                log.error("No historical data found for backtest range.")
-                return 1
+            df_raw = connector.get_rates_range(cfg.symbol, cfg.timeframe, start_date, end_date)
 
             engine = BacktestEngine(
                 symbol=cfg.symbol, initial_balance=10000.0,
@@ -344,19 +298,7 @@ def main() -> int:
                 feature_engineer=fe, execution_filter=ex_filter
             )
             report = engine.run_walk_forward(df_raw, model)
-
-            if RichTable:
-                table = RichTable(title="Backtest Results", box=None)
-                table.add_column("Metric", style="cyan")
-                table.add_column("Value", justify="right")
-                table.add_row("Annualized Return", f"{report.annualized_return:.2%}")
-                table.add_row("Sharpe Ratio", f"{report.sharpe_ratio:.2f}")
-                table.add_row("Max Drawdown", f"{report.max_drawdown:.2%}")
-                table.add_row("Win Rate", f"{report.win_rate:.2%}")
-                table.add_row("Total Trades", str(report.total_trades))
-                console.print(Panel(table, title="[bold green]Institutional Report[/]", border_style="green"))
-            else:
-                log.info("backtest_completed", report=report)
+            log.info("Backtest completed", report=report)
     finally:
         connector.disconnect()
 
