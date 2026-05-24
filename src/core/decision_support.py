@@ -27,10 +27,10 @@ License: MIT
 
 from __future__ import annotations
 
-import logging
 from datetime import datetime, timezone
 from typing import Any
 
+import structlog
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.core.constants import DecisionStatus, SignalDirection
@@ -38,7 +38,7 @@ from src.core.explainability import SignalExplainer, SignalExplanation
 from src.data.event_models import RiskStatus
 from src.models.regime_detector import RegimeInfo
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 __all__ = [
     "DecisionPacket",
@@ -109,6 +109,13 @@ class PerformanceContext(BaseModel):
         description="Conditional Value at Risk (Expected Shortfall) at 95% confidence.",
     )
     total_trades: int = Field(0, ge=0, description="Count of trades analyzed in this window.")
+    trade_frequency: float = Field(
+        0.0, ge=0.0, description="Average trades per day in the analysis window."
+    )
+    avg_hold_time: float = Field(0.0, ge=0.0, description="Average trade duration in hours.")
+    profit_concentration: float = Field(
+        0.0, ge=0.0, le=1.0, description="Percentage of profit from top 10% of trades."
+    )
 
 
 class DecisionPacket(BaseModel):
@@ -273,6 +280,9 @@ class DecisionSupportSystem:
             max_drawdown=performance_metrics.get("max_drawdown", 0.0),
             cvar_95=performance_metrics.get("cvar_95", 0.0),
             total_trades=int(performance_metrics.get("total_trades", 0)),
+            trade_frequency=performance_metrics.get("trade_frequency", 0.0),
+            avg_hold_time=performance_metrics.get("avg_hold_time", 0.0),
+            profit_concentration=performance_metrics.get("profit_concentration", 0.0),
         )
 
         # Generate executive summary
@@ -377,7 +387,9 @@ class DecisionSupportSystem:
         consensus_score = consensus_strength * 40.0
 
         # 2. Regime Score (0-30)
-        regime_score = regime.confidence * 30.0
+        # Mix of regime confidence and alignment with the current strategy
+        alignment = explanation.regime_context.regime_alignment_score
+        regime_score = ((regime.confidence + alignment) / 2.0) * 30.0
 
         # 3. Risk & Safety Score (0-30)
         # Weights: 20% for Risk/Reward quality, 10% for Macro safety
