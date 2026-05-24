@@ -433,3 +433,31 @@ def test_chain_scenarios(simulator):
     assert "Flash crash" in results[0].description
     assert "Merton Jump-Diffusion" in results[1].description
     assert "News shock" in results[2].description
+
+
+def test_feature_engineer_compatibility_issue_scenarios(simulator):
+    """Verify that all scenarios requested in the issue are compatible with FeatureEngineer."""
+    from src.core.feature_engineering import FeatureEngineer
+
+    requested_types = [
+        RareEventType.FLASH_CRASH,
+        RareEventType.LIQUIDITY_VACUUM,
+        RareEventType.GOLD_GAP,
+        RareEventType.VIOLENT_REVERSAL,
+        RareEventType.MULTI_SESSION_DISLOCATION,
+        RareEventType.VOL_CLUSTER,
+    ]
+
+    fe = FeatureEngineer(normalize=True)
+
+    for event_type in requested_types:
+        config = RareEventConfig(event_type=event_type, n_steps=500, seed=42)
+        df, _ = simulator.generate_scenario(config)
+
+        # Ensure FeatureEngineer can process the synthetic data
+        features = fe.compute_features(df)
+
+        assert isinstance(features, pd.DataFrame)
+        assert not features.empty
+        assert features.shape[1] > 20
+        assert not features.isnull().values.any()

@@ -266,11 +266,13 @@ class RareEventSimulator:
         # Ensure impact is significant enough for RegimeDetector thresholds
         impact = -0.05 * config.event_magnitude
 
-        # Crash phase: acceleration
+        # Crash phase: stochastic acceleration
         for i in range(crash_duration):
             idx = start_idx + i
             if idx < n:
-                returns[idx] += (impact / crash_duration) * (1 + i / crash_duration)
+                mean_step = (impact / crash_duration) * (1 + i / crash_duration)
+                # Inject stochastic jump component
+                returns[idx] += self.rng.normal(mean_step, abs(mean_step) * 0.5)
                 # Significant vol boost to trigger NEWS_SHOCK or VOLATILE_BREAKOUT
                 vols[idx] *= 4.0 * config.event_magnitude
 
@@ -605,14 +607,18 @@ class RareEventSimulator:
         reversal_idx = start_idx + trend_duration
         reversal_duration = int(30 * config.event_magnitude)
 
-        # Phase 1: Trend
-        returns[start_idx:reversal_idx] += 0.002 * config.event_magnitude
+        # Phase 1: Trend with stochastic drift
+        trend_mean = 0.002 * config.event_magnitude
+        returns[start_idx:reversal_idx] += self.rng.normal(
+            trend_mean, abs(trend_mean) * 0.5, size=reversal_idx - start_idx
+        )
 
-        # Phase 2: Reversal
+        # Phase 2: Stochastic Reversal
         for i in range(reversal_duration):
             idx = reversal_idx + i
             if idx < n:
-                returns[idx] -= 0.004 * config.event_magnitude * (1 + i / 15)
+                mean_reversal = -0.004 * config.event_magnitude * (1 + i / 15)
+                returns[idx] += self.rng.normal(mean_reversal, abs(mean_reversal) * 0.5)
                 vols[idx] *= 2.0 * config.event_magnitude
 
         df = self._generate_base_ohlc(
@@ -713,7 +719,10 @@ class RareEventSimulator:
         n = config.n_steps
         vols = np.full(n, config.base_volatility)
 
-        shock_indices = [n // 4, n // 2, 3 * n // 4]
+        # Randomize shock locations within the middle 80% of the sample
+        shock_indices = np.sort(
+            self.rng.choice(range(n // 10, 9 * n // 10), size=3, replace=False)
+        ).tolist()
 
         alpha = 0.2
         beta = 0.75
