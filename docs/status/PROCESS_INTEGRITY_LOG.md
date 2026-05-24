@@ -878,3 +878,29 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Emergency Audit:** Conduct a manual line-by-line validation of core trading and risk logic in the latest grafted commit (1b3c858).
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 27th Consecutive Day of History Destruction).
+
+## 2026-05-24 18:00 GMT+4
+
+**Summary:** Severe process drift. Second monolithic graft of the day (PR #1413) further solidifies the breakdown of Git-based governance.
+
+**Suspected Process Issues:**
+- **Accelerated History Destruction:** The `main` branch was reset for the second time today (following the report at 13:30). PR #1413 is now the single commit in the repository's history.
+- **Extreme Labeling Drift (PR #1413):** Commit (`07d0d68`) is titled "docs: Daily PR triage and risk dashboard [2026-05-24] (#1413)", yet it replaces 564 files (~443,000 lines of code). This continues the pattern of masking total system replacements under "docs" labels.
+- **CI Safety Gate Bypass:** Merged while CI status was 'pending' or globally blocked, violating core safety invariants.
+- **PR Backlog Fragmentation:** 552 open PRs are now functionally incompatible with the new single-commit baseline.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `07d0d68` (replaces all prior history).
+- PR #1413: Vehicle for the latest total system swap.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1413 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merged while CI remains globally blocked).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository, including core trading and risk logic, is being swapped with zero granular visibility).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The "Graft-and-Swap" model has reached a point of extreme automation that bypasses all human and agent-based review for core logic. Immediate intervention is required.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `07d0d68` against known trusted baselines.
+- **Halt Grafts:** Disable all automated merge/graft logic until a linear history can be restored.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 27th Consecutive Day of History Destruction & Severe Labeling Drift).
