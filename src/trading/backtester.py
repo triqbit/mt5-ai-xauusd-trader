@@ -24,9 +24,9 @@ import pandas as pd
 import structlog
 
 from src.core.audit_log import get_audit_logger
-from src.core.feature_engineering import FeatureEngineer
 from src.core.profiler import profile
 from src.core.schemas import TradeSignal
+from src.data.feature_engineering import FeatureEngineer
 from src.trading.execution_filter import ExecutionFilter
 
 logger = structlog.get_logger(__name__)

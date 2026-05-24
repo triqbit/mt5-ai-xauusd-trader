@@ -208,7 +208,7 @@ class HealthChecker:
                     conn.execute(text("SELECT 1"))
             res = ComponentStatus(status=HealthStatus.HEALTHY, message="Database reachable")
         except Exception as e:
-            logger.error("Health check - Database failure: %s", e)
+            logger.error("Health check - Database failure", e=e)
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message=f"Database unreachable: {e!s}",
@@ -312,7 +312,7 @@ class HealthChecker:
                 )
 
         except Exception as e:
-            logger.error("Health check - MT5 failure: %s", e)
+            logger.error("Health check - MT5 failure", e=e)
             res = ComponentStatus(
                 status=HealthStatus.FAILED,
                 message=f"MT5 API call failed: {e!s}",

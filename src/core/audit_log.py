@@ -80,7 +80,7 @@ class AuditLogger:
         Base.metadata.create_all(self.engine)
         self.Session = get_session_factory(self.engine)
         self._initialized = True
-        logger.info("AuditLogger initialized with database: %s", db_url)
+        logger.info("AuditLogger initialized with database", db_url=db_url)
 
     def log(
         self,

@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from src.core.feature_engineering import HAS_TALIB, FeatureEngineer
+from src.data.feature_engineering import HAS_TALIB, FeatureEngineer
 from src.utils.synthetic_data import ScenarioGenerator
 
 

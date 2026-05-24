@@ -106,16 +106,16 @@ def get_engine(db_url: str) -> Engine:
                     # Create with 0o600 (owner read/write only)
                     fd = os.open(db_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
                     os.close(fd)
-                    logger.info("Initialized secure SQLite database file: %s", db_path)
+                    logger.info("Initialized secure SQLite database file", db_path=db_path)
                 else:
                     # Enforce 0o600 on existing file if supported by platform
                     if os.name != "nt":
                         current_mode = stat.S_IMODE(os.stat(db_path).st_mode)
                         if current_mode != 0o600:
                             os.chmod(db_path, 0o600)
-                            logger.debug("Hardened permissions on existing database: %s", db_path)
+                            logger.debug("Hardened permissions on existing database", db_path=db_path)
         except Exception as e:
-            logger.warning("Failed to enforce secure SQLite permissions: %s", e)
+            logger.warning("Failed to enforce secure SQLite permissions", e=e)
 
     connect_args: dict[str, Any] = {}
     if is_sqlite:
@@ -146,8 +146,7 @@ def get_engine(db_url: str) -> Engine:
 
     engine = create_engine(db_url, **engine_kwargs)
 
-    logger.info(
-        "Database engine initialized for: %s", db_url.split("@")[-1] if "@" in db_url else db_url
+    logger.info("Database engine initialized for", info=db_url.split("@")[-1] if "@" in db_url else db_url
     )
     return engine
 
@@ -165,5 +164,5 @@ def verify_engine(engine: Engine) -> bool:
             conn.execute(text("SELECT 1"))
         return True
     except Exception as e:
-        logger.error("Database engine verification failed: %s", e)
+        logger.error("Database engine verification failed", e=e)
         return False

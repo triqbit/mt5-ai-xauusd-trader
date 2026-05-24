@@ -129,7 +129,7 @@ def test_walk_forward_normalization_no_lookahead(sample_data):
     # Check that observations are not identical to raw features
     # (since they should be normalized)
     # We need to compute features to compare
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     fe = FeatureEngineer(normalize=False)
     raw_features = fe.compute_features(sample_data, drop_ohlcv=False)
 
