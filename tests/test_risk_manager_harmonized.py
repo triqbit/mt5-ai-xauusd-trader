@@ -109,13 +109,13 @@ def test_directional_exposure(risk_manager, buy_signal, market_data):
 def test_atr_position_sizing(risk_manager, market_data):
     # Normal volatility
     market_data["atr"] = 1.0
-    size = risk_manager.size_position("XAUUSD", market_data)
+    size = risk_manager.calculate_position_size("XAUUSD", market_data)
     assert size > 0
 
     # Extreme volatility
     market_data.loc[market_data.index[-1], "atr"] = 4.0
     # avg_atr remains approx 1.0. ratio = 4.0 > 3.0 (extreme threshold)
-    size = risk_manager.size_position("XAUUSD", market_data)
+    size = risk_manager.calculate_position_size("XAUUSD", market_data)
     assert size == 0.0
 
 def test_full_approval(risk_manager, buy_signal, market_data):

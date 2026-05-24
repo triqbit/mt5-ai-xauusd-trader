@@ -61,7 +61,7 @@ with patch.dict(
 ):
     # Import components we want to test
     from src.core.constants import SignalDirection
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
     from src.models import ensemble  # Use the module to avoid attribute errors on reload
     from src.models.ensemble import EnsembleModel
     from src.utils.synthetic_data import ScenarioGenerator
@@ -149,7 +149,7 @@ def test_data_to_model_inference_flow(data_generator, feature_engineer, mock_ens
 
     # The FeatureEngineer uses the 'talib' module imported at the top of src/core/feature_engineering.py
     # We must patch it there.
-    import src.core.feature_engineering as fe_mod
+    import src.data.feature_engineering as fe_mod
 
     with patch.object(fe_mod, "talib", mock_talib):
         setup_mock_talib(mock_talib)
@@ -175,7 +175,7 @@ def test_pipeline_resilience_to_malformed_data(data_generator, feature_engineer,
     df_malformed = data_generator.generate(n_steps=100, regime="malformed")
     df_malformed.index = pd.date_range(start="2024-01-01", periods=100, freq="1min")
 
-    import src.core.feature_engineering as fe_mod
+    import src.data.feature_engineering as fe_mod
 
     with patch.object(fe_mod, "talib", mock_talib):
         setup_mock_talib(mock_talib)
@@ -193,7 +193,7 @@ def test_pipeline_insufficient_history(data_generator, feature_engineer):
     df_short = data_generator.generate(n_steps=n_short, regime="ranging")
     df_short.index = pd.date_range(start="2024-01-01", periods=n_short, freq="1min")
 
-    import src.core.feature_engineering as fe_mod
+    import src.data.feature_engineering as fe_mod
 
     with patch.object(fe_mod, "talib", mock_talib):
         setup_mock_talib(mock_talib)
@@ -215,7 +215,7 @@ def test_mtf_feature_alignment(data_generator, feature_engineer):
     df = data_generator.generate(n_steps=n_steps, regime="ranging")
     df.index = pd.date_range(start="2024-01-01", periods=n_steps, freq="1min")
 
-    import src.core.feature_engineering as fe_mod
+    import src.data.feature_engineering as fe_mod
 
     with patch.object(fe_mod, "talib", mock_talib):
         setup_mock_talib(mock_talib)

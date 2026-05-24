@@ -16,11 +16,12 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import structlog
 from sqlalchemy import Engine, create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger("core.database")
 
 # Slow query logging threshold (seconds) as per DATABASE_STANDARDS.md
 SLOW_QUERY_THRESHOLD = 1.0
@@ -38,10 +39,9 @@ def after_cursor_execute(conn, cursor, statement, parameters, context, executema
     total_time = time.perf_counter() - context._query_start_time
     if total_time > SLOW_QUERY_THRESHOLD:
         logger.warning(
-            "Slow query detected: %s (%.2f seconds)",
-            statement,
-            total_time,
-            extra={"duration": total_time, "statement": statement},
+            "slow_query_detected",
+            statement=statement,
+            duration=total_time,
         )
 
 
@@ -106,16 +106,16 @@ def get_engine(db_url: str) -> Engine:
                     # Create with 0o600 (owner read/write only)
                     fd = os.open(db_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
                     os.close(fd)
-                    logger.info("Initialized secure SQLite database file: %s", db_path)
+                    logger.info("initialized_secure_sqlite", path=str(db_path))
                 else:
                     # Enforce 0o600 on existing file if supported by platform
                     if os.name != "nt":
                         current_mode = stat.S_IMODE(os.stat(db_path).st_mode)
                         if current_mode != 0o600:
                             os.chmod(db_path, 0o600)
-                            logger.debug("Hardened permissions on existing database: %s", db_path)
+                            logger.debug("hardened_sqlite_permissions", path=str(db_path))
         except Exception as e:
-            logger.warning("Failed to enforce secure SQLite permissions: %s", e)
+            logger.warning("failed_to_enforce_secure_sqlite_permissions", error=str(e))
 
     connect_args: dict[str, Any] = {}
     if is_sqlite:
@@ -147,7 +147,8 @@ def get_engine(db_url: str) -> Engine:
     engine = create_engine(db_url, **engine_kwargs)
 
     logger.info(
-        "Database engine initialized for: %s", db_url.split("@")[-1] if "@" in db_url else db_url
+        "database_engine_initialized",
+        url=db_url.split("@")[-1] if "@" in db_url else db_url
     )
     return engine
 
@@ -165,5 +166,5 @@ def verify_engine(engine: Engine) -> bool:
             conn.execute(text("SELECT 1"))
         return True
     except Exception as e:
-        logger.error("Database engine verification failed: %s", e)
+        logger.error("database_engine_verification_failed", error=str(e))
         return False

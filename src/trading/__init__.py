@@ -1,4 +1,4 @@
-"""Trading modules: connectors and risk management."""
+"""Trading modules: connectors, risk management, and execution."""
 
 from __future__ import annotations
 
@@ -11,19 +11,23 @@ from src.trading.capital_allocator import (
     RejectionCode,
     StrategyConfig,
 )
+from src.trading.executor import TradingExecutor
 from src.trading.mt5_connector import MT5Connector
-from src.trading.risk_engine import RiskDecision, RiskEngine
+from src.trading.risk_manager import RiskDecision, RiskManager
+from src.trading.audited_risk_manager import AuditedRiskManager
 
 __all__ = [
     "AllocationRequest",
     "AllocationResult",
+    "AuditedRiskManager",
     "BacktestEngine",
     "CapitalAllocator",
     "MT5Connector",
     "PerformanceReport",
     "RejectionCode",
     "RiskDecision",
-    "RiskEngine",
+    "RiskManager",
     "StrategyConfig",
     "TradeSignal",
+    "TradingExecutor",
 ]

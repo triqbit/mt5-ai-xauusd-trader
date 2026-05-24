@@ -11,12 +11,12 @@ from src.core.monitor import Monitor
 from src.core.profiler import profile
 
 if TYPE_CHECKING:
-    from src.core.feature_engineering import FeatureEngineer
+    from src.data.feature_engineering import FeatureEngineer
 else:
-    # Lazy load FeatureEngineer to avoid early talib dependency
+    # Lazy load FeatureEngineer to avoid early talib dependency and maintain backward compatibility
     def __getattr__(name):
         if name == "FeatureEngineer":
-            from src.core.feature_engineering import FeatureEngineer
+            from src.data.feature_engineering import FeatureEngineer
 
             return FeatureEngineer
         if name == "health":
