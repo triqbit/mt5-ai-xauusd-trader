@@ -47,7 +47,7 @@ uvicorn[standard]==0.34.0
 python-dotenv==1.2.2
 pydantic==2.13.4
 pydantic-settings==2.14.1
-tomli==2.2.1
+tomli==2.4.1
 
 # ── Testing ─────────────────────────────────────────────────
 pytest==9.0.3

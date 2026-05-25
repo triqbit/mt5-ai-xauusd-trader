@@ -40,7 +40,7 @@ dependencies = [
     "python-dotenv==1.2.2",
     "pydantic==2.13.4",
     "pydantic-settings==2.14.1",
-    "tomli==2.2.1",
+    "tomli==2.4.1",
     "python-dateutil==2.9.0.post0",
     "nest-asyncio==1.6.0",
     "pytz==2026.2",
