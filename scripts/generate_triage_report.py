@@ -108,6 +108,7 @@ def get_domains(files):
 
 
 def classify_risk(files, title=""):
+    # Critical system files that should always trigger High Risk
     high_risk_patterns = [
         "src/trading/",
         "src/models/",
@@ -115,22 +116,34 @@ def classify_risk(files, title=""):
         "migrations/",
         "main.py",
         "alembic.ini",
-        "pyproject.toml",
         "Dockerfile",
-        ".github/",
-        "Makefile",
-        "scripts/",
+        ".github/workflows/",  # CI pipeline changes are high risk
     ]
+
+    # Files that are important but not immediately critical to trading execution
     medium_risk_patterns = [
         "src/research/",
         "src/analytics/",
         "src/core/",
         "src/environment/",
+        "Makefile",
+        "scripts/",
+        "pyproject.toml",
+        "requirements",
     ]
 
-    safe_keywords = ["docs", "readme", "lint", "typo", "cleanup", "chore", "dx:"]
+    safe_keywords = ["docs", "readme", "lint", "typo", "cleanup", "chore", "dx:", "dashboard"]
 
-    # Heuristic based on title (useful if no files due to rate limit)
+    # Specific exceptions for safe surfaces within medium/high risk paths
+    safe_file_patterns = [
+        "docs/",
+        "README.md",
+        "PR_TRIAGE_DAILY.md",
+        "MERGE_READY_CHECKLIST.md",
+        ".md",
+        "tests/",
+    ]
+
     t_lower = title.lower()
     is_likely_safe = any(kw in t_lower for kw in safe_keywords)
 
@@ -139,15 +152,38 @@ def classify_risk(files, title=""):
             return "Safe Surface", "Heuristic: Title matches safe keywords."
         return "Triage Required", "No files found or unable to fetch files."
 
+    # First check if ALL files are in safe patterns
+    all_safe = True
+    for f in files:
+        if not any(sp in f for sp in safe_file_patterns):
+            all_safe = False
+            break
+
+    if all_safe:
+        return "Safe Surface", "Only documentation or tests."
+
+    # Check for High Risk
     for f in files:
         for p in high_risk_patterns:
             if p in f:
+                # Exception: if it's a doc change in a high risk path, don't trigger yet
+                if f.endswith(".md"):
+                    continue
                 return "High Risk", f"Touches high-risk area: {f}"
+
+    # Check for Medium Risk
+    for f in files:
         for p in medium_risk_patterns:
             if p in f:
+                if f.endswith(".md"):
+                    continue
+                # General check for minor dependency bumps in non-core packages
+                safe_deps = ["click", "rich", "tabulate", "jinja2", "pytz", "colorlog", "tqdm"]
+                if "bump" in t_lower and any(sd in t_lower for sd in safe_deps):
+                    return "Safe Surface", f"Minor dependency bump: {t_lower}"
                 return "Medium Risk", f"Touches core/research/analytics/risk: {f}"
 
-    return "Safe Surface", "Only documentation, tests, or non-critical configurations."
+    return "Safe Surface", "Non-critical surface area."
 
 
 def get_recommendation(risk, domains, ci_status):
