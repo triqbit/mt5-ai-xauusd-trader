@@ -904,3 +904,29 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt Grafts:** Disable all automated merge/graft logic until a linear history can be restored.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 27th Consecutive Day of History Destruction & Severe Labeling Drift).
+
+## 2026-05-25 18:00 GMT+4
+
+**Summary:** Severe process drift. Twenty-eighth consecutive day of history destruction via monolithic graft (PR #1430). Governance breakdown remains critical.
+
+**Suspected Process Issues:**
+- **Persistent History Destruction:** The `main` branch was reset with a single monolithic graft commit (`07b5a5c`) for the 28th consecutive day. Repository history remains at a count of 1, rendering all Git-native forensic and collaboration tools non-functional.
+- **Severe Labeling Drift (PR #1430):** Commit (`07b5a5c`) is titled "DX: daily PR risk triage and dashboard [2026-05-25] (#1430)", yet it replaces the entire repository (564 files, ~443,000 lines). This continues the dangerous pattern of masking total system replacements (including core trading and risk logic) under "DX" labels.
+- **Unmanageable PR Backlog:** 553 open PRs exist. Most are stale and fundamentally incompatible with the current single-commit baseline. The repository remains in a state of 🔴 HIGH TURBULENCE.
+- **CI Safety Gate Bypass:** Merged while CI status was 'pending' or globally blocked, violating core safety invariants.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `07b5a5c` (replaces all prior history).
+- PR #1430: Vehicle for the latest total system swap.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1430 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merged while CI remains globally blocked).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository, including core trading and risk logic, is being swapped daily with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The "Graft-and-Swap" model has reached its 28th consecutive day. Immediate intervention is required to restore linear history and stop the use of history-resetting grafts.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `07b5a5c` against known trusted baselines.
+- **Halt Grafts:** Disable all automated merge/graft logic until a linear history can be restored.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 28th Consecutive Day of History Destruction & Severe Labeling Drift).
