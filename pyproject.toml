@@ -27,7 +27,7 @@ dependencies = [
     "aiohttp==3.13.5",
     "httpx==0.28.1",
     "psycopg2-binary==2.9.12",
-    "sqlalchemy==2.0.38",
+    "sqlalchemy==2.0.50",
     "alembic==1.18.4",
     "redis==7.4.0",
     "prometheus-client==0.21.1",
