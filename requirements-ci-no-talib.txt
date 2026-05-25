@@ -46,4 +46,4 @@ types-python-dateutil==2.9.0.20260508
 types-setuptools==82.0.0.20260508
 types-PyYAML==6.0.12.20260510
 playwright>=1.60.0
-pytest-playwright>=0.6.0
+pytest-playwright>=0.8.0
