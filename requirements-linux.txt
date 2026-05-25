@@ -52,7 +52,7 @@ tomli==2.4.1
 pytest==9.0.3
 pytest-asyncio==1.3.0
 pytest-cov==7.1.0
-hypothesis==6.152.7
+hypothesis==6.152.9
 
 # ── DevOps / CI ─────────────────────────────────────────────
 optuna==4.8.0
