@@ -7,7 +7,7 @@ import urllib.request
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
-BIG_BANG_DATE = datetime.datetime(2026, 5, 23, tzinfo=datetime.timezone.utc)
+BIG_BANG_DATE = datetime.datetime(2026, 5, 25, tzinfo=datetime.timezone.utc)
 
 
 def api_call(url):
@@ -108,6 +108,9 @@ def get_domains(files):
 
 
 def classify_risk(files, title=""):
+    # Clean up repetitive naming in titles (e.g., "(deps)(deps)")
+    title = title.replace("(deps)(deps)", "(deps)")
+
     # Critical system files that should always trigger High Risk
     high_risk_patterns = [
         "src/trading/",
@@ -272,12 +275,15 @@ def generate_report():
             if risk == "Unknown":
                 risk = "Triage Required"
 
-        report += f"| [{num}](https://github.com/{REPO}/pull/{num}) | {title} | {user} | `{branch}` | {ci_status} | {risk} | {status_flag} |\n"
+        # Clean up title for the report
+        clean_title = title.replace("(deps)(deps)", "(deps)")
+
+        report += f"| [{num}](https://github.com/{REPO}/pull/{num}) | {clean_title} | {user} | `{branch}` | {ci_status} | {risk} | {status_flag} |\n"
 
         classified_prs.append(
             {
                 "number": num,
-                "title": title,
+                "title": clean_title,
                 "user": user,
                 "risk": risk,
                 "ci_status": ci_status,
@@ -343,6 +349,11 @@ def generate_report():
 
     report += "\n## ✨ Good Candidates for Review Today\n\n"
     candidates = (safe_surface + medium_risk + high_risk)[:4]
+    if len(candidates) < 3:
+        stale_candidates = [
+            pr for pr in classified_prs if "Stale" in pr["flag"] and pr["risk"] != "Triage Required"
+        ]
+        candidates.extend(stale_candidates[: 4 - len(candidates)])
 
     if not candidates:
         report += "No new candidates identified today.\n"
@@ -367,13 +378,23 @@ def generate_report():
     checklist += "This checklist identifies top promising PRs for immediate review.\n\n"
 
     top_3 = (safe_surface + medium_risk + high_risk)[:3]
+    if len(top_3) < 3:
+        stale_candidates = [
+            pr for pr in classified_prs if "Stale" in pr["flag"] and pr["risk"] != "Triage Required"
+        ]
+        top_3.extend(stale_candidates[: 3 - len(top_3)])
+
     if not top_3:
         checklist += "No new candidates found for merge-readiness checklist today.\n"
     else:
         for i, c in enumerate(top_3):
             checklist += f"## {i + 1}. PR #{c['number']}: {c['title']}\n"
+            status_note = ""
+            if "Stale" in c["flag"]:
+                status_note = " (Candidate for re-validation/review)"
+
             checklist += (
-                f"- **Short scope summary**: {c['risk']} update implementing '{c['title']}'\n"
+                f"- **Short scope summary**: {c['risk']} update implementing '{c['title']}'{status_note}\n"
             )
             checklist += f"- **Domains touched**: {', '.join(c['domains'])}\n"
             checklist += f"- **CI status**: {c['ci_status']}\n"
