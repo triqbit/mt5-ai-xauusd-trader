@@ -270,7 +270,7 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 
 **Check Invariants:**
 - [x] Changes go through PRs (PR #811 used).
-- [ ] CI must pass before merge (CI state for the total system swap is unverifiable via Git history).
+- [ ] CI must pass before merge (CI state for the total system swap is unverifiable via history).
 - [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the codebase, including trading and risk logic, is being replaced daily with zero traceability).
 
 **Recommended Follow-ups:**
@@ -956,3 +956,29 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt Grafts:** Disable all automated merge/graft logic until a linear history can be restored and the PR backlog is pruned.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 29th Consecutive Day of History Destruction).
+
+## 2026-05-27 13:45 UTC
+
+**Summary:** Thirtieth consecutive day of history destruction. PR #1435 executes another total system swap, further entrenching the breakdown of Git-based governance.
+
+**Suspected Process Issues:**
+- **Persistent History Destruction:** The `main` branch was reset with a single monolithic graft commit (`4a3abc0`) for the 30th consecutive day. Repository history remains at a count of 1, rendering all Git-native forensic and collaboration tools non-functional.
+- **Severe Labeling Drift (PR #1435):** Commit (`4a3abc0`) is titled "docs: update daily merge-readiness checklist [2026-05-26] (#1435)", yet it replaces the entire repository (564 files, ~443,000 lines). This continues the pattern of masking total system replacements (including core trading and risk logic) under documentation labels.
+- **Massive PR Backlog:** ~553 open PRs remain in a state of permanent fragmentation, decoupled from the moving baseline.
+- **CI Safety Gate Bypass:** Merges continue while CI remains globally blocked due to cumulative lint/formatting debt.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `4a3abc0` (replaces `9ff6bc2` and all prior history).
+- PR #1435: Vehicle for the latest total system swap.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1435 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merged while CI remains globally blocked).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository, including core trading and risk logic, is being swapped daily with zero traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The "Graft-and-Swap" model has reached its 30th consecutive day. Immediate human intervention is required to restore linear history and stop the use of history-resetting grafts.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `4a3abc0` against known trusted baselines is mandatory.
+- **Halt Grafts:** Disable all automated merge/graft logic until a linear history can be restored.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 30th Consecutive Day of History Destruction).
