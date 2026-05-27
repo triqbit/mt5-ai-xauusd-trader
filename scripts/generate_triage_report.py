@@ -7,7 +7,7 @@ import urllib.request
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
-BIG_BANG_DATE = datetime.datetime(2026, 5, 26, tzinfo=datetime.timezone.utc)
+BIG_BANG_DATE = datetime.datetime(2026, 5, 27, tzinfo=datetime.timezone.utc)
 
 
 def api_call(url):
@@ -393,9 +393,7 @@ def generate_report():
             if "Stale" in c["flag"]:
                 status_note = " (Candidate for re-validation/review)"
 
-            checklist += (
-                f"- **Short scope summary**: {c['risk']} update implementing '{c['title']}'{status_note}\n"
-            )
+            checklist += f"- **Short scope summary**: {c['risk']} update implementing '{c['title']}'{status_note}\n"
             checklist += f"- **Domains touched**: {', '.join(c['domains'])}\n"
             checklist += f"- **CI status**: {c['ci_status']}\n"
 
