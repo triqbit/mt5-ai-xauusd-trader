@@ -7,7 +7,6 @@ import urllib.request
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 REPO = "triqbit/mt5-ai-xauusd-trader"
-BIG_BANG_DATE = datetime.datetime(2026, 5, 28, tzinfo=datetime.timezone.utc)
 
 
 def api_call(url):
@@ -65,6 +64,20 @@ def get_ci_status(sha):
     if status_data and "state" in status_data:
         return status_data["state"]
     return "unknown"
+
+
+def get_latest_main_commit_date():
+    """Fetches the timestamp of the latest commit on main to detect history grafts."""
+    url = f"https://api.github.com/repos/{REPO}/branches/main"
+    data = api_call(url)
+    if data and "commit" in data and "commit" in data["commit"]:
+        # Try to get the committer date
+        commit_data = data["commit"]["commit"]
+        date_str = commit_data["committer"]["date"]
+        return datetime.datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=datetime.timezone.utc
+        )
+    return datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
 
 
 def get_domains(files):
@@ -203,6 +216,10 @@ def get_recommendation(risk, domains, ci_status):
 
 
 def generate_report():
+    print("Fetching repository state...")
+    big_bang_date = get_latest_main_commit_date()
+    print(f"Latest history graft detected at: {big_bang_date}")
+
     print("Fetching PRs...")
     prs = get_all_prs()
 
@@ -239,8 +256,12 @@ def generate_report():
     # We will populate this later
 
     report += "## 📋 Summary Table\n\n"
-    report += "| PR # | Title | Author | Branch | CI Status | Risk Class | Status Flag |\n"
-    report += "|------|-------|--------|--------|-----------|------------|-------------|\n"
+    report += (
+        "| PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |\n"
+    )
+    report += (
+        "|------|-------|--------|--------|--------|-----------|------------|-------------|\n"
+    )
 
     classified_prs = []
 
@@ -258,8 +279,11 @@ def generate_report():
         )
 
         status_flag = "New"
-        if created_at < BIG_BANG_DATE:
+        if created_at < big_bang_date:
             status_flag = "⚠️ Stale (Pre-Big-Bang)"
+
+        labels = [label["name"] for label in pr.get("labels", [])]
+        labels_str = ", ".join(labels) if labels else "none"
 
         print(f"[{i + 1}/{len(prs)}] Processing PR #{num}...")
 
@@ -278,7 +302,7 @@ def generate_report():
         # Clean up title for the report
         clean_title = title.replace("(deps)(deps)", "(deps)")
 
-        report += f"| [{num}](https://github.com/{REPO}/pull/{num}) | {clean_title} | {user} | `{branch}` | {ci_status} | {risk} | {status_flag} |\n"
+        report += f"| [{num}](https://github.com/{REPO}/pull/{num}) | {clean_title} | {user} | `{branch}` | {labels_str} | {ci_status} | {risk} | {status_flag} |\n"
 
         classified_prs.append(
             {
