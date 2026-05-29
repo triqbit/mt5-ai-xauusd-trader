@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pandas as pd
 
-from src.core.feature_engineering import FeatureEngineer
+from src.data.feature_engineering import FeatureEngineer
 from src.models.ensemble import EnsembleModel
 
 
@@ -20,7 +20,7 @@ def test_feature_engineer_profiling_blocks():
     })
     df.index = pd.date_range(start='2023-01-01', periods=100, freq='5min')
 
-    with patch('src.core.feature_engineering.profile') as mock_profile:
+    with patch('src.data.feature_engineering.profile') as mock_profile:
         fe.compute_features(df)
 
         # Check for expected labels
