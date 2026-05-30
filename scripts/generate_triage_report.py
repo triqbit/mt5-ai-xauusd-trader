@@ -256,12 +256,8 @@ def generate_report():
     # We will populate this later
 
     report += "## 📋 Summary Table\n\n"
-    report += (
-        "| PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |\n"
-    )
-    report += (
-        "|------|-------|--------|--------|--------|-----------|------------|-------------|\n"
-    )
+    report += "| PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |\n"
+    report += "|------|-------|--------|--------|--------|-----------|------------|-------------|\n"
 
     classified_prs = []
 
@@ -417,9 +413,7 @@ def generate_report():
             if "Stale" in c["flag"]:
                 status_note = " (Candidate for re-validation/review)"
 
-            checklist += (
-                f"- **Short scope summary**: {c['risk']} update implementing '{c['title']}'{status_note}\n"
-            )
+            checklist += f"- **Short scope summary**: {c['risk']} update implementing '{c['title']}'{status_note}\n"
             checklist += f"- **Domains touched**: {', '.join(c['domains'])}\n"
             checklist += f"- **CI status**: {c['ci_status']}\n"
 
