@@ -32,7 +32,11 @@ def get_all_prs():
     while True:
         url = f"https://api.github.com/repos/{REPO}/pulls?state=open&per_page=100&page={page}"
         data = api_call(url)
-        if data is None or not isinstance(data, list):
+        if data is None:
+            if page == 1:
+                return None  # Signal failure on first page
+            break
+        if not isinstance(data, list):
             break
         prs.extend(data)
         if len(data) < 100:
@@ -49,7 +53,9 @@ def get_all_pr_files(pr_number):
             f"https://api.github.com/repos/{REPO}/pulls/{pr_number}/files?per_page=100&page={page}"
         )
         data = api_call(url)
-        if data is None or not isinstance(data, list):
+        if data is None:
+            return None  # Signal failure
+        if not isinstance(data, list):
             break
         files.extend([f["filename"] for f in data if "filename" in f])
         if len(data) < 100:
@@ -223,11 +229,15 @@ def generate_report():
     print("Fetching PRs...")
     prs = get_all_prs()
 
-    if not prs and prs is not None:
+    if prs is None:
+        print(
+            "CRITICAL: Rate limited or error fetching PRs. Aborting report generation to preserve existing data.",
+            file=sys.stderr,
+        )
+        return
+
+    if not prs:
         print("No open PRs found.")
-    elif prs is None:
-        print("Rate limited or error fetching PRs.")
-        prs = []
 
     now = datetime.datetime.now(datetime.timezone.utc)
     now_str = now.strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -286,8 +296,13 @@ def generate_report():
         if i < detailed_limit:
             ci_status = get_ci_status(sha)
             files = get_all_pr_files(num)
-            risk, reason = classify_risk(files, title)
-            domains = get_domains(files)
+            if files is None:
+                print(f"Warning: Failed to fetch files for PR #{num}. Using heuristics.")
+                risk, reason = classify_risk([], title)
+                domains = ["Triage Required (API Error)"]
+            else:
+                risk, reason = classify_risk(files, title)
+                domains = get_domains(files)
         else:
             ci_status = "unknown"
             risk, reason = classify_risk([], title)
