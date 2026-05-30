@@ -63,9 +63,13 @@ Changes to these directories affect the core financial and operational safety of
 ## 🛠️ How to Pick Your First Task
 
 1.  **Read [Your First Real Contribution](./FIRST_REAL_CONTRIBUTION.md):** Follow our step-by-step guide to making a low-risk, high-impact first contribution.
-2.  **Run `make doctor`:** If any check fails on your system, improving that check or the documentation around it is a great first contribution.
-3.  **Check `docs/status/PR_TRIAGE_DAILY.md`:** Look for PRs labeled as "Safe Surface". This report is updated daily by the triage bot and is the best source for finding approved first-task candidates.
-4.  **Audit `tests/`:** Find a module with low coverage (check `make test` output) and add missing unit tests.
+2.  **Filter PRs by Label:** Use GitHub's label filters to find existing work in Safe Zones for inspiration or collaboration:
+    - `is:pr is:open label:docs`: Documentation improvements.
+    - `is:pr is:open label:test`: Testing and coverage enhancements.
+    - `is:pr is:open label:chore`: Maintenance and developer experience tasks.
+3.  **Run `make doctor`:** If any check fails on your system, improving that check or the documentation around it is a great first contribution.
+4.  **Check `docs/status/PR_TRIAGE_DAILY.md`:** Look for PRs categorized as **"Safe Surface"**. This report is updated daily and is the best source for finding approved first-task candidates.
+5.  **Audit `tests/`:** Find a module with low coverage (check `make test` output) and add missing unit tests.
 
 ---
 *This map is maintained by Jules06 (qufuwan). If you are unsure where your change fits, please open a discussion or tag a maintainer.*
