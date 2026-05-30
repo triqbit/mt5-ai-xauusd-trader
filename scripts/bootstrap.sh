@@ -30,7 +30,7 @@ fi
 $PIP install --upgrade pip
 
 if [ -f "requirements.txt" ]; then
-    echo "Installing from requirements.txt..."
+    echo "Installing production dependencies..."
     # Attempt standard installation
     if ! $PIP install -r requirements.txt; then
         echo ""
@@ -57,7 +57,13 @@ if [ -f "requirements.txt" ]; then
         fi
     fi
 else
-    echo "requirements.txt not found, skipping installation."
+    echo "requirements.txt not found, skipping production dependencies."
+fi
+
+# Install test dependencies
+if [ -f "requirements-test.txt" ]; then
+    echo "Installing test dependencies..."
+    $PIP install -r requirements-test.txt
 fi
 
 # 4. Setup .env
