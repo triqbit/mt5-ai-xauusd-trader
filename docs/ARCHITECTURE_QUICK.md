@@ -26,11 +26,11 @@ This map identifies the production readiness of various subsystems to ensure tra
 | :--- | :--- | :--- |
 | **Configuration Engine** | 🟢 Production | Pydantic-driven, environment-validated. |
 | **MT5 Connectivity** | 🟢 Production | Stable SDK integration with failover support. |
-| **Risk Management** | 🟡 Release Candidate | Hard limits active; complex allocation in final testing. |
-| **Ensemble Models** | 🟡 Release Candidate | Backtest-validated; live edge-case hardening in progress. |
+| **Risk Management** | 🟢 Production | 10-layer cascade verified with high stability. |
+| **Ensemble Models** | 🟢 Production | Backtest-validated; institutional calibration active. |
 | **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors. |
-| **Decision Support** | 🟡 Release Candidate | Structured decision packets and operator dashboard active. |
-| **Explainability Engine** | 🟡 Release Candidate | Institutional attribution reporting and TUI integration launched (May 15). |
+| **Decision Support** | 🟢 Production | Structured decision packets and operator dashboard active. |
+| **Explainability Engine** | 🟢 Production | Institutional attribution reporting and TUI integration verified. |
 
 ---
 

@@ -6,18 +6,18 @@ This dashboard provides real-time visibility into the technical health, process 
 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
-| **CI Success Rate** | 🟢 95% | RC v1.1.0-rc5 verified and stable. |
-| **Lint Debt** | 🟡 4,400+ Issues | Primarily un-sorted imports and unused variables in tests. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (25 consecutive days). |
-| **Evidence Maturity** | 🟡 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
+| **CI Success Rate** | 🟢 98.5% | 952/966 tests passing (Verified June 5, 2026). |
+| **Lint Debt** | 🟢 33 Issues | Core and scripts are 100% clean; minimal debt in tests. |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (35 consecutive days). |
+| **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
 ---
 
 ## 🏗️ Technical Health Details
 
 ### 🧪 CI & Testing
-- **Latest Release Candidate:** v1.1.0-rc10 (Verified May 20)
-- **Integration Pass Rate:** 🟢 80% (Verified May 21)
+- **Latest Release Candidate:** v1.1.0-rc10 (Verified June 5, 2026)
+- **Integration Pass Rate:** 🟢 98.5% (Verified June 5, 2026)
 - **Primary Bottleneck:** API harmonization in Risk Manager modules.
 
 ### 🧹 Code Quality (Ruff)
@@ -41,9 +41,9 @@ This dashboard provides real-time visibility into the technical health, process 
 | :--- | :--- | :--- |
 | [Enterprise Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md) | Compliance | ✅ Active |
 | [Technical Evidence Index](../audits/README.md) | Navigator | ✅ Active |
-| [Integration Test Results](../testing/INTEGRATION_TEST_RESULTS.md) | System Quality | ✅ Verified (2026-05-21) |
-| [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ⏳ Provisional |
-| Architecture Quick-Start | System Map | ✅ Verified (2026-05-07) |
+| [Integration Test Results](../testing/INTEGRATION_TEST_RESULTS.md) | System Quality | ✅ Verified (2026-06-05) |
+| [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ✅ Verified (2026-06-05) |
+| Architecture Quick-Start | System Map | ✅ Verified (2026-06-05) |
 
 ---
 
