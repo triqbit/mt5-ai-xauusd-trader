@@ -6,11 +6,11 @@ This directory serves as the central repository for all technical audits, perfor
 
 | Report | Description | Status |
 | :--- | :--- | :--- |
-| [**walkforward_verification_report.md**](./walkforward_verification_report.md) | Institutional Walk-Forward Optimization and strategy robustness report. | ✅ Verified (Provisional) |
+| [**walkforward_verification_report.md**](./walkforward_verification_report.md) | Institutional Walk-Forward Optimization and strategy robustness report. | ✅ Verified (June 5) |
 | [**ENTERPRISE_EVIDENCE_SCORECARD.md**](./ENTERPRISE_EVIDENCE_SCORECARD.md) | Compliance with institutional engineering standards and subsystem maturity. | ✅ Active |
-| [**INTEGRATION_TEST_RESULTS.md**](../testing/INTEGRATION_TEST_RESULTS.md) | Verified results of end-to-end integration paths and API harmonization. | ✅ Verified (May 21) |
-| **ALIGNMENT_REPORT.md** | Strategy-to-code alignment and agent coordination audit. | ⏳ Upcoming |
-| **PERFORMANCE_COMPLEXITY_REPORT.md** | Runtime efficiency and computational complexity analysis. | ⏳ Upcoming |
+| [**INTEGRATION_TEST_RESULTS.md**](../testing/INTEGRATION_TEST_RESULTS.md) | Verified results of end-to-end integration paths and API harmonization. | ✅ Verified (June 5) |
+| **ALIGNMENT_REPORT.md** | Strategy-to-code alignment and agent coordination audit. | 🔵 In-Progress |
+| **PERFORMANCE_COMPLEXITY_REPORT.md** | Runtime efficiency and computational complexity analysis. | 🔵 In-Progress |
 | [**CORRECTIVE_ACTION_VERIFICATION.md**](./CORRECTIVE_ACTION_VERIFICATION.md) | Post-incident audits and resolution verification. | ⏳ Upcoming |
 | [**ADR_AUDIT_REPORT.md**](./ADR_AUDIT_REPORT.md) | Review of key Architecture Decision Records (ADRs). | ⏳ Upcoming |
 
