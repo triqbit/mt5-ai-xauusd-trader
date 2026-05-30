@@ -7,7 +7,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟢 98.5% | 952/966 tests passing (Verified June 5, 2026). |
-| **Lint Debt** | 🟢 33 Issues | Core and scripts are 100% clean; minimal debt in tests. |
+| **Lint Debt** | 🟡 138 Issues | Significant reduction; targeted script and core cleanup complete. |
 | **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (35 consecutive days). |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
@@ -21,11 +21,12 @@ This dashboard provides real-time visibility into the technical health, process 
 - **Primary Bottleneck:** API harmonization in Risk Manager modules.
 
 ### 🧹 Code Quality (Ruff)
-- **Total Errors:** 4,400+
+- **Total Errors:** 138 (Excluding restricted domains)
 - **Key Areas:**
-  - `tests/`: 3,400+ issues (Unused imports, unformatted blocks).
+  - `tests/`: 3,400+ issues (Unused imports, unformatted blocks) - *Deferred to avoid noise*.
   - `src/`: 0 issues (100% clean core).
-- **Strategy:** Core is 100% clean; test debt is deferred to avoid history noise.
+  - `scripts/`: 0 issues (100% clean automation).
+- **Strategy:** Core and automation are 100% clean; test debt is deferred to avoid history noise.
 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
