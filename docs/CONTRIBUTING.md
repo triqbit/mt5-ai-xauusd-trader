@@ -24,6 +24,12 @@ We use a role-based governance model where specific leads oversee different doma
 - **Setup Environment:** Use Python 3.11+. Follow the [Setup Guide](../SETUP_GUIDE.md).
 - **Consult the [Contribution Map](./CONTRIBUTION_MAP.md):** Identify if your change falls into a **Safe Zone** (docs, tests) or a **Sensitive Zone** (trading logic, models, core).
 
+### ⚠️ Critical: History Management & Daily Resets
+This repository operates under a high-frequency update model. Please read the following carefully:
+- **Daily History Grafting:** The `main` branch is updated daily via monolithic "grafts" (total repository swaps). This means standard Git history is often unavailable on `main`.
+- **Mandatory Rebase:** Because `main` resets daily, your feature branch **must** be rebased onto the latest `main` commit before submission. Use `git fetch origin main` and `git rebase origin/main`.
+- **Environment Stability:** If `make bootstrap` fails, check `docs/status/PROJECT_HEALTH.md` for known dependency conflicts or transient environment issues.
+
 ### 2. Implementation
 - **Branching Strategy:** We enforce a strict branching strategy to ensure traceability. All development must occur on branches prefixed by type:
   - `feature/`: New capabilities or enhancements (e.g., `feature/ppo-optim-v2`)
