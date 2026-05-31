@@ -86,9 +86,19 @@ def get_latest_main_commit_date():
     return datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
 
 
-def get_domains(files):
+def get_domains(files, title=""):
     if not files:
-        return ["Unknown"]
+        # Heuristics based on title
+        t_lower = title.lower()
+        if "docs" in t_lower or "readme" in t_lower:
+            return ["docs"]
+        if "test" in t_lower:
+            return ["tests"]
+        if "deps" in t_lower or "bump" in t_lower:
+            return ["dependencies"]
+        if "dx:" in t_lower:
+            return ["docs", "infra/scripts"]
+        return ["Triage Required"]
 
     domains = set()
     mapping = {
@@ -299,14 +309,14 @@ def generate_report():
             if files is None:
                 print(f"Warning: Failed to fetch files for PR #{num}. Using heuristics.")
                 risk, reason = classify_risk([], title)
-                domains = ["Triage Required (API Error)"]
+                domains = get_domains([], title)
             else:
                 risk, reason = classify_risk(files, title)
-                domains = get_domains(files)
+                domains = get_domains(files, title)
         else:
             ci_status = "unknown"
             risk, reason = classify_risk([], title)
-            domains = ["Triage Required"]
+            domains = get_domains([], title)
             if risk == "Unknown":
                 risk = "Triage Required"
 
@@ -383,12 +393,15 @@ def generate_report():
     report += f"- **Stale (Total):** {stale_count} PR{plural(stale_count)}\n"
 
     report += "\n## ✨ Good Candidates for Review Today\n\n"
-    candidates = (safe_surface + medium_risk + high_risk)[:4]
+    # Exclude High Risk from daily candidates to focus on safe/utility zones
+    candidates = (safe_surface + medium_risk)[:4]
     if len(candidates) < 3:
         stale_candidates = [
             pr for pr in classified_prs if "Stale" in pr["flag"] and pr["risk"] != "Triage Required"
         ]
-        candidates.extend(stale_candidates[: 4 - len(candidates)])
+        stale_safe = [pr for pr in stale_candidates if pr["risk"] == "Safe Surface"]
+        stale_medium = [pr for pr in stale_candidates if pr["risk"] == "Medium Risk"]
+        candidates.extend((stale_safe + stale_medium)[: 4 - len(candidates)])
 
     if not candidates:
         report += "No new candidates identified today.\n"
@@ -406,18 +419,21 @@ def generate_report():
         f.write(report)
 
     # Generate Merge-Readiness Checklist
+    # Generate Merge-Readiness Checklist (Strictly Low/Medium Risk)
     checklist = "# Merge-Readiness Checklist\n\n"
     checklist += "> [!IMPORTANT]\n"
     checklist += "> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules.\n\n"
     checklist += f"Generated on: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
     checklist += "This checklist identifies top promising PRs for immediate review.\n\n"
 
-    top_3 = (safe_surface + medium_risk + high_risk)[:3]
+    top_3 = (safe_surface + medium_risk)[:3]
     if len(top_3) < 3:
         stale_candidates = [
             pr for pr in classified_prs if "Stale" in pr["flag"] and pr["risk"] != "Triage Required"
         ]
-        top_3.extend(stale_candidates[: 3 - len(top_3)])
+        stale_safe = [pr for pr in stale_candidates if pr["risk"] == "Safe Surface"]
+        stale_medium = [pr for pr in stale_candidates if pr["risk"] == "Medium Risk"]
+        top_3.extend((stale_safe + stale_medium)[: 3 - len(top_3)])
 
     if not top_3:
         checklist += "No new candidates found for merge-readiness checklist today.\n"
