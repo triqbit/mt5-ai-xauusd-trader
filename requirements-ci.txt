@@ -26,7 +26,7 @@ metaapi-cloud-sdk==29.1.1
 
 # -- Testing -------------------------------------------------------
 python-socketio==4.6.1
-optuna==4.8.0
+optuna==4.9.0
 pytest==9.0.3
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
