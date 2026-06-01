@@ -1164,3 +1164,29 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately until a linear history can be restored and a human audit completed.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 37th Consecutive Day of History Destruction & Severe Labeling Drift).
+
+## 2026-06-01 18:00 GMT+4
+
+**Summary:** Thirty-eighth consecutive day of history destruction. PR #1462 executes another total system swap, further entrenching the breakdown of Git-based governance and extreme labeling drift.
+
+**Suspected Process Issues:**
+- **Persistent History Destruction:** The `main` branch remains a single-commit node (`862ffdd`). Repository history remains at a count of 1 for the 38th consecutive day, rendering all Git-native forensic and collaboration tools non-functional.
+- **Severe Labeling Drift (PR #1462):** Commit (`862ffdd`) is titled "DX: improve daily PR triage script and update dashboard (#1462)", yet it replaced the entire repository (565 files, ~444,000 lines). This continues the dangerous pattern of masking total system replacements (including core trading and risk logic) under minor "DX" labels.
+- **Massive PR Backlog:** 554 open PRs remain in a state of permanent fragmentation, decoupled from the ever-moving single-commit baseline.
+- **CI Safety Gate Bypass:** Merges continue while CI remains globally blocked due to cumulative lint/formatting debt and pre-existing test failures.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `862ffdd` (replaces `7f72b68` and all prior history).
+- PR #1462: Vehicle for the latest total system swap.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1462 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merged while CI remains globally blocked).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository, including core trading and risk logic, is being swapped daily with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The "Graft-and-Swap" model has entered its 38th consecutive day. Immediate human intervention is required to stop history destruction and restore a linear, traceable Git history.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `862ffdd` against known trusted baselines is mandatory.
+- **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately until a linear history can be restored and a human audit completed.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 38th Consecutive Day of History Destruction & Severe Labeling Drift).
