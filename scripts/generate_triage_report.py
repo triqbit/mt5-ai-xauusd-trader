@@ -90,15 +90,26 @@ def get_domains(files, title=""):
     if not files:
         # Heuristics based on title
         t_lower = title.lower()
+        domains = []
         if "docs" in t_lower or "readme" in t_lower:
-            return ["docs"]
+            domains.append("docs")
         if "test" in t_lower:
-            return ["tests"]
+            domains.append("tests")
         if "deps" in t_lower or "bump" in t_lower:
-            return ["dependencies"]
+            domains.append("dependencies")
         if "dx:" in t_lower:
-            return ["docs", "infra/scripts"]
-        return ["Triage Required"]
+            domains.append("docs")
+            domains.append("infra/scripts")
+        if "refactor" in t_lower:
+            domains.append("refactor")
+        if "chore" in t_lower:
+            domains.append("chore")
+        if "ci" in t_lower:
+            domains.append("infra/CI")
+
+        if not domains:
+            return ["Triage Required"]
+        return sorted(set(domains))
 
     domains = set()
     mapping = {
@@ -174,6 +185,9 @@ def classify_risk(files, title=""):
         "MERGE_READY_CHECKLIST.md",
         ".md",
         "tests/",
+        "scripts/generate_triage_report.py",
+        "scripts/doctor.py",
+        "scripts/bootstrap.sh",
     ]
 
     t_lower = title.lower()
@@ -210,7 +224,17 @@ def classify_risk(files, title=""):
                 if f.endswith(".md"):
                     continue
                 # General check for minor dependency bumps in non-core packages
-                safe_deps = ["click", "rich", "tabulate", "jinja2", "pytz", "colorlog", "tqdm"]
+                safe_deps = [
+                    "click",
+                    "rich",
+                    "tabulate",
+                    "jinja2",
+                    "pytz",
+                    "colorlog",
+                    "tqdm",
+                    "gymnasium",
+                    "stable-baselines3",
+                ]
                 if "bump" in t_lower and any(sd in t_lower for sd in safe_deps):
                     return "Safe Surface", f"Minor dependency bump: {t_lower}"
                 return "Medium Risk", f"Touches core/research/analytics/risk: {f}"
@@ -363,6 +387,22 @@ def generate_report():
             top_3_items.append(
                 f"**Critical Path:** High Risk PR #{hr['number']} needs expert review."
             )
+
+    # Backfill from Stale PRs if needed
+    if len(top_3_items) < 3:
+        stale_candidates = [
+            pr for pr in classified_prs if "Stale" in pr["flag"] and pr["risk"] != "Triage Required"
+        ]
+        stale_safe = [pr for pr in stale_candidates if pr["risk"] == "Safe Surface"]
+        stale_medium = [pr for pr in stale_candidates if pr["risk"] == "Medium Risk"]
+
+        for s_pr in stale_safe + stale_medium:
+            if len(top_3_items) >= 3:
+                break
+            if f"PR #{s_pr['number']}" not in str(top_3_items):
+                top_3_items.append(
+                    f"**Re-validate Stale:** Review {s_pr['risk']} PR #{s_pr['number']} ({s_pr['title']})"
+                )
 
     top_3_section = ""
     for idx, item in enumerate(top_3_items[:3]):
