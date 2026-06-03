@@ -457,7 +457,7 @@ def generate_report():
         stale_safe = [pr for pr in stale_candidates if pr["risk"] == "Safe Surface"]
         stale_medium = [pr for pr in stale_candidates if pr["risk"] == "Medium Risk"]
 
-        for s_pr in (stale_safe + stale_medium):
+        for s_pr in stale_safe + stale_medium:
             if len(top_3_items) >= 3:
                 break
             if f"PR #{s_pr['number']}" not in str(top_3_items):

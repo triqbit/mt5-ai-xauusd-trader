@@ -41,10 +41,18 @@ class TestTriageReport(unittest.TestCase):
             os.makedirs(os.path.join(tmpdir, "docs/status"), exist_ok=True)
             report_path = os.path.join(tmpdir, "docs/status/PR_TRIAGE_DAILY.md")
             with open(report_path, "w") as f:
-                f.write("| PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |\n")
-                f.write("|------|-------|--------|--------|--------|-----------|------------|-------------|\n")
-                f.write("| [9999](https://github.com/repo/pull/9999) | test | user | branch | none | success | High Risk | New |\n")
-                f.write("| [8888](https://github.com/repo/pull/8888) | test | user | branch | none | success | Triage Required | New |\n")
+                f.write(
+                    "| PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |\n"
+                )
+                f.write(
+                    "|------|-------|--------|--------|--------|-----------|------------|-------------|\n"
+                )
+                f.write(
+                    "| [9999](https://github.com/repo/pull/9999) | test | user | branch | none | success | High Risk | New |\n"
+                )
+                f.write(
+                    "| [8888](https://github.com/repo/pull/8888) | test | user | branch | none | success | Triage Required | New |\n"
+                )
 
             # Monkeypatch the path in the function's closure or just use a helper that takes a path
             # Since the script is simple, I'll just temporarily change directory
@@ -54,9 +62,10 @@ class TestTriageReport(unittest.TestCase):
                 cache = load_cache_fn()
                 self.assertIn(9999, cache)
                 self.assertEqual(cache[9999], "High Risk")
-                self.assertNotIn(8888, cache) # Should skip Triage Required
+                self.assertNotIn(8888, cache)  # Should skip Triage Required
             finally:
                 os.chdir(old_cwd)
+
 
 if __name__ == "__main__":
     unittest.main()
