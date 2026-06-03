@@ -1,6 +1,7 @@
 import datetime
 import json
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -83,7 +84,41 @@ def get_latest_main_commit_date():
         return datetime.datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").replace(
             tzinfo=datetime.timezone.utc
         )
+
+    # Fallback to local git if API fails
+    try:
+        cmd = ["git", "log", "-1", "--format=%cI", "main"]
+        result = subprocess.check_output(cmd).decode().strip()
+        return datetime.datetime.fromisoformat(result).astimezone(datetime.timezone.utc)
+    except Exception as e:
+        print(f"Local git fallback failed: {e}", file=sys.stderr)
+
     return datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
+
+
+def load_cache():
+    """Loads existing risk classifications from the daily report to avoid triage regressions."""
+    cache = {}
+    path = "docs/status/PR_TRIAGE_DAILY.md"
+    if not os.path.exists(path):
+        return cache
+
+    try:
+        with open(path, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                if line.startswith("| ["):
+                    parts = [p.strip() for p in line.split("|")]
+                    if len(parts) >= 8:
+                        # Extract PR number from [123](...)
+                        pr_num_str = parts[1].split("]")[0].replace("[", "")
+                        risk_class = parts[7]
+                        if pr_num_str.isdigit() and risk_class != "Triage Required":
+                            cache[int(pr_num_str)] = risk_class
+    except Exception as e:
+        print(f"Warning: Failed to load triage cache: {e}", file=sys.stderr)
+
+    return cache
 
 
 def get_domains(files, title=""):
@@ -156,6 +191,7 @@ def classify_risk(files, title=""):
         "src/trading/",
         "src/models/",
         "src/core/config.py",
+        "src/environment/",
         "migrations/",
         "main.py",
         "alembic.ini",
@@ -168,13 +204,24 @@ def classify_risk(files, title=""):
         "src/research/",
         "src/analytics/",
         "src/core/",
-        "src/environment/",
+        "src/monitoring/",
         "Makefile",
         "scripts/",
         "pyproject.toml",
         "requirements",
     ]
 
+    # High-impact title keywords
+    high_risk_keywords = [
+        "trading",
+        "risk",
+        "engine",
+        "security",
+        "model",
+        "connector",
+        "allocator",
+    ]
+    medium_risk_keywords = ["research", "analytics", "environment", "cli", "ux", "makefile", "api"]
     safe_keywords = ["docs", "readme", "lint", "typo", "cleanup", "chore", "dx:", "dashboard"]
 
     # Specific exceptions for safe surfaces within medium/high risk paths
@@ -196,6 +243,10 @@ def classify_risk(files, title=""):
     if not files:
         if is_likely_safe:
             return "Safe Surface", "Heuristic: Title matches safe keywords."
+        if any(kw in t_lower for kw in high_risk_keywords):
+            return "High Risk", "Heuristic: Title matches high-risk keywords."
+        if any(kw in t_lower for kw in medium_risk_keywords):
+            return "Medium Risk", "Heuristic: Title matches medium-risk keywords."
         return "Triage Required", "No files found or unable to fetch files."
 
     # First check if ALL files are in safe patterns
@@ -259,6 +310,10 @@ def generate_report():
     print("Fetching repository state...")
     big_bang_date = get_latest_main_commit_date()
     print(f"Latest history graft detected at: {big_bang_date}")
+
+    cache = load_cache()
+    if cache:
+        print(f"Loaded {len(cache)} cached risk classifications.")
 
     print("Fetching PRs...")
     prs = get_all_prs()
@@ -332,14 +387,20 @@ def generate_report():
             files = get_all_pr_files(num)
             if files is None:
                 print(f"Warning: Failed to fetch files for PR #{num}. Using heuristics.")
-                risk, reason = classify_risk([], title)
+                if num in cache:
+                    risk, reason = cache[num], "Cached from previous report."
+                else:
+                    risk, reason = classify_risk([], title)
                 domains = get_domains([], title)
             else:
                 risk, reason = classify_risk(files, title)
                 domains = get_domains(files, title)
         else:
             ci_status = "unknown"
-            risk, reason = classify_risk([], title)
+            if num in cache:
+                risk, reason = cache[num], "Cached from previous report."
+            else:
+                risk, reason = classify_risk([], title)
             domains = get_domains([], title)
             if risk == "Unknown":
                 risk = "Triage Required"
