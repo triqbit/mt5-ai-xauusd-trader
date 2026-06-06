@@ -1,0 +1,14 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- /home/jules/.pyenv/versions/3.12.13/bin/python3
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /app
+configfile: pyproject.toml
+plugins: mock-3.15.1, hypothesis-6.155.2, cov-7.1.0, anyio-4.13.0
+collecting ... collected 3 items
+
+tests/test_triage_report.py::TestTriageReport::test_classify_risk_by_file PASSED [ 33%]
+tests/test_triage_report.py::TestTriageReport::test_classify_risk_by_keyword PASSED [ 66%]
+tests/test_triage_report.py::TestTriageReport::test_load_cache PASSED    [100%]
+
+============================== 3 passed in 0.31s ===============================
