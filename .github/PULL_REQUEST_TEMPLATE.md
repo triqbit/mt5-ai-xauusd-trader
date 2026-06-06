@@ -11,6 +11,16 @@ Fixes # (issue)
 - [ ] ⚡ Performance improvement
 - [ ] 🛡️ Security / Governance update
 
+## 🛡️ Contribution Safety Checklist
+Before submitting, please categorize your PR based on the [Contribution Map](docs/CONTRIBUTION_MAP.md):
+
+- [ ] **Safety Zone:** I have verified my PR falls into:
+  - [ ] 🟢 **Safe Zone** (docs, tests, scripts)
+  - [ ] 🟡 **Utility Zone** (utils, analytics)
+  - [ ] 🔴 **Sensitive Zone** (trading, models, core) - *Requires Multi-Signature Approval*
+- [ ] **History Alignment:** I have rebased my branch onto the latest `main` graft.
+- [ ] **Rebase Check:** `git fetch origin main && git rebase origin/main` (Command executed and passed)
+
 ## ✅ Mandatory Quality Gates
 These checks are required before the PR can be merged:
 - [ ] **Tests Passed:** `python3 -m pytest tests/` (All tests passed)
