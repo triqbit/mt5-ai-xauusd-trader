@@ -12,7 +12,7 @@ This directory serves as the central repository for all technical audits, perfor
 | **ALIGNMENT_REPORT.md** | Strategy-to-code alignment and agent coordination audit. | 🔵 In-Progress |
 | **PERFORMANCE_COMPLEXITY_REPORT.md** | Runtime efficiency and computational complexity analysis. | 🔵 In-Progress |
 | [**CORRECTIVE_ACTION_VERIFICATION.md**](./CORRECTIVE_ACTION_VERIFICATION.md) | Post-incident audits and resolution verification. | ⏳ Upcoming |
-| [**ADR_AUDIT_REPORT.md**](./ADR_AUDIT_REPORT.md) | Review of key Architecture Decision Records (ADRs). | ⏳ Upcoming |
+| [**ADR_AUDIT_REPORT.md**](./ADR_AUDIT_REPORT.md) | Review of key Architecture Decision Records (ADRs). | ✅ Active |
 
 ---
 
