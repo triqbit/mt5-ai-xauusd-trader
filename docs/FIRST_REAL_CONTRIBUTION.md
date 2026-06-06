@@ -54,7 +54,11 @@ make doctor
 ### Step 5: Submit for Review
 
 1.  **Commit with Conventional Commits:** `feat: add disk space check to doctor diagnostics`
-2.  **Rebase:** `git rebase main`
+2.  **Final Rebase (Critical):** Always rebase just before pushing to ensure you are on the latest graft:
+    ```bash
+    git fetch origin main
+    git rebase origin/main
+    ```
 3.  **Push and PR:** Open a PR and tag **Jules06 (@qufuwan)** for review.
 
 ---

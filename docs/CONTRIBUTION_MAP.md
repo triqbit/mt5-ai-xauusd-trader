@@ -12,6 +12,21 @@ This map defines the "Safe Zones" and "Sensitive Zones" of the MT5 AI/ML Trading
 
 ---
 
+## 🌪️ Turbulence Response FAQ
+
+The repository is currently in a state of **High Turbulence** due to rapid automated development cycles. Here is how to navigate as a contributor:
+
+### 1. Why are there 550+ open PRs?
+Most open PRs are **"Stale (Pre-Big-Bang)"**. They were created against previous repository history grafts and are currently pending bulk closure or manual rebase. **Do not let this deter you.** Focus on "Safe Surface" candidates identified in the latest [PR Triage Report](./status/PR_TRIAGE_DAILY.md).
+
+### 2. Why is CI blocked?
+CI is currently failing globally due to legacy linting errors in `migrations/` that were integrated during a history graft. **Safe contributions (docs, tests, scripts) are still encouraged.** Maintainers will manually verify your PR if it stays within a **Safe Zone**.
+
+### 3. How do I know if my PR is safe to merge?
+Check the [Merge-Ready Checklist](./status/MERGE_READY_CHECKLIST.md). If your PR is listed there, it has been flagged as a priority for alignment and review.
+
+---
+
 ## 🟢 Safe Zones (Recommended for First PRs)
 
 These areas are perfect for new contributors to get familiar with the project and provide immediate value with minimal risk to trading operations.
