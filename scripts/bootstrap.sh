@@ -29,20 +29,50 @@ fi
 
 $PIP install --upgrade pip
 
-if [ -f "requirements.txt" ]; then
-    echo "Installing production dependencies..."
-    # Attempt standard installation
-    if ! $PIP install -r requirements.txt; then
+# Install critical diagnostic tools first to ensure 'make doctor' works even if full install fails
+echo "Installing core diagnostic tools (rich, pydantic, structlog, ruff)..."
+$PIP install rich pydantic pydantic-settings structlog python-dotenv ruff
+
+# Select best requirements file based on platform
+OS_TYPE=$(uname -s)
+REQ_FILE="requirements.txt"
+
+if [[ "$OS_TYPE" == "Linux" && -f "requirements-linux.txt" ]]; then
+    echo "Linux detected, using requirements-linux.txt"
+    REQ_FILE="requirements-linux.txt"
+elif [[ "$OS_TYPE" == "Darwin" && -f "requirements-linux.txt" ]]; then
+    echo "macOS detected, using requirements-linux.txt as baseline"
+    REQ_FILE="requirements-linux.txt"
+fi
+
+if [ -f "$REQ_FILE" ]; then
+    echo "Installing production dependencies from $REQ_FILE..."
+    # Attempt standard installation with extra index for torch cpu if needed
+    PIP_INSTALL_CMD="$PIP install"
+    if grep -q "+cpu" "$REQ_FILE"; then
+        PIP_INSTALL_CMD="$PIP install --extra-index-url https://download.pytorch.org/whl/cpu"
+    fi
+
+    if ! $PIP_INSTALL_CMD -r "$REQ_FILE"; then
         echo ""
         echo "----------------------------------------------------------"
-        echo "WARNING: Standard installation failed (likely TA-Lib)."
+        echo "WARNING: Standard installation failed."
         echo "Attempting resilient installation (ignoring TA-Lib)..."
         echo "----------------------------------------------------------"
 
         # Create a temporary requirements file without TA-Lib
-        grep -iv "TA-Lib" requirements.txt > requirements-temp.txt
-        $PIP install -r requirements-temp.txt
-        rm requirements-temp.txt
+        echo "Creating temporary requirements without TA-Lib..."
+        grep -iv "TA-Lib" "$REQ_FILE" > requirements-ta-lib-fallback.txt
+        if ! $PIP_INSTALL_CMD -r requirements-ta-lib-fallback.txt; then
+            echo ""
+            echo "----------------------------------------------------------"
+            echo "CRITICAL WARNING: Production dependency installation FAILED."
+            echo "This is likely due to invalid versions in $REQ_FILE."
+            echo "The system will be in a DEGRADED state."
+            echo "Run 'make doctor' to diagnose specific missing packages."
+            echo "----------------------------------------------------------"
+        fi
+        rm -f requirements-ta-lib-fallback.txt
 
         echo ""
         echo "Attempting to install TA-Lib separately..."
@@ -57,7 +87,7 @@ if [ -f "requirements.txt" ]; then
         fi
     fi
 else
-    echo "requirements.txt not found, skipping production dependencies."
+    echo "$REQ_FILE not found, skipping production dependencies."
 fi
 
 # Install test dependencies

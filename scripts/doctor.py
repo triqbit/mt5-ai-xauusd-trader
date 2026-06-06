@@ -117,8 +117,15 @@ def check_dependencies(dependencies=None):
         def get_version(name):
             return "unknown"
 
-    deps = dependencies or CORE_DEPENDENCIES
+    deps = (dependencies or CORE_DEPENDENCIES).copy()
+
+    # Platform-specific dependency adjustments
+    is_windows = sys.platform == "win32"
+    if is_windows:
+        deps["MetaTrader5"] = ("MetaTrader5", "5.0.0")
+
     missing = []
+    optional_missing = []
     outdated = []
     versions = []
 
@@ -153,11 +160,23 @@ def check_dependencies(dependencies=None):
             missing.append(display_name)
 
     if missing:
+        remedy = (
+            "Run 'pip install -r requirements-linux.txt'. If versions fail to resolve, check for invalid pins in requirements files."
+            if sys.platform != "win32"
+            else "Run 'pip install -r requirements.txt'. If versions fail to resolve, check for invalid pins in requirements files."
+        )
         return DiagnosticCheck(
             "Dependencies",
             "FAILED",
             f"Missing: {', '.join(missing)}",
-            "Run 'pip install -r requirements.txt'",
+            remedy,
+        )
+    elif optional_missing:
+        return DiagnosticCheck(
+            "Dependencies",
+            "WARNING",
+            f"Missing Optional: {', '.join(optional_missing)}",
+            "Install optional packages for full functionality.",
         )
     elif outdated:
         return DiagnosticCheck(
@@ -246,7 +265,7 @@ def check_env_file():
             ".env Configuration",
             "FAILED",
             ".env is missing",
-            "Copy .env.example to .env and fill in details.",
+            "Run 'python main.py --setup' or 'make setup' to configure the environment.",
         )
 
 
@@ -373,11 +392,16 @@ def check_mt5_config():
     if login != "0" and pwd and server:
         return DiagnosticCheck("MT5 Credentials", "OK", f"Configured for {server}")
     else:
+        remedy = (
+            "Run 'python main.py --setup'. On Linux, you may need MetaAPI credentials."
+            if sys.platform != "win32"
+            else "Run 'python main.py --setup' and provide your MT5 credentials."
+        )
         return DiagnosticCheck(
             "MT5 Credentials",
             "WARNING",
             "Incomplete MT5 configuration",
-            "Check MT5_LOGIN, MT5_PASSWORD, and MT5_SERVER in .env",
+            remedy,
         )
 
 
