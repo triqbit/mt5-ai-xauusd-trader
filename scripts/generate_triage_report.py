@@ -73,27 +73,31 @@ def get_ci_status(sha):
     return "unknown"
 
 
-def get_latest_main_commit_date():
-    """Fetches the timestamp of the latest commit on main to detect history grafts."""
+def get_latest_main_commit_info():
+    """Fetches the timestamp and SHA of the latest commit on main to detect history grafts."""
     url = f"https://api.github.com/repos/{REPO}/branches/main"
     data = api_call(url)
-    if data and "commit" in data and "commit" in data["commit"]:
-        # Try to get the committer date
+    if data and "commit" in data:
+        commit_sha = data["commit"]["sha"]
         commit_data = data["commit"]["commit"]
         date_str = commit_data["committer"]["date"]
-        return datetime.datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").replace(
+        dt = datetime.datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%SZ").replace(
             tzinfo=datetime.timezone.utc
         )
+        return dt, commit_sha
 
     # Fallback to local git if API fails
     try:
         cmd = ["git", "log", "-1", "--format=%cI", "main"]
-        result = subprocess.check_output(cmd).decode().strip()
-        return datetime.datetime.fromisoformat(result).astimezone(datetime.timezone.utc)
+        date_result = subprocess.check_output(cmd).decode().strip()
+        dt = datetime.datetime.fromisoformat(date_result).astimezone(datetime.timezone.utc)
+        cmd_sha = ["git", "rev-parse", "main"]
+        sha = subprocess.check_output(cmd_sha).decode().strip()
+        return dt, sha
     except Exception as e:
         print(f"Local git fallback failed: {e}", file=sys.stderr)
 
-    return datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1)
+    return datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=1), "unknown"
 
 
 def load_cache():
@@ -308,8 +312,8 @@ def get_recommendation(risk, domains, ci_status):
 
 def generate_report():
     print("Fetching repository state...")
-    big_bang_date = get_latest_main_commit_date()
-    print(f"Latest history graft detected at: {big_bang_date}")
+    big_bang_date, big_bang_sha = get_latest_main_commit_info()
+    print(f"Latest history graft detected at: {big_bang_date} (SHA: {big_bang_sha})")
 
     cache = load_cache()
     if cache:
@@ -494,15 +498,26 @@ def generate_report():
     report += f"- **Stale (Total):** {stale_count} PR{plural(stale_count)}\n"
 
     report += "\n## ✨ Good Candidates for Review Today\n\n"
-    # Exclude High Risk from daily candidates to focus on safe/utility zones
-    candidates = (safe_surface + medium_risk)[:4]
+    # Exclude High Risk and Triage/Dashboard reports from daily candidates to focus on safe/utility zones
+    filtered_safe = [
+        pr
+        for pr in safe_surface
+        if "triage" not in pr["title"].lower() and "dashboard" not in pr["title"].lower()
+    ]
+    candidates = (filtered_safe + medium_risk)[:4]
     if len(candidates) < 3:
         stale_candidates = [
             pr for pr in classified_prs if "Stale" in pr["flag"] and pr["risk"] != "Triage Required"
         ]
-        stale_safe = [pr for pr in stale_candidates if pr["risk"] == "Safe Surface"]
+        stale_filtered_safe = [
+            pr
+            for pr in stale_candidates
+            if pr["risk"] == "Safe Surface"
+            and "triage" not in pr["title"].lower()
+            and "dashboard" not in pr["title"].lower()
+        ]
         stale_medium = [pr for pr in stale_candidates if pr["risk"] == "Medium Risk"]
-        candidates.extend((stale_safe + stale_medium)[: 4 - len(candidates)])
+        candidates.extend((stale_filtered_safe + stale_medium)[: 4 - len(candidates)])
 
     if not candidates:
         report += "No new candidates identified today.\n"
@@ -523,19 +538,11 @@ def generate_report():
     # Generate Merge-Readiness Checklist (Strictly Low/Medium Risk)
     checklist = "# Merge-Readiness Checklist\n\n"
     checklist += "> [!IMPORTANT]\n"
-    checklist += "> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules.\n\n"
+    checklist += f"> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `{big_bang_sha}` is required for all PRs.**\n\n"
     checklist += f"Generated on: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
     checklist += "This checklist identifies top promising PRs for immediate review.\n\n"
 
-    top_3 = (safe_surface + medium_risk)[:3]
-    if len(top_3) < 3:
-        stale_candidates = [
-            pr for pr in classified_prs if "Stale" in pr["flag"] and pr["risk"] != "Triage Required"
-        ]
-        stale_safe = [pr for pr in stale_candidates if pr["risk"] == "Safe Surface"]
-        stale_medium = [pr for pr in stale_candidates if pr["risk"] == "Medium Risk"]
-        top_3.extend((stale_safe + stale_medium)[: 3 - len(top_3)])
-
+    top_3 = candidates[:3]
     if not top_3:
         checklist += "No new candidates found for merge-readiness checklist today.\n"
     else:
@@ -549,15 +556,13 @@ def generate_report():
             checklist += f"- **Domains touched**: {', '.join(c['domains'])}\n"
             checklist += f"- **CI status**: {c['ci_status']}\n"
 
-            missing = []
+            missing = [f"Mandatory rebase against commit `{big_bang_sha}`"]
             if "tests" not in c["domains"] and c["risk"] != "Safe Surface":
                 missing.append("tests")
             if "docs" not in c["domains"] and c["risk"] != "Safe Surface":
                 missing.append("docs")
 
-            checklist += (
-                f"- **Missing items**: {', '.join(missing) if missing else 'None identified'}\n"
-            )
+            checklist += f"- **Missing items**: {', '.join(missing)}\n"
             checklist += f"- **Recommendation**: {get_recommendation(c['risk'], c['domains'], c['ci_status'])}\n\n"
 
     checklist += "---\n*Prepared by Jules06 (qufuwan) for Jules05 and human review.*\n"
