@@ -1,0 +1,5 @@
+commit e33d96d0a57eb33fea3c1f25c466b6c6b02c4758
+Author: google-labs-jules[bot] <161369871+google-labs-jules[bot]@users.noreply.github.com>
+Date:   Sun Jun 7 15:57:15 2026 +0000
+
+    DX: prepare merge-ready checklist and fix global formatting

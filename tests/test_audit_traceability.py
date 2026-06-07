@@ -14,6 +14,7 @@ def audit_logger():
     AuditLogger._initialized = False
     return AuditLogger("sqlite:///:memory:")
 
+
 def test_log_config_snapshot(audit_logger):
     config_data = {"SYMBOL": "XAUUSD", "MODE": "live"}
     entry_id = audit_logger.log_config_snapshot(config_data, reason="unit_test")
@@ -23,6 +24,7 @@ def test_log_config_snapshot(audit_logger):
         assert entry.action == "config_snapshot"
         assert entry.metadata_json == config_data
         assert "unit_test" in entry.details
+
 
 def test_log_prediction(audit_logger):
     metadata = {"weights": [0.5, 0.5]}
@@ -36,6 +38,7 @@ def test_log_prediction(audit_logger):
         assert entry.metadata_json["confidence"] == 0.95
         assert entry.metadata_json["model_context"] == metadata
 
+
 def test_log_risk_decision(audit_logger):
     decision_chain = {"circuit_breaker": True, "daily_loss": False}
     entry_id = audit_logger.log_risk_decision("XAUUSD", -1, decision_chain, False)
@@ -45,6 +48,7 @@ def test_log_risk_decision(audit_logger):
         assert entry.action == "risk_decision"
         assert entry.metadata_json["passed"] is False
         assert entry.metadata_json["decision_chain"] == decision_chain
+
 
 def test_log_blocked_trade(audit_logger):
     context = {"filter": "ATR"}
@@ -56,6 +60,7 @@ def test_log_blocked_trade(audit_logger):
         assert "High Volatility" in entry.details
         assert entry.metadata_json["context"] == context
 
+
 def test_log_operator_action(audit_logger):
     entry_id = audit_logger.log_operator_action("admin", "emergency_halt", "System anomaly")
 
@@ -65,6 +70,7 @@ def test_log_operator_action(audit_logger):
         assert entry.action == "operator_emergency_halt"
         assert "System anomaly" in entry.details
 
+
 def test_log_deployment(audit_logger):
     entry_id = audit_logger.log_deployment("1.1.0", "production")
 
@@ -73,6 +79,7 @@ def test_log_deployment(audit_logger):
         assert entry.action == "deployment"
         assert entry.metadata_json["version"] == "1.1.0"
         assert entry.metadata_json["environment"] == "production"
+
 
 def test_log_trade_outcome(audit_logger):
     metadata = {"entry": 2000.0, "exit": 2010.0}
@@ -84,6 +91,7 @@ def test_log_trade_outcome(audit_logger):
         assert entry.metadata_json["ticket"] == 12345
         assert entry.metadata_json["pnl"] == 100.0
         assert entry.metadata_json["context"] == metadata
+
 
 def test_log_config_change(audit_logger):
     old = {"MODE": "demo"}
@@ -97,9 +105,12 @@ def test_log_config_change(audit_logger):
         assert entry.metadata_json["new"] == new
         assert "Manual switch" in entry.details
 
+
 def test_log_operator_action_refined(audit_logger):
     # Test the refined version of log_operator_action
-    entry_id = audit_logger.log_operator_action("admin", "emergency_halt", "System anomaly", {"extra": "data"})
+    entry_id = audit_logger.log_operator_action(
+        "admin", "emergency_halt", "System anomaly", {"extra": "data"}
+    )
 
     with audit_logger.Session() as session:
         entry = session.get(AuditEntry, entry_id)

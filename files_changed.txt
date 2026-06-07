@@ -1,0 +1,2 @@
+commit_id.txt
+commit_msg.txt

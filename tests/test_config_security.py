@@ -10,12 +10,13 @@ def test_redis_url_is_secret():
     config = TradingConfig(
         MT5_PASSWORD="test_password",
         MT5_SERVER="test_server",
-        redis_url="redis://user:pass@localhost:6379/0"
+        redis_url="redis://user:pass@localhost:6379/0",
     )
 
     assert isinstance(config.redis_url, SecretStr)
     assert str(config.redis_url) == "**********"
     assert config.redis_url.get_secret_value() == "redis://user:pass@localhost:6379/0"
+
 
 def test_redis_url_redaction_in_audit_snapshot(tmp_path):
     """Verify that redis_url is redacted in audit log snapshots."""
@@ -31,7 +32,7 @@ def test_redis_url_redaction_in_audit_snapshot(tmp_path):
     config = TradingConfig(
         MT5_PASSWORD="test_password",
         MT5_SERVER="test_server",
-        redis_url="redis://user:pass@localhost:6379/0"
+        redis_url="redis://user:pass@localhost:6379/0",
     )
 
     snapshot = config.model_dump(
@@ -43,7 +44,7 @@ def test_redis_url_redaction_in_audit_snapshot(tmp_path):
             "database_url",
             "redis_url",
             "telegram_token",
-        }
+        },
     )
 
     assert "redis_url" not in snapshot
@@ -56,6 +57,7 @@ def test_redis_url_redaction_in_audit_snapshot(tmp_path):
         result = conn.execute(select(AuditEntry.metadata_json)).fetchone()
         metadata = result[0]
         assert "redis_url" not in metadata
+
 
 def test_redis_url_redaction_if_not_excluded(tmp_path):
     """Verify that even if NOT excluded manually, the masking processor catches it if it's a SecretStr."""
@@ -70,13 +72,12 @@ def test_redis_url_redaction_if_not_excluded(tmp_path):
 
     real_secret = "redis://user:pass@localhost:6379/0"
     config = TradingConfig(
-        MT5_PASSWORD="test_password",
-        MT5_SERVER="test_server",
-        redis_url=real_secret
+        MT5_PASSWORD="test_password", MT5_SERVER="test_server", redis_url=real_secret
     )
 
     # Update masking processor secrets explicitly
     from src.core.log_config import get_masking_processor
+
     get_masking_processor().update_secrets(config)
 
     # Dump WITHOUT excluding redis_url
