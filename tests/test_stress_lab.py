@@ -715,7 +715,9 @@ def test_slippage_cost_tracking(sample_data):
         # Approximate check: slippage * trades * lot_size * contract_multiplier * 2
         # Note: 'slippage' in bps is price * 100 / 10000 = price * 0.01
         avg_price = sample_data["close"].mean()
-        expected_slippage_per_leg = avg_price * (100.0 / 10000.0) * scenario.lot_size * lab.contract_multiplier
+        expected_slippage_per_leg = (
+            avg_price * (100.0 / 10000.0) * scenario.lot_size * lab.contract_multiplier
+        )
         total_legs = metrics.num_trades * 2
         expected_total = expected_slippage_per_leg * total_legs
 

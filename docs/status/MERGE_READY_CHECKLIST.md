@@ -1,32 +1,32 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `9b899dc` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `cc03b4fd550c4673c7c10d8b76b499aba85cabfb` is required for all PRs.**
 
-Generated on: 2026-06-06 14:30:00 UTC
+Generated on: 2026-06-07 13:29:57 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
 ## 1. PR #1455: chore(deps): bump gymnasium from 1.0.0 to 1.3.0
-- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump gymnasium from 1.0.0 to 1.3.0'.
+- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump gymnasium from 1.0.0 to 1.3.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
-- **CI status**: pending (blocked by global CI state)
-- **Missing items**: Mandatory rebase against commit `9b899dc`; verification of Stable-Baselines3 compatibility.
-- **Recommendation**: Candidate for review once rebased.
+- **CI status**: pending
+- **Missing items**: Mandatory rebase against commit `cc03b4fd550c4673c7c10d8b76b499aba85cabfb`
+- **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1429: chore(deps): bump click from 8.1.8 to 8.4.1
-- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump click from 8.1.8 to 8.4.1'.
+- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump click from 8.1.8 to 8.4.1' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
-- **CI status**: pending (blocked by global CI state)
-- **Missing items**: Mandatory rebase against commit `9b899dc`.
-- **Recommendation**: Candidate for review once rebased.
+- **CI status**: pending
+- **Missing items**: Mandatory rebase against commit `cc03b4fd550c4673c7c10d8b76b499aba85cabfb`
+- **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1336: DX: improve developer onboarding and contribution experience
-- **Short scope summary**: Safe Surface update improving setup clarity and contribution pathways.
-- **Domains touched**: docs, scripts
-- **CI status**: unknown (pre-Big-Bang)
-- **Missing items**: Mandatory rebase against commit `9b899dc`; verification of `scripts/bootstrap.sh` enhancements.
-- **Recommendation**: Candidate for review once rebased.
+- **Short scope summary**: Safe Surface update implementing 'DX: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
+- **Domains touched**: docs, infra/scripts
+- **CI status**: unknown
+- **Missing items**: Mandatory rebase against commit `cc03b4fd550c4673c7c10d8b76b499aba85cabfb`
+- **Recommendation**: Needs CI success before merge
 
 ---
 *Prepared by Jules06 (qufuwan) for Jules05 and human review.*
