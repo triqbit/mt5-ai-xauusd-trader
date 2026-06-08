@@ -35,7 +35,7 @@ redis==8.0.0
 prometheus-client==0.21.1
 structlog==25.5.0
 rich==15.0.0
-tqdm==4.67.3
+tqdm==4.68.1
 
 # ── Dashboard / API ─────────────────────────────────────────
 fastapi==0.136.3
