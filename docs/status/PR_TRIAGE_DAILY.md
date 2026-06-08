@@ -1,26 +1,24 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-06-07 13:18:35 UTC
+**Date:** 2026-06-08 14:29:35 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
-- High number of open PRs (555)
+- High number of open PRs (553)
 
 ---
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Address Turbulence:** High number of open PRs (555)
-2. **Re-validate Stale:** Review Safe Surface PR #1455 (chore(deps): bump gymnasium from 1.0.0 to 1.3.0)
-3. **Re-validate Stale:** Review Safe Surface PR #1429 (chore(deps): bump click from 8.1.8 to 8.4.1)
+1. **Address Turbulence:** High number of open PRs (553)
+2. **Re-validate Stale:** Review Safe Surface PR #1409 (docs: Daily PR triage and risk dashboard [2026-05-23])
+3. **Re-validate Stale:** Review Safe Surface PR #1336 (DX: improve developer onboarding and contribution experience)
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
 | [1470](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1470) | docs: update daily merge-readiness checklist [2026-06-03] | triqbit | `docs-merge-checklist-2026-06-03-12193052405329652474` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1455](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1455) | chore(deps): bump gymnasium from 1.0.0 to 1.3.0 | dependabot[bot] | `dependabot/pip/gymnasium-1.3.0` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1429](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1429) | chore(deps): bump click from 8.1.8 to 8.4.1 | dependabot[bot] | `dependabot/pip/click-8.4.1` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1412](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1412) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-product-coherence-improvements-15654352759067746756` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1409](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1409) | docs: Daily PR triage and risk dashboard [2026-05-23] | triqbit | `dx-daily-merge-checklist-2026-05-23-2325326555346100103` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1404](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1404) | 🔗 Jules05: Integration test results [2026-05-23] | yxynoty | `jules05-integration-results-2026-05-23-1111935695238620886` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -38,8 +36,8 @@
 | [1359](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1359) | 💡 Jules02: CLI and operator UX improvement — Centralized loop control and observability | xnessom | `feat/jules-ux-improvements-17355899848812806450` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1358](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1358) | refine institutional decision support system | saysgrok | `jules/decision-support-refinement-14863980251247551831` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1355](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1355) | 🤖 Jules05: Auto-merge policy update | yxynoty | `jules-auto-merge-policy-update-v2-16307037561171272572` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1353](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1353) | Daily PR Intake & Risk Triage Dashboard [2026-05-19] | triqbit | `dx-daily-triage-2026-05-19-3194403183270032630` | none | unknown | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1349](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1349) | 📘 Jules02: Documentation and schema governance — Decision funnel unification | xnessom | `feat-jules-decision-funnel-unification-v2-13333372400311877230` | escalated-risk | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
+| [1353](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1353) | Daily PR Intake & Risk Triage Dashboard [2026-05-19] | triqbit | `dx-daily-triage-2026-05-19-3194403183270032630` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1349](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1349) | 📘 Jules02: Documentation and schema governance — Decision funnel unification | xnessom | `feat-jules-decision-funnel-unification-v2-13333372400311877230` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1344](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1344) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-product-coherence-improvements-20260518-7427190619380435882` | escalated-risk | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [1338](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1338) | 📡 Jules02: Observability improvement — Decision funnel telemetry and unified heartbeat | xnessom | `feat/observability-decision-funnel-14900306213594860766` | escalated-risk | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [1337](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1337) | 🤖 Jules05: Auto-merge policy update | yxynoty | `jules05-auto-merge-policy-update-2411154997242434832` | none | unknown | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
@@ -580,14 +578,14 @@
 - **Medium Risk (New):** 0 PRs
 - **Safe Surface (New):** 0 PRs
 - **Triage Required (New):** 0 PRs
-- **Stale (Total):** 555 PRs
+- **Stale (Total):** 553 PRs
 
 ## ✨ Good Candidates for Review Today
 
-- **PR #1455**: chore(deps): bump gymnasium from 1.0.0 to 1.3.0 (dependabot[bot]) [CI: pending] - *Safe Surface*
-- **PR #1429**: chore(deps): bump click from 8.1.8 to 8.4.1 (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #1336**: DX: improve developer onboarding and contribution experience (triqbit) - *Safe Surface*
 - **PR #1300**: 🧹 Jules05: Technical debt cleanup — architectural harmonization (yxynoty) - *Safe Surface*
+- **PR #1268**: refactor: 🧹 Jules05: Technical debt cleanup — architectural harmonization (yxynoty) - *Safe Surface*
+- **PR #1210**: docs: 📘 Jules02: Documentation and schema governance — Unified decision schemas and tracing (xnessom) - *Safe Surface*
 
 ---
 *Note: This report is generated by Jules06 (qufuwan). Risk classification is based on file paths and heuristics.*
