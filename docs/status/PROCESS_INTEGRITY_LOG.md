@@ -1424,3 +1424,30 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately until a linear history can be restored and a human audit completed.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 47th Consecutive Day of History Destruction & Severe Labeling Drift).
+
+## 2026-06-10 14:15 UTC
+
+**Summary:** Forty-eighth and forty-ninth consecutive history grafts detected within hours of the daily report. Governance breakdown continues to accelerate with multiple system-wide swaps per day.
+
+**Suspected Process Issues:**
+- **Accelerated History Destruction:** The `main` branch was reset twice more today (PR #1501 and PR #1502) following the 13:40 UTC report. Repository history remains at a count of 1.
+- **Persistent Labeling Drift (PR #1502):** Commit (`0ff0000`) is titled "docs: update daily merge-readiness checklist [2026-06-10] (#1502)", yet it replaced the entire repository (568 files, ~444,771 lines).
+- **History Erasure:** The documentation for PR #1501 (commit `c24d6ce`) was erased from the log by the subsequent graft in PR #1502, illustrating the total loss of process traceability.
+- **Massive PR Backlog:** 553 open PRs remain in a state of permanent fragmentation.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `0ff0000` (replaces `c24d6ce`, `4e174ae`, and all prior history).
+- PR #1502: Latest total system swap.
+- PR #1501: Intermediary graft destroyed by #1502.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1501, #1502 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merges continue while CI remains globally blocked).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository is being swapped multiple times per day with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The frequency of monolithic grafts has reached a point where documentation itself is being erased before it can be audited. Immediate human intervention is required.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/trading/risk_manager.py` in `0ff0000` is mandatory.
+- **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - Accelerated History Destruction & Traceability Loss).
