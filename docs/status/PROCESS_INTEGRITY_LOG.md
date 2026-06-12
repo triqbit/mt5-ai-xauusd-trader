@@ -1451,3 +1451,58 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - Accelerated History Destruction & Traceability Loss).
+
+## 2026-06-11 14:35 UTC
+
+**Summary:** Fiftieth consecutive monolithic history graft detected. Process integrity remains in total collapse. Global CI is now hard-blocked by formatting drift.
+
+**Suspected Process Issues:**
+- **Fiftieth Consecutive Graft:** The `main` branch remains a single-commit node (`e61fc1d`), representing the 50th consecutive day of total repository replacements.
+- **Global CI Blockage:** The 'Fast Validation' CI workflow is failing due to 120 files deviating from `ruff==0.4.3` formatting. This drift in the baseline branch ensures all subsequent PRs will fail CI unless a global reformat is performed.
+- **Labeling Drift (PR #1503):** Commit (`e61fc1d`) is titled "docs: update process integrity log [2026-06-10] (#1503)", yet it replaces the entire repository (568 files, ~444,798 lines).
+- **Total Traceability Loss:** Forensic auditing via Git remains impossible.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `e61fc1d` (replaces `0ff0000` and all prior history).
+- PR #1503: Latest total system swap.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1503 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merges continue while CI is globally blocked by baseline formatting drift).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository is being swapped daily with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The 'Graft-and-Swap' model has reached its 50th consecutive day. Immediate human intervention is required to address the total loss of history and the global CI blockage.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `e61fc1d` is mandatory.
+- **Global Reformat:** A repository-wide `ruff format .` is required to unblock CI.
+- **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 50th Consecutive Day of History Destruction & Global CI Blockage).
+
+## 2026-06-12 13:45 UTC
+
+**Summary:** Fifty-first consecutive monolithic history graft detected. Process integrity remains in total collapse. History erasure observed as yesterday's integrity documentation was overwritten by today's graft.
+
+**Suspected Process Issues:**
+- **Fifty-First Consecutive Graft:** The `main` branch remains a single-commit node (`ec8edc2`), representing the 51st consecutive day of total repository replacements.
+- **History Erasure:** The Process Integrity Log entry for 2026-06-11 (PR #1503) was erased from the file by the PR #1505 graft, which synchronized the repo state from a baseline that did not include the June 11th updates.
+- **Severe Labeling Drift (PR #1505):** Commit (`ec8edc2`) is titled "docs: update daily PR triage and risk dashboard (#1505)", yet it replaces the entire repository (568 files, ~444,875 lines). This continues the dangerous pattern of masking total system swaps under documentation labels.
+- **Persistent Global CI Blockage:** CI remains hard-blocked by repository-wide formatting drift and dependency conflicts. Merges continue to bypass all safety gates.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `ec8edc2` (replaces `e61fc1d`, `0ff0000`, and all prior history).
+- PR #1505: Latest total system swap.
+- PR #1504: Intermediary graft (if any) or PR destroyed/bypassed.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1505 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merges continue while CI is globally blocked).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository, including core trading and risk logic, is being swapped daily with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The frequency of monolithic grafts and the resulting erasure of governance documentation has reached a critical failure point. Immediate human intervention is mandatory to restore process control.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `ec8edc2` is required.
+- **Restore Traceability:** Stop the use of monolithic grafts and restore a linear, incremental commit history.
+- **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 51st Consecutive Day of History Destruction & Documentation Erasure).
