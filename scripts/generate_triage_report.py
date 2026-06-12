@@ -101,7 +101,7 @@ def get_latest_main_commit_info():
 
 
 def load_cache():
-    """Loads existing risk classifications from the daily report to avoid triage regressions."""
+    """Loads existing PR data from the daily report to avoid triage regressions or data loss during rate limits."""
     cache = {}
     path = "docs/status/PR_TRIAGE_DAILY.md"
     if not os.path.exists(path):
@@ -115,10 +115,30 @@ def load_cache():
                     parts = [p.strip() for p in line.split("|")]
                     if len(parts) >= 8:
                         # Extract PR number from [123](...)
-                        pr_num_str = parts[1].split("]")[0].replace("[", "")
-                        risk_class = parts[7]
-                        if pr_num_str.isdigit() and risk_class != "Triage Required":
-                            cache[int(pr_num_str)] = risk_class
+                        num_part = parts[1]
+                        pr_num_str = num_part.split("]")[0].replace("[", "")
+                        if not pr_num_str.isdigit():
+                            continue
+
+                        num = int(pr_num_str)
+                        title = parts[2]
+                        user = parts[3]
+                        branch = parts[4].replace("`", "")
+                        labels = parts[5]
+                        ci_status = parts[6]
+                        risk = parts[7]
+                        flag = parts[8]
+
+                        cache[num] = {
+                            "number": num,
+                            "title": title,
+                            "user": user,
+                            "branch": branch,
+                            "labels": labels,
+                            "ci_status": ci_status,
+                            "risk": risk,
+                            "flag": flag,
+                        }
     except Exception as e:
         print(f"Warning: Failed to load triage cache: {e}", file=sys.stderr)
 
@@ -224,9 +244,31 @@ def classify_risk(files, title=""):
         "model",
         "connector",
         "allocator",
+        "coherence",
+        "governance",
     ]
-    medium_risk_keywords = ["research", "analytics", "environment", "cli", "ux", "makefile", "api"]
-    safe_keywords = ["docs", "readme", "lint", "typo", "cleanup", "chore", "dx:", "dashboard"]
+    medium_risk_keywords = [
+        "research",
+        "analytics",
+        "environment",
+        "cli",
+        "ux",
+        "makefile",
+        "api",
+        "observability",
+        "validation",
+    ]
+    safe_keywords = [
+        "docs",
+        "readme",
+        "lint",
+        "typo",
+        "cleanup",
+        "chore",
+        "dx:",
+        "dashboard",
+        "integrity",
+    ]
 
     # Specific exceptions for safe surfaces within medium/high risk paths
     safe_file_patterns = [
@@ -324,10 +366,34 @@ def generate_report():
 
     if prs is None:
         print(
-            "CRITICAL: Rate limited or error fetching PRs. Aborting report generation to preserve existing data.",
+            "WARNING: Rate limited or error fetching PRs. Attempting to rebuild report from cache.",
             file=sys.stderr,
         )
-        return
+        if not cache:
+            print(
+                "CRITICAL: No cache available and API failed. Aborting.",
+                file=sys.stderr,
+            )
+            return
+
+        # Convert cache to the format expected by the rest of the script
+        prs_from_cache = []
+        # Sort by number descending
+        for num in sorted(cache.keys(), reverse=True):
+            entry = cache[num]
+            prs_from_cache.append({
+                "number": entry["number"],
+                "title": entry["title"],
+                "user": {"login": entry["user"]},
+                "head": {"ref": entry["branch"], "sha": "unknown"},
+                "created_at": "2020-01-01T00:00:00Z", # Placeholder, flag is used
+                "labels": [{"name": l.strip()} for l in entry["labels"].split(",") if l.strip() != "none"],
+                "from_cache": True,
+                "cached_flag": entry["flag"],
+                "cached_ci": entry["ci_status"],
+                "cached_risk": entry["risk"],
+            })
+        prs = prs_from_cache
 
     if not prs:
         print("No open PRs found.")
@@ -386,13 +452,26 @@ def generate_report():
 
         print(f"[{i + 1}/{len(prs)}] Processing PR #{num}...")
 
-        if i < detailed_limit:
+        if pr.get("from_cache"):
+            status_flag = pr["cached_flag"]
+            ci_status = pr["cached_ci"]
+            risk, reason = classify_risk([], title)
+            # Prioritize previous risk if current title-only heuristic is weaker
+            if (
+                pr.get("cached_risk")
+                and pr["cached_risk"] != "Triage Required"
+                and risk == "Triage Required"
+            ):
+                risk = pr["cached_risk"]
+                reason = "Preserved from previous report."
+            domains = get_domains([], title)
+        elif i < detailed_limit:
             ci_status = get_ci_status(sha)
             files = get_all_pr_files(num)
             if files is None:
                 print(f"Warning: Failed to fetch files for PR #{num}. Using heuristics.")
                 if num in cache:
-                    risk, reason = cache[num], "Cached from previous report."
+                    risk, reason = classify_risk([], title)
                 else:
                     risk, reason = classify_risk([], title)
                 domains = get_domains([], title)
@@ -401,10 +480,7 @@ def generate_report():
                 domains = get_domains(files, title)
         else:
             ci_status = "unknown"
-            if num in cache:
-                risk, reason = cache[num], "Cached from previous report."
-            else:
-                risk, reason = classify_risk([], title)
+            risk, reason = classify_risk([], title)
             domains = get_domains([], title)
             if risk == "Unknown":
                 risk = "Triage Required"
