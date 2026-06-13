@@ -160,8 +160,21 @@ python main.py --mode live --algo ensemble --confirm-live
 | [**SLO & Reliability Targets**](./docs/SLO_TARGETS.md) | **Measurable reliability standards and error budget framework.** |
 | [**Contributing Guide**](./docs/CONTRIBUTING.md) | **How to contribute safely and effectively.** |
 | [**Contribution Map**](./docs/CONTRIBUTION_MAP.md) | **Safe vs. Sensitive zone navigation.** |
+| [**First Contribution**](./docs/FIRST_REAL_CONTRIBUTION.md) | **Step-by-step guide for your first PR.** |
 | [**Data Retention Policy**](./docs/DATA_RETENTION_POLICY.md) | **Policies for operational data retention and automated purging.** |
 | [**Disaster Recovery Plan**](./docs/DISASTER_RECOVERY.md) | **Procedures for database, log, and operational data recovery.** |
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! To ensure safety in this high-turbulence repository:
+
+1.  **Start in a [Safe Zone](./docs/CONTRIBUTION_MAP.md#🟢-safe-zones-recommended-for-first-prs):** Focus on `docs/`, `tests/`, or `scripts/`.
+2.  **Follow the [First Real Contribution](./docs/FIRST_REAL_CONTRIBUTION.md) guide:** A step-by-step path to your first PR.
+3.  **Mandatory Rebase:** Always rebase your branch on the latest `main` graft before submitting.
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and governance rules.
 
 ---
 
