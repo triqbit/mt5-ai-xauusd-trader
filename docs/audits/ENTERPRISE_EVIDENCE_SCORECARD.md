@@ -27,7 +27,7 @@ This scorecard provides a direct mapping between system capabilities and technic
 ### 2. Forensic Traceability
 - **Status:** 🔴 **CRITICAL RISK**
 - **Primary Evidence:** [PROCESS_INTEGRITY_LOG.md](../status/PROCESS_INTEGRITY_LOG.md)
-- **Note:** Monolithic history grafting (53 consecutive days) currently prevents granular forensic audit of trading logic evolution on the `main` branch.
+- **Note:** Monolithic history grafting (56 consecutive days) currently prevents granular forensic audit of trading logic evolution on the `main` branch.
 
 ### 3. Production Readiness
 - **Status:** 🟡 **Emerging**

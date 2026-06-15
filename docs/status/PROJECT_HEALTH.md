@@ -8,7 +8,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟢 98.5% | 952/966 tests passing (Verified June 12, 2026). |
 | **Lint Debt** | 🟡 139 Issues | 8 legacy errors in `migrations/` and 1 recent E741 in `scripts/`. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (55 consecutive days). |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (56 consecutive days). |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
 ---
@@ -16,7 +16,7 @@ This dashboard provides real-time visibility into the technical health, process 
 ## 🏗️ Technical Health Details
 
 ### 🧪 CI & Testing
-- **Latest Release Candidate:** v1.1.0-rc10 (Verified June 12, 2026)
+- **Latest Release Candidate:** v1.1.0-rc11 (Verified June 15, 2026)
 - **Integration Pass Rate:** 🟢 98.5% (Verified June 12, 2026)
 - **Primary Bottleneck:** API harmonization in Risk Manager modules.
 
@@ -31,7 +31,7 @@ This dashboard provides real-time visibility into the technical health, process 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
 - **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes.
-- **Current Node:** Commit `99aceae` (55th consecutive graft).
+- **Current Node:** Commit `93673fa` (56th consecutive graft).
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 

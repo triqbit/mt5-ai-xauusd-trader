@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `99aceae49c84a6d3a602ab3a72b57b695fd09c2a` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `93673fa5f167ea992ab2f9a34a4646433eaca535` is required for all PRs.**
 
-Generated on: 2026-06-14 18:05:34 UTC
+Generated on: 2026-06-15 13:18:43 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Safe Surface update implementing 'DX: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
 - **Domains touched**: docs, infra/scripts
 - **CI status**: unknown
-- **Missing items**: Mandatory rebase against commit `99aceae49c84a6d3a602ab3a72b57b695fd09c2a`
+- **Missing items**: Mandatory rebase against commit `93673fa5f167ea992ab2f9a34a4646433eaca535`
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1300: 🧹 Jules05: Technical debt cleanup — architectural harmonization
 - **Short scope summary**: Safe Surface update implementing '🧹 Jules05: Technical debt cleanup — architectural harmonization' (Candidate for re-validation/review)
 - **Domains touched**: Triage Required
 - **CI status**: unknown
-- **Missing items**: Mandatory rebase against commit `99aceae49c84a6d3a602ab3a72b57b695fd09c2a`
+- **Missing items**: Mandatory rebase against commit `93673fa5f167ea992ab2f9a34a4646433eaca535`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1268: refactor: 🧹 Jules05: Technical debt cleanup — architectural harmonization
 - **Short scope summary**: Safe Surface update implementing 'refactor: 🧹 Jules05: Technical debt cleanup — architectural harmonization' (Candidate for re-validation/review)
 - **Domains touched**: refactor
 - **CI status**: unknown
-- **Missing items**: Mandatory rebase against commit `99aceae49c84a6d3a602ab3a72b57b695fd09c2a`
+- **Missing items**: Mandatory rebase against commit `93673fa5f167ea992ab2f9a34a4646433eaca535`
 - **Recommendation**: Needs CI success before merge
 
 ---
