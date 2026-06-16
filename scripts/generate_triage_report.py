@@ -387,7 +387,11 @@ def generate_report():
                 "user": {"login": entry["user"]},
                 "head": {"ref": entry["branch"], "sha": "unknown"},
                 "created_at": "2020-01-01T00:00:00Z", # Placeholder, flag is used
-                "labels": [{"name": l.strip()} for l in entry["labels"].split(",") if l.strip() != "none"],
+                "labels": [
+                    {"name": label.strip()}
+                    for label in entry["labels"].split(",")
+                    if label.strip() != "none"
+                ],
                 "from_cache": True,
                 "cached_flag": entry["flag"],
                 "cached_ci": entry["ci_status"],
