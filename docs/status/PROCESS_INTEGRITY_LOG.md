@@ -1690,3 +1690,11 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately until a linear history can be restored and a human audit completed.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 58th Consecutive Day of History Destruction & Severe Labeling Drift).
+
+**Dependency Safety Blockade:**
+- **Issue:** The repository is currently in a state of "Dependency Blockade". The `submit-pypi` CI job fails due to a version conflict between `metaapi-cloud-sdk==29.1.1` (requires `python-socketio<5.0.0,>=4.6.0`) and the current pin `python-socketio==5.14.0`.
+- **Impact:** This prevents even documentation-only Pull Requests from passing CI, effectively halting all governed contributions.
+- **Root Cause:** A regression in dependency management (likely during a monolithic graft) has reintroduced an incompatible version of `python-socketio`.
+- **Recommended Follow-up:** **HIGH PRIORITY** — Jules03 or a human must restore the `python-socketio==4.6.1` pin across all requirements files and `pyproject.toml` to unblock the pipeline.
+
+**Status:** 🔴 RED (CI Safety Gate Blocked by Dependency Conflict).
