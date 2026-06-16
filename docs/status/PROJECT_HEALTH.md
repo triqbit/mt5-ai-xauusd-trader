@@ -7,8 +7,8 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟢 98.5% | 952/966 tests passing (Verified June 12, 2026). |
-| **Lint Debt** | 🟡 139 Issues | 8 legacy errors in `migrations/` and 1 recent E741 in `scripts/`. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (56 consecutive days). |
+| **Lint Debt** | 🟡 138 Issues | 8 legacy errors in `migrations/` (E741 resolved in `scripts/`). |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (58 consecutive days). |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
 ---
@@ -25,13 +25,13 @@ This dashboard provides real-time visibility into the technical health, process 
 - **Key Areas:**
   - `tests/`: 3,400+ issues (Unused imports, unformatted blocks) - *Deferred to avoid noise*.
   - `src/`: 0 issues (100% clean core).
-  - `scripts/`: 1 issue (E741: Ambiguous variable name 'l' in `generate_triage_report.py`).
-- **Strategy:** Core is 100% clean; script/migration debt is documented for escalation.
+  - `scripts/`: 0 issues (100% clean after E741 fix).
+- **Strategy:** Core is 100% clean; migration debt is documented for escalation.
 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
 - **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes.
-- **Current Node:** Commit `93673fa` (56th consecutive graft).
+- **Current Node:** Commit `0559fb9` (58th consecutive graft).
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
