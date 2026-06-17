@@ -287,12 +287,13 @@ def classify_risk(files, title=""):
     is_likely_safe = any(kw in t_lower for kw in safe_keywords)
 
     if not files:
-        if is_likely_safe:
-            return "Safe Surface", "Heuristic: Title matches safe keywords."
+        # Prioritize high/medium risk keywords over safe keywords
         if any(kw in t_lower for kw in high_risk_keywords):
             return "High Risk", "Heuristic: Title matches high-risk keywords."
         if any(kw in t_lower for kw in medium_risk_keywords):
             return "Medium Risk", "Heuristic: Title matches medium-risk keywords."
+        if is_likely_safe:
+            return "Safe Surface", "Heuristic: Title matches safe keywords."
         return "Triage Required", "No files found or unable to fetch files."
 
     # First check if ALL files are in safe patterns
@@ -387,7 +388,11 @@ def generate_report():
                 "user": {"login": entry["user"]},
                 "head": {"ref": entry["branch"], "sha": "unknown"},
                 "created_at": "2020-01-01T00:00:00Z", # Placeholder, flag is used
-                "labels": [{"name": l.strip()} for l in entry["labels"].split(",") if l.strip() != "none"],
+                "labels": [
+                    {"name": label_name.strip()}
+                    for label_name in entry["labels"].split(",")
+                    if label_name.strip() != "none"
+                ],
                 "from_cache": True,
                 "cached_flag": entry["flag"],
                 "cached_ci": entry["ci_status"],
