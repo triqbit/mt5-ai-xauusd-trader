@@ -279,6 +279,6 @@ def test_safe_pytorch_loading():
                         if not has_weights_only:
                             violations.append(f"{path.relative_to(root_dir)}:{node.lineno}")
 
-    assert not violations, (
-        f"Unsafe torch.load calls found in: {violations}. Always use weights_only=True."
-    )
+    assert (
+        not violations
+    ), f"Unsafe torch.load calls found in: {violations}. Always use weights_only=True."

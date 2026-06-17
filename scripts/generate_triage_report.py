@@ -382,22 +382,24 @@ def generate_report():
         # Sort by number descending
         for num in sorted(cache.keys(), reverse=True):
             entry = cache[num]
-            prs_from_cache.append({
-                "number": entry["number"],
-                "title": entry["title"],
-                "user": {"login": entry["user"]},
-                "head": {"ref": entry["branch"], "sha": "unknown"},
-                "created_at": "2020-01-01T00:00:00Z", # Placeholder, flag is used
-                "labels": [
-                    {"name": label_name.strip()}
-                    for label_name in entry["labels"].split(",")
-                    if label_name.strip() != "none"
-                ],
-                "from_cache": True,
-                "cached_flag": entry["flag"],
-                "cached_ci": entry["ci_status"],
-                "cached_risk": entry["risk"],
-            })
+            prs_from_cache.append(
+                {
+                    "number": entry["number"],
+                    "title": entry["title"],
+                    "user": {"login": entry["user"]},
+                    "head": {"ref": entry["branch"], "sha": "unknown"},
+                    "created_at": "2020-01-01T00:00:00Z",  # Placeholder, flag is used
+                    "labels": [
+                        {"name": label_name.strip()}
+                        for label_name in entry["labels"].split(",")
+                        if label_name.strip() != "none"
+                    ],
+                    "from_cache": True,
+                    "cached_flag": entry["flag"],
+                    "cached_ci": entry["ci_status"],
+                    "cached_risk": entry["risk"],
+                }
+            )
         prs = prs_from_cache
 
     if not prs:
