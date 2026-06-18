@@ -1741,3 +1741,30 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 61st Consecutive Day of History Destruction).
+
+## 2026-06-18 13:50 UTC
+
+**Summary:** Sixty-second and sixty-third consecutive history grafts detected. Governance breakdown enters its third month of total history destruction.
+
+**Suspected Process Issues:**
+- **Persistent History Destruction:** The `main` branch remains a single-commit node (`1b2b64f`), representing the 63rd consecutive day (or node) of total repository replacements.
+- **Extreme Labeling Drift (PR #1532):** Commit (`1b2b64f`) is titled "docs: update daily merge-readiness checklist [2026-06-17] (#1532)", yet it replaced the entire repository (568 files, ~445,000 lines).
+- **Accelerated Grafts:** Two system-wide swaps (PR #1531 and PR #1532) occurred since the last daily integrity report.
+- **Global CI Blockage:** CI remains hard-blocked by formatting drift and dependency conflicts. Merges continue to bypass all safety gates.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `1b2b64f` (replaces `13dfe20`, `7af6ed8`, and all prior history).
+- PR #1532: Current total system swap (63rd graft).
+- PR #1531: Intermediary graft (62nd graft, commit `13dfe20`).
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1531, #1532 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merges continue while CI is globally blocked).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: The entire trading engine is being swapped daily with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The frequency of monolithic grafts has reached its 63rd consecutive node. Immediate human intervention is required to restore linear history and stop the use of history-resetting grafts.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `1b2b64f` is mandatory.
+- **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 63rd Consecutive Day of History Destruction).
