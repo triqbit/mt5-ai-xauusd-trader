@@ -7,8 +7,8 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🔴 BLOCKED | CI hard-blocked by formatting drift and dependency conflicts. |
-| **PR Backlog** | 🔴 556 Stale | 100% of open PRs are stale relative to the 64th history graft. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (64 consecutive nodes). |
+| **PR Backlog** | 🔴 556 Stale | 100% of open PRs are stale relative to the 66th history graft. |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (66 consecutive nodes). |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
 ---
@@ -31,7 +31,7 @@ This dashboard provides real-time visibility into the technical health, process 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
 - **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes.
-- **Current Node:** Commit `1a18af0` (64th consecutive graft).
+- **Current Node:** Commit `60d90e1` (66th consecutive graft).
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
