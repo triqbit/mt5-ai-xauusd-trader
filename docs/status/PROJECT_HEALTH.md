@@ -7,7 +7,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🔴 BLOCKED | CI hard-blocked by formatting drift and dependency conflicts. |
-| **PR Backlog** | 🔴 556 Stale | 100% of open PRs are stale relative to the 66th history graft. |
+| **PR Backlog** | 🔴 557 Stale | 100% of open PRs are stale relative to the 66th history graft. |
 | **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (66 consecutive nodes). |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
@@ -17,7 +17,7 @@ This dashboard provides real-time visibility into the technical health, process 
 
 ### 🧪 CI & Testing
 - **Status:** 🔴 **BLOCKED**
-- **Issue:** Global CI blockage due to formatting drift (120+ files) and dependency conflicts.
+- **Issue:** Global CI blockage due to formatting drift (120+ files) and critical dependency conflict (`python-socketio==5.x` vs `metaapi-cloud-sdk` requirement for `4.x`).
 - **Integration Pass Rate:** 🟢 98.5% (Baseline verified June 12, 2026; subsequent merges bypass CI).
 
 ### 🧹 Code Quality (Ruff)

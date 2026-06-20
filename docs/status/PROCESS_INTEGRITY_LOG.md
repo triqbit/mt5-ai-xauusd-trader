@@ -1750,7 +1750,7 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Persistent History Destruction:** The `main` branch remains a single-commit node (`1b2b64f`), representing the 63rd consecutive day (or node) of total repository replacements.
 - **Extreme Labeling Drift (PR #1532):** Commit (`1b2b64f`) is titled "docs: update daily merge-readiness checklist [2026-06-17] (#1532)", yet it replaced the entire repository (568 files, ~445,000 lines).
 - **Accelerated Grafts:** Two system-wide swaps (PR #1531 and PR #1532) occurred since the last daily integrity report.
-- **Global CI Blockage:** CI remains hard-blocked by formatting drift and dependency conflicts. Merges continue to bypass all safety gates.
+- **Global CI Blockage:** CI remains hard-blocked by formatting drift and a critical dependency conflict (`python-socketio` version mismatch). Merges continue to bypass all safety gates.
 
 **PRs/Commits Involved:**
 - `main` branch: Commit `1b2b64f` (replaces `13dfe20`, `7af6ed8`, and all prior history).
@@ -1776,7 +1776,7 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 **Suspected Process Issues:**
 - **Sixty-Fourth Consecutive Graft:** The `main` branch remains a single-commit node (`1a18af0`), representing the 64th consecutive node of total repository replacements.
 - **Severe Labeling Drift (PR #1534):** Commit (`1a18af0`) is titled "docs: update daily merge-readiness checklist [2026-06-18] (#1534)", yet it replaced the entire repository (568 files, ~445,000 lines).
-- **Global CI Blockage:** CI remains hard-blocked by formatting drift and dependency conflicts. Merges continue to bypass all safety gates.
+- **Global CI Blockage:** CI remains hard-blocked by formatting drift and a critical dependency conflict (`python-socketio` version mismatch). Merges continue to bypass all safety gates.
 - **Lost Traceability:** Forensic auditing via Git remains impossible. The repository history is perpetually a single commit.
 
 **PRs/Commits Involved:**
@@ -1802,7 +1802,7 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 **Suspected Process Issues:**
 - **Sixty-Fifth Consecutive Graft:** The `main` branch remains a single-commit node (`aac59a1`), representing the 65th consecutive node of total repository replacements.
 - **Severe Labeling Drift (PR #1535):** Commit (`aac59a1`) is titled "docs: daily PR triage and project health update [2026-06-19] (#1535)", yet it replaced the entire repository (568 files, ~445,000 lines).
-- **Global CI Blockage:** CI remains hard-blocked by formatting drift and dependency conflicts. Merges continue to bypass all safety gates.
+- **Global CI Blockage:** CI remains hard-blocked by formatting drift and a critical dependency conflict (`python-socketio` version mismatch). Merges continue to bypass all safety gates.
 - **Traceability Black Hole:** Forensic auditing via Git remains impossible. The repository history is perpetually a single commit.
 
 **PRs/Commits Involved:**
@@ -1828,7 +1828,7 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 **Suspected Process Issues:**
 - **Sixty-Sixth Consecutive Graft:** The `main` branch remains a single-commit node (`60d90e1`), representing the 66th consecutive node of total repository replacements.
 - **Severe Labeling Drift (PR #1541):** Commit (`60d90e1`) is titled "DX: improve developer onboarding and contribution experience (#1541)", yet it replaced the entire repository (569 files, ~445,000 lines). This continues the dangerous pattern of masking total system swaps under minor labels.
-- **Global CI Blockage:** CI remains hard-blocked by formatting drift and dependency conflicts. Merges continue to bypass all safety gates.
+- **Global CI Blockage:** CI remains hard-blocked by formatting drift and a critical dependency conflict (`python-socketio` version mismatch). Merges continue to bypass all safety gates.
 - **Traceability Black Hole:** Forensic auditing via Git remains impossible. The repository history is perpetually a single commit.
 
 **PRs/Commits Involved:**
