@@ -109,3 +109,63 @@ def test_check_mt5_config_incomplete():
         res = doctor.check_mt5_config()
         assert res.status == "WARNING"
         assert "Incomplete MT5 configuration" in res.message
+
+
+def test_check_git_config_success():
+    """Verify Git config check passes when user info is set."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = [
+            MagicMock(stdout="Test User\n"),
+            MagicMock(stdout="test@example.com\n"),
+        ]
+        res = doctor.check_git_config()
+        assert res.status == "OK"
+        assert "Test User" in res.message
+
+
+def test_check_git_config_missing():
+    """Verify Git config check warns when info is missing."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.side_effect = [
+            MagicMock(stdout="\n"),
+            MagicMock(stdout="\n"),
+        ]
+        res = doctor.check_git_config()
+        assert res.status == "WARNING"
+        assert "user.name or user.email not set" in res.message
+
+
+def test_check_branch_naming_valid():
+    """Verify branch naming check passes for valid prefixes."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(stdout="feature/test-branch\n")
+        res = doctor.check_branch_naming()
+        assert res.status == "OK"
+        assert "Valid prefix" in res.message
+
+
+def test_check_branch_naming_invalid():
+    """Verify branch naming check warns for invalid prefixes."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(stdout="invalid-branch\n")
+        res = doctor.check_branch_naming()
+        assert res.status == "WARNING"
+        assert "Invalid prefix" in res.message
+
+
+def test_check_graft_alignment_aligned():
+    """Verify graft alignment check passes when aligned."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=0, stdout="common-commit-hash\n")
+        res = doctor.check_graft_alignment()
+        assert res.status == "OK"
+        assert "Common ancestry found" in res.message
+
+
+def test_check_graft_alignment_stale():
+    """Verify graft alignment check warns when stale."""
+    with patch("subprocess.run") as mock_run:
+        mock_run.return_value = MagicMock(returncode=1, stdout="\n")
+        res = doctor.check_graft_alignment()
+        assert res.status == "WARNING"
+        assert "No common ancestry" in res.message
