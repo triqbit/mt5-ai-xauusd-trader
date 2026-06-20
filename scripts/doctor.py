@@ -8,6 +8,7 @@ import logging
 import os
 import platform
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -405,12 +406,86 @@ def check_mt5_config():
         )
 
 
+def check_git_config():
+    """Verify Git user configuration."""
+    try:
+        name = (
+            subprocess.run(["git", "config", "user.name"], capture_output=True, text=True)
+            .stdout.strip()
+        )
+        email = (
+            subprocess.run(["git", "config", "user.email"], capture_output=True, text=True)
+            .stdout.strip()
+        )
+
+        if name and email:
+            return DiagnosticCheck("Git Configuration", "OK", f"Configured as {name} <{email}>")
+        else:
+            return DiagnosticCheck(
+                "Git Configuration",
+                "WARNING",
+                "user.name or user.email not set",
+                "Run 'git config --global user.name \"Your Name\"' and 'git config --global user.email \"your@email.com\"'",
+            )
+    except FileNotFoundError:
+        return DiagnosticCheck("Git Configuration", "FAILED", "Git not found", "Install Git.")
+    except Exception as e:
+        return DiagnosticCheck("Git Configuration", "WARNING", f"Error checking Git: {e}")
+
+
+def check_branch_naming():
+    """Verify current branch follows naming standards."""
+    try:
+        branch = (
+            subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True
+            )
+            .stdout.strip()
+        )
+
+        if branch == "main" or branch == "develop":
+            return DiagnosticCheck("Branch Naming", "OK", f"On protected branch: {branch}")
+
+        prefixes = ["feature/", "bugfix/", "hotfix/", "docs/", "refactor/", "chore/"]
+        if any(branch.startswith(p) for p in prefixes):
+            return DiagnosticCheck("Branch Naming", "OK", f"Valid prefix: {branch}")
+        else:
+            return DiagnosticCheck(
+                "Branch Naming",
+                "WARNING",
+                f"Invalid prefix: {branch}",
+                f"Rename branch to start with one of: {', '.join(prefixes)}",
+            )
+    except Exception:
+        return DiagnosticCheck("Branch Naming", "WARNING", "Could not determine branch")
+
+
+def check_graft_alignment():
+    """Check if the branch is aligned with the latest history graft."""
+    try:
+        # Check if we have common ancestry with origin/main
+        res = subprocess.run(
+            ["git", "merge-base", "HEAD", "origin/main"], capture_output=True, text=True
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            return DiagnosticCheck("Graft Alignment", "OK", "Common ancestry found with main")
+        else:
+            return DiagnosticCheck(
+                "Graft Alignment",
+                "WARNING",
+                "No common ancestry with main",
+                "Your branch may be stale due to a daily history graft. Run 'git fetch origin main' and 'git rebase origin/main'.",
+            )
+    except Exception:
+        return DiagnosticCheck("Graft Alignment", "WARNING", "Could not verify graft alignment")
+
+
 def main():
     # Ensure root is in path
     root = Path(__file__).resolve().parents[1]
     sys.path.append(str(root))
 
-    checks = [
+    system_checks = [
         check_python_version(),
         check_dependencies(),
         check_requirement_harmonization(),
@@ -420,6 +495,12 @@ def main():
         check_database(),
         check_file_permissions(),
         check_mt5_config(),
+    ]
+
+    contributor_checks = [
+        check_git_config(),
+        check_branch_naming(),
+        check_graft_alignment(),
     ]
 
     version = get_system_version()
@@ -434,13 +515,14 @@ def main():
             )
         )
 
-        table = Table(box=None, expand=True)
+        # System Readiness Table
+        table = Table(box=None, expand=True, title="[bold]System Readiness[/]")
         table.add_column("Check", style="cyan")
         table.add_column("Status", justify="center")
         table.add_column("Message")
         table.add_column("Suggested Remedy", style="green")
 
-        for c in checks:
+        for c in system_checks:
             status_color = (
                 "green" if c.status == "OK" else "yellow" if c.status == "WARNING" else "red"
             )
@@ -450,14 +532,39 @@ def main():
                 c.message,
                 c.remedy if c.status != "OK" else "",
             )
-
         console.print(table)
 
-        failed = any(c.status == "FAILED" for c in checks)
+        # Contributor Readiness Table
+        table_contributor = Table(box=None, expand=True, title="[bold]Contributor Readiness[/]")
+        table_contributor.add_column("Check", style="cyan")
+        table_contributor.add_column("Status", justify="center")
+        table_contributor.add_column("Message")
+        table_contributor.add_column("Suggested Remedy", style="green")
+
+        for c in contributor_checks:
+            status_color = (
+                "green" if c.status == "OK" else "yellow" if c.status == "WARNING" else "red"
+            )
+            table_contributor.add_row(
+                c.name,
+                f"[{status_color}]{c.status}[/]",
+                c.message,
+                c.remedy if c.status != "OK" else "",
+            )
+        console.print(table_contributor)
+
+        console.print(
+            Panel(
+                "[dim]See [bold]docs/CONTRIBUTION_MAP.md[/] and [bold]docs/status/PR_TRIAGE_DAILY.md[/] for safe contribution zones.[/]",
+                border_style="blue",
+            )
+        )
+
+        failed = any(c.status == "FAILED" for c in system_checks + contributor_checks)
         if failed:
             console.print(
                 Panel(
-                    "[bold red]SYSTEM HAS CRITICAL ISSUES[/]\nPlease resolve the 'FAILED' items above before starting the bot.",
+                    "[bold red]SYSTEM HAS CRITICAL ISSUES[/]\nPlease resolve the 'FAILED' items above before starting the bot or contributing.",
                     border_style="red",
                 )
             )
@@ -465,7 +572,7 @@ def main():
         else:
             console.print(
                 Panel(
-                    "[bold green]SYSTEM READY[/]\nYour environment is correctly configured for trading.",
+                    "[bold green]SYSTEM READY[/]\nYour environment is correctly configured for trading and contributions.",
                     border_style="green",
                 )
             )
@@ -475,14 +582,26 @@ def main():
         print(f"=== MT5 AI/ML Trading Bot Doctor (v{version}) ===")
         print(f"Platform: {platform.system()} {platform.release()}")
         print("-" * 50)
+        print("--- System Readiness ---")
         failed = False
-        for c in checks:
+        for c in system_checks:
             print(f"[{c.status:7}] {c.name:20}: {c.message}")
             if c.status != "OK":
                 print(f"          REMEDY: {c.remedy}")
             if c.status == "FAILED":
                 failed = True
 
+        print("-" * 50)
+        print("--- Contributor Readiness ---")
+        for c in contributor_checks:
+            print(f"[{c.status:7}] {c.name:20}: {c.message}")
+            if c.status != "OK":
+                print(f"          REMEDY: {c.remedy}")
+            if c.status == "FAILED":
+                failed = True
+
+        print("-" * 50)
+        print("See docs/CONTRIBUTION_MAP.md for safe contribution zones.")
         print("-" * 50)
         if failed:
             print("CRITICAL ISSUES FOUND. Resolve them and try again.")
