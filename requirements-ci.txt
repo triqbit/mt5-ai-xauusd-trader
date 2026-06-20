@@ -19,13 +19,13 @@ redis==8.0.0
 
 # -- Pydantic / settings -------------------------------------------
 pydantic==2.13.4
-pydantic-settings==2.14.1
+pydantic-settings==2.14.2
 
 # -- MetaTrader 5 (Cloud Fallback) ---------------------------------
 metaapi-cloud-sdk==29.1.1
 
 # -- Testing -------------------------------------------------------
-python-socketio==5.14.0
+python-socketio==4.6.1
 optuna==4.9.0
 pytest==9.1.0
 pytest-asyncio==1.4.0
