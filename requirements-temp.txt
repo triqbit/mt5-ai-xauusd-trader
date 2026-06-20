@@ -44,7 +44,7 @@ uvicorn[standard]==0.34.0
 # ── Configuration ───────────────────────────────────────────
 python-dotenv==1.2.2
 pydantic==2.13.4
-pydantic-settings==2.14.1
+pydantic-settings==2.14.2
 tomli==2.4.1
 
 # ── Testing ─────────────────────────────────────────────────
@@ -60,7 +60,7 @@ ruff==0.15.17
 mypy==2.1.0
 
 # ── Utilities ───────────────────────────────────────────────
-python-socketio==5.14.0
+python-socketio==4.6.1
 python-dateutil==2.9.0.post0
 pytz==2026.2
 click==8.4.1
