@@ -25,7 +25,7 @@ pydantic-settings==2.14.2
 metaapi-cloud-sdk==29.1.1
 
 # -- Testing -------------------------------------------------------
-python-socketio==4.6.1
+python-socketio==5.14.0
 optuna==4.9.0
 pytest==9.1.0
 pytest-asyncio==1.4.0
