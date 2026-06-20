@@ -46,6 +46,16 @@ This map identifies the production readiness of various subsystems to ensure tra
 
 ---
 
+## 🏛️ Governance & Forensics
+
+To maintain institutional safety in an automated environment, the repository utilizes a specific governance model:
+
+- **History Grafting:** The `main` branch utilizes monolithic history grafts for daily state synchronization.
+- **Verification Invariant:** Since Git-native forensics are limited by grafting, every logic change is verified by autonomous agents (Jules Framework) against known safe baselines.
+- **Audit Trail:** Granular logic evolution is documented in the [Process Integrity Log](./status/PROCESS_INTEGRITY_LOG.md) and [Alignment Report](./audits/ALIGNMENT_REPORT.md).
+
+---
+
 ## 🔍 Evidence & Audit Routing
 
 Use these paths to find technical evidence and audit reports:
