@@ -30,6 +30,7 @@ jobs:
             test
             chore
             ci
+            DX
           # Configure that a scope must be always lowercase.
           subjectPattern: ^(?![A-Z]).+$
           # If the PR title contains a breaking change (!), it must be at the end of the type.

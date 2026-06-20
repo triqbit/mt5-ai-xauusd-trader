@@ -409,14 +409,12 @@ def check_mt5_config():
 def check_git_config():
     """Verify Git user configuration."""
     try:
-        name = (
-            subprocess.run(["git", "config", "user.name"], capture_output=True, text=True)
-            .stdout.strip()
-        )
-        email = (
-            subprocess.run(["git", "config", "user.email"], capture_output=True, text=True)
-            .stdout.strip()
-        )
+        name = subprocess.run(
+            ["git", "config", "user.name"], capture_output=True, text=True
+        ).stdout.strip()
+        email = subprocess.run(
+            ["git", "config", "user.email"], capture_output=True, text=True
+        ).stdout.strip()
 
         if name and email:
             return DiagnosticCheck("Git Configuration", "OK", f"Configured as {name} <{email}>")
@@ -436,12 +434,9 @@ def check_git_config():
 def check_branch_naming():
     """Verify current branch follows naming standards."""
     try:
-        branch = (
-            subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True
-            )
-            .stdout.strip()
-        )
+        branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True
+        ).stdout.strip()
 
         if branch == "main" or branch == "develop":
             return DiagnosticCheck("Branch Naming", "OK", f"On protected branch: {branch}")
