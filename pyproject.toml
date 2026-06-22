@@ -50,7 +50,7 @@ dependencies = [
     "python-telegram-bot==22.8",
     "psutil==7.2.2",
     "optuna==4.9.0",
-    "python-socketio==5.14.0",
+    "python-socketio==5.16.3",
     "MetaTrader5==5.0.5735; sys_platform == 'win32'",
     "metaapi-cloud-sdk==29.1.1",
 ]
