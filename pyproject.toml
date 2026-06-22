@@ -67,7 +67,7 @@ test = [
     "pytest-asyncio==1.4.0",
     "pytest-mock==3.15.1",
     "pytest-cov==7.1.0",
-    "hypothesis==6.155.2",
+    "hypothesis==6.155.7",
     "types-redis==4.6.0.20241004",
     "types-requests==2.33.0.20260518",
     "types-python-dateutil==2.9.0.20260518",
