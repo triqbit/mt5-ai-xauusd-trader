@@ -7,7 +7,7 @@
 numpy==1.26.4
 scipy==1.15.3
 scikit-learn==1.6.1
-pandas==2.2.3
+pandas==2.3.3
 
 # -- Technical Analysis --------------------------------------------
 
