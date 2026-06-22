@@ -6,7 +6,7 @@
 
 # ── Core ML / RL ────────────────────────────────────────────
 torch==2.5.1+cpu
-stable-baselines3==2.5.0
+stable-baselines3==2.9.0
 gymnasium==1.0.0
 numpy==1.26.4
 scipy==1.15.3
