@@ -1872,3 +1872,34 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately until a manual audit is completed.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 67th Consecutive History Graft & Severe Labeling Drift).
+
+## 2026-06-22 17:50 GMT+4
+
+**Summary:** Sixty-eighth and sixty-ninth detected monolithic history grafts. Governance breakdown enters a phase of total forensic erasure.
+
+**Suspected Process Issues:**
+- **Accelerated History Destruction:** The `main` branch has been reset twice today (PR #1559 and PR #1560). Repository history remains at a count of 1.
+- **Sixty-Ninth Consecutive Graft:** The `main` branch remains a single-commit node (`25c1a5f`), representing the 69th consecutive node of total repository replacements.
+- **Persistent Labeling Drift (PR #1560):** Commit (`25c1a5f`) is titled "DX: improve daily PR triage and risk classification logic (#1560)", yet it replaced the entire repository (569 files, ~445,000 lines).
+- **Persistent Global CI Blockage:** CI remains hard-blocked by formatting drift and dependency conflicts. Merges continue to bypass all safety gates.
+- **Unmanageable PR Backlog:** 560 open PRs exist. 100% of the backlog is stale relative to the current graft.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `25c1a5f` (replaces `7ca2dca`, `2d77b27`, and all prior history).
+- PR #1560: Current total system swap (69th graft).
+- PR #1559: Intermediary graft (68th graft, commit `7ca2dca`).
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1559, #1560 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merges continue while CI is globally blocked).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: The entire trading engine is being swapped daily with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The frequency of monolithic grafts has reached its 69th consecutive node. Immediate human intervention is required to restore linear history and stop the use of history-resetting grafts.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `25c1a5f` is mandatory.
+- **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 69th Consecutive History Graft).
+
+**Post-Submission Update:**
+- **CI Failure Confirmed:** The submission of this integrity report triggered a 'Fast Validation' failure due to repository-wide formatting drift (121 files requiring reformat). This confirms the 'Global CI Blockage' reported above. As per my hard limits, I have not attempted to fix the code formatting directly, as it would involve modifying trading, risk, and test logic.
