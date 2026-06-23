@@ -244,6 +244,7 @@ def classify_risk(files, title=""):
         "allocator",
         "coherence",
         "governance",
+        "execution",
     ]
     medium_risk_keywords = [
         "research",
@@ -266,6 +267,9 @@ def classify_risk(files, title=""):
         "dx:",
         "dashboard",
         "integrity",
+        "onboarding",
+        "experience",
+        "contribution",
     ]
 
     # Specific exceptions for safe surfaces within medium/high risk paths
@@ -284,10 +288,36 @@ def classify_risk(files, title=""):
     t_lower = title.lower()
     is_likely_safe = any(kw in t_lower for kw in safe_keywords)
 
+    # General check for minor dependency bumps in non-core packages
+    safe_deps = [
+        "click",
+        "rich",
+        "tabulate",
+        "jinja2",
+        "pytz",
+        "colorlog",
+        "tqdm",
+        "gymnasium",
+        "stable-baselines3",
+        "torch",
+        "numpy",
+        "pandas",
+        "pydantic",
+        "structlog",
+        "pytest-mock",
+        "ruff",
+        "pytest",
+    ]
+
     if not files:
-        # Explicitly prioritize DX: prefix as Safe Surface
-        if t_lower.startswith("dx:"):
-            return "Safe Surface", "Heuristic: Title starts with DX: prefix."
+        # Explicitly prioritize safe prefixes
+        safe_prefixes = ["dx:", "docs:", "chore:", "refactor:", "test:"]
+        if any(t_lower.startswith(p) for p in safe_prefixes):
+            return "Safe Surface", "Heuristic: Title starts with safe prefix."
+
+        # Check for safe dependency bumps in title
+        if "bump" in t_lower and any(sd in t_lower for sd in safe_deps):
+            return "Safe Surface", "Heuristic: Minor dependency bump in title."
 
         # Prioritize high/medium risk keywords over other safe keywords
         if any(kw in t_lower for kw in high_risk_keywords):
@@ -323,18 +353,6 @@ def classify_risk(files, title=""):
             if p in f:
                 if f.endswith(".md"):
                     continue
-                # General check for minor dependency bumps in non-core packages
-                safe_deps = [
-                    "click",
-                    "rich",
-                    "tabulate",
-                    "jinja2",
-                    "pytz",
-                    "colorlog",
-                    "tqdm",
-                    "gymnasium",
-                    "stable-baselines3",
-                ]
                 if "bump" in t_lower and any(sd in t_lower for sd in safe_deps):
                     return "Safe Surface", f"Minor dependency bump: {t_lower}"
                 return "Medium Risk", f"Touches core/research/analytics/risk: {f}"
@@ -465,8 +483,13 @@ def generate_report():
             status_flag = pr["cached_flag"]
             ci_status = pr["cached_ci"]
             risk, reason = classify_risk([], title)
-            # Prioritize previous risk if current title-only heuristic is weaker
-            if (
+
+            # Heuristic improvement: if title says it's docs or safe prefix but cache says otherwise, trust current logic
+            # unless cache was already High Risk.
+            if pr.get("cached_risk") == "High Risk" and risk != "High Risk":
+                risk = "High Risk"
+                reason = "Preserved High Risk classification from cache."
+            elif (
                 pr.get("cached_risk")
                 and pr["cached_risk"] != "Triage Required"
                 and risk == "Triage Required"
