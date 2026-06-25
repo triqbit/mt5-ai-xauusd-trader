@@ -34,9 +34,9 @@ def get_all_prs():
         url = f"https://api.github.com/repos/{REPO}/pulls?state=open&per_page=100&page={page}"
         data = api_call(url)
         if data is None:
-            if page == 1:
-                return None  # Signal failure on first page
-            break
+            # If any page fails, we don't have a complete list.
+            # Return None to trigger cache fallback if available.
+            return None
         if not isinstance(data, list):
             break
         prs.extend(data)
@@ -511,7 +511,11 @@ def generate_report():
                 risk, reason = classify_risk(files, title)
                 domains = get_domains(files, title)
         else:
-            ci_status = "unknown"
+            # If beyond detailed limit, try to use cached CI status
+            if num in cache:
+                ci_status = cache[num]["ci_status"]
+            else:
+                ci_status = "unknown"
             risk, reason = classify_risk([], title)
             domains = get_domains([], title)
             if risk == "Unknown":
