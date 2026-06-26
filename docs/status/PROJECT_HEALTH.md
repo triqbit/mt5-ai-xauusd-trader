@@ -7,8 +7,8 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🔴 BLOCKED | CI hard-blocked by formatting drift and dependency conflicts. |
-| **PR Backlog** | 🔴 560 Stale | 100% of open PRs are stale relative to the 73rd history graft. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (73 consecutive nodes). |
+| **PR Backlog** | 🔴 560 Stale | 100% of open PRs are stale relative to the 74th history graft. |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (74 consecutive nodes). |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
 ---
@@ -17,7 +17,7 @@ This dashboard provides real-time visibility into the technical health, process 
 
 ### 🧪 CI & Testing
 - **Status:** 🔴 **BLOCKED**
-- **Issue:** Global CI blockage due to formatting drift (120+ files) and dependency conflicts.
+- **Issue:** Global CI blockage due to formatting drift (121 files) and dependency conflicts. Local verification (2026-06-26) confirms that baseline drift ensures all new PRs fail the "Fast Validation" gate until a global reformat is performed.
 - **Integration Pass Rate:** 🟢 98.5% (Baseline verified June 12, 2026; subsequent merges bypass CI).
 
 ### 🧹 Code Quality (Ruff)
@@ -31,7 +31,7 @@ This dashboard provides real-time visibility into the technical health, process 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
 - **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes.
-- **Current Node:** Commit `978b23d` (73rd consecutive graft).
+- **Current Node:** Commit `9d7846f` (74th consecutive graft).
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
