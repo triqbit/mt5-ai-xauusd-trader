@@ -46,10 +46,12 @@ Open `scripts/doctor.py` and implement a new `DiagnosticCheck`. Use the existing
 
 ### Step 4: Verify Your Changes
 
-Run the doctor script again to see your new check in action:
+Run the doctor script again to see your new check in action and verify that your contribution stays within a **Safe Zone**:
 ```bash
 make doctor
 ```
+
+The doctor will audit your local changes and tell you if you've touched any "Sensitive Zones" that require multi-signature approval.
 
 ### Step 5: Submit for Review
 
