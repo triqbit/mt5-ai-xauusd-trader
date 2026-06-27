@@ -256,6 +256,21 @@ def classify_risk(files, title=""):
         "api",
         "observability",
         "validation",
+        "decision",
+        "regime",
+        "stress",
+        "benchmarking",
+        "calibration",
+        "explainability",
+        "resilience",
+        "resiliency",
+        "journal",
+        "mining",
+        "audit",
+        "monitoring",
+        "alerting",
+        "logging",
+        "artifact",
     ]
     safe_keywords = [
         "docs",
@@ -270,6 +285,14 @@ def classify_risk(files, title=""):
         "onboarding",
         "experience",
         "contribution",
+        "policy",
+        "roadmap",
+        "composition",
+        "checklist",
+        "report",
+        "progress",
+        "workflow",
+        "results",
     ]
 
     # Specific exceptions for safe surfaces within medium/high risk paths
