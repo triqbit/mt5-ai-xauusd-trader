@@ -7,7 +7,7 @@
 numpy==1.26.4
 scipy==1.15.3
 scikit-learn==1.6.1
-pandas==2.3.3
+pandas==2.2.3
 
 # -- Technical Analysis --------------------------------------------
 
@@ -24,14 +24,14 @@ pydantic-settings==2.14.2
 metaapi-cloud-sdk==29.1.1
 
 # -- Testing -------------------------------------------------------
-python-socketio==5.16.3
+python-socketio==4.6.1
 optuna==4.9.0
 pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-cov==7.1.0
 pytest-mock==3.15.1
 python-telegram-bot==22.8
-fastapi==0.137.0
+fastapi==0.136.1
 requests==2.34.2
 httpx==0.28.1
 structlog==25.5.0
