@@ -1,8 +1,8 @@
-# Acceptance Criteria: 9-Layer Execution Filter
+# Acceptance Criteria: 11-Layer Execution Filter
 
 ## Functional Acceptance Criteria
 - **Behavior:**
-    - Signals must pass all 9 layers to be approved for execution:
+    - Signals must pass all 11 layers to be approved for execution:
         1. **ATR Volatility:** Blocks if ATR > 3x average ATR (volatility spike).
         2. **Trend Angle:** Slope of EMA21 must match signal direction.
         3. **EMA Sequence:** EMA stack (8 > 21 > 50 > 200 for BUY) must be aligned.
@@ -12,6 +12,8 @@
         7. **Model Stability Guard:** Blocks if aggregate model drift or accuracy breaches limits.
         8. **Performance Floor:** Blocks if historical win rate drops below floor (default 40% after 20 trades).
         9. **Confidence Threshold:** Enforces configured minimum confidence (default 0.55).
+        10. **Signal Consistency:** Filters out rapidly alternating buy/sell signals (Signal Flicker).
+        11. **Macro Risk Gate:** Blocks trades during active high-impact macroeconomic event windows.
     - If any layer fails, the signal must be blocked, and the specific blocking layer must be identified in `blocked_by`.
 - **Edge Cases:**
     - Handle missing technical indicators by calculating them on-the-fly or providing safe fallbacks.
@@ -27,7 +29,7 @@
     - Integration tests for the full `validate` cascade with various failure scenarios.
     - Minimum 90% coverage for the execution filter module.
 - **Performance:**
-    - Total validation time for all 9 layers must be < 20ms.
+    - Total validation time for all 11 layers must be < 20ms.
 - **Error Handling:**
     - The filter must not raise exceptions; internal errors return "Blocked" with details.
 - **Observability:**
@@ -36,7 +38,7 @@
 
 ## Operational Acceptance
 - **Documentation:**
-    - Detailed documentation of all 9 layers in the central feature guide.
+    - Detailed documentation of all 11 layers in the central feature guide.
 - **Configuration:**
     - Every layer threshold (ATR multiplier, Drawdown limit, Win rate floor, etc.) must be configurable via `TradingConfig`.
 - **Rollback:**

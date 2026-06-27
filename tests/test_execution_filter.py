@@ -1,7 +1,7 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 tests/test_execution_filter.py
-Unit tests for the 6-layer execution filter.
+Unit tests for the 11-layer execution filter.
 """
 
 from datetime import datetime

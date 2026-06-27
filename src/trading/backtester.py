@@ -321,7 +321,7 @@ class BacktestEngine:
                                     "momentum": {"rsi": rsi_vals[abs_idx]},
                                 }
 
-                                # Validate signal through 10-layer filter
+                                # Validate signal through 11-layer filter
                                 # Optimization: market_data=None because we use precomputed_metrics
                                 t0 = time.perf_counter()
                                 decision = self.ef.validate(

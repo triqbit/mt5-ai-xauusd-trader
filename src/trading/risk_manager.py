@@ -6,7 +6,7 @@ Enterprise risk management engine implementing:
   - Kelly Criterion position sizing (fractional)
   - Ray Dalio All-Weather portfolio allocation
   - Dynamic drawdown protection & circuit breakers
-  - 6-layer entry filter cascade
+  - 8-layer entry filter cascade
 
 This module relies on the unified TradeSignal schema from src.core.schemas
 to ensure all signals entering the risk engine are technically valid.

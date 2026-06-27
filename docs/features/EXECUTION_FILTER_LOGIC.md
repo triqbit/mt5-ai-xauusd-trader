@@ -1,8 +1,8 @@
 # 📈 Execution Filter Trading Logic
 
-The `ExecutionFilter` implements a 10-layer validation cascade (with 6 primary layers highlighted in the requirements) to vet institutional trading signals before execution. This ensures that every trade aligns with volatility, trend, momentum, and risk standards.
+The `ExecutionFilter` implements an 11-layer validation cascade to vet institutional trading signals before execution. This ensures that every trade aligns with volatility, trend, momentum, and risk standards.
 
-## 🛡️ The Primary 6-Layer Cascade
+## 🛡️ The 11-Layer Cascade
 
 ### 1. ATR Volatility Threshold (`ATR_VOLATILITY`)
 - **Purpose**: Prevents entering trades during extreme, erratic volatility.
@@ -39,6 +39,26 @@ The `ExecutionFilter` implements a 10-layer validation cascade (with 6 primary l
 - **Purpose**: Protects the account from catastrophic losses.
 - **Logic**: Monitors the current account drawdown.
 - **Threshold**: Blocks all signals if `current_drawdown >= 12%`.
+
+### 7. Model Stability (`MODEL_STABILITY`)
+- **Purpose**: Prevents execution if model performance is degrading.
+- **Logic**: Monitors model drift and accuracy against institutional thresholds.
+
+### 8. Performance Guard (`PERFORMANCE_FLOOR`)
+- **Purpose**: Halts trading if historical win rate falls below floor.
+- **Logic**: Checks win rate over the last 20+ trades.
+
+### 9. Confidence Threshold (`CONFIDENCE_THRESHOLD`)
+- **Purpose**: Ensures only high-conviction signals are executed.
+- **Logic**: Requires signal confidence to exceed minimum threshold (default 0.55).
+
+### 10. Signal Consistency (`SIGNAL_FLICKER`)
+- **Purpose**: Filters out rapidly alternating buy/sell signals.
+- **Logic**: Analyzes signal history within a rolling window.
+
+### 11. Macro Risk Gate (`MACRO_EVENT`)
+- **Purpose**: Protects against high-impact macroeconomic events.
+- **Logic**: Blocks trades during active high-impact news windows.
 
 ## 📊 Execution Decision Output
 
