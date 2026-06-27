@@ -255,7 +255,9 @@ class AuditLogger:
             metadata={"version": version, "environment": environment, "status": status},
         )
 
-    def log_system_restored(self, incident_id: str | None = None, details: str | None = None) -> int:
+    def log_system_restored(
+        self, incident_id: str | None = None, details: str | None = None
+    ) -> int:
         """Log a system restoration event for RTO tracking."""
         return self.log(
             actor="system",

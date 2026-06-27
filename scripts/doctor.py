@@ -409,14 +409,12 @@ def check_mt5_config():
 def check_git_config():
     """Verify Git user configuration."""
     try:
-        name = (
-            subprocess.run(["git", "config", "user.name"], capture_output=True, text=True)
-            .stdout.strip()
-        )
-        email = (
-            subprocess.run(["git", "config", "user.email"], capture_output=True, text=True)
-            .stdout.strip()
-        )
+        name = subprocess.run(
+            ["git", "config", "user.name"], capture_output=True, text=True
+        ).stdout.strip()
+        email = subprocess.run(
+            ["git", "config", "user.email"], capture_output=True, text=True
+        ).stdout.strip()
 
         if name and email:
             return DiagnosticCheck("Git Configuration", "OK", f"Configured as {name} <{email}>")
@@ -436,12 +434,9 @@ def check_git_config():
 def check_branch_naming():
     """Verify current branch follows naming standards."""
     try:
-        branch = (
-            subprocess.run(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True
-            )
-            .stdout.strip()
-        )
+        branch = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True
+        ).stdout.strip()
 
         if branch == "main" or branch == "develop":
             return DiagnosticCheck("Branch Naming", "OK", f"On protected branch: {branch}")
@@ -464,20 +459,105 @@ def check_graft_alignment():
     """Check if the branch is aligned with the latest history graft."""
     try:
         # Check if we have common ancestry with origin/main
+        # This is critical because main is force-pushed daily with monolithic grafts.
         res = subprocess.run(
             ["git", "merge-base", "HEAD", "origin/main"], capture_output=True, text=True
         )
         if res.returncode == 0 and res.stdout.strip():
-            return DiagnosticCheck("Graft Alignment", "OK", "Common ancestry found with main")
+            return DiagnosticCheck(
+                "Graft Alignment", "OK", "Aligned with current repository history"
+            )
         else:
             return DiagnosticCheck(
                 "Graft Alignment",
-                "WARNING",
-                "No common ancestry with main",
-                "Your branch may be stale due to a daily history graft. Run 'git fetch origin main' and 'git rebase origin/main'.",
+                "FAILED",
+                "Disconnected history (Stale)",
+                "The 'main' branch resets daily via grafts. Run 'git fetch origin main && git rebase origin/main' to sync.",
             )
     except Exception:
         return DiagnosticCheck("Graft Alignment", "WARNING", "Could not verify graft alignment")
+
+
+def check_contribution_safety():
+    """Audit local changes against the Contribution Map (Safe vs Sensitive zones)."""
+    try:
+        # 1. Changes in current branch relative to main
+        res_branch = subprocess.run(
+            ["git", "diff", "--name-only", "origin/main...HEAD"], capture_output=True, text=True
+        )
+        if res_branch.returncode != 0:
+            res_branch = subprocess.run(
+                ["git", "diff", "--name-only", "main...HEAD"], capture_output=True, text=True
+            )
+
+        # 2. Unstaged/Staged changes in working directory
+        res_workdir = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD"], capture_output=True, text=True
+        )
+
+        # 3. Untracked files
+        res_untracked = subprocess.run(
+            ["git", "ls-files", "--others", "--exclude-standard"], capture_output=True, text=True
+        )
+
+        all_files = set()
+        for res in [res_branch, res_workdir, res_untracked]:
+            if res.returncode == 0 and res.stdout:
+                all_files.update(res.stdout.strip().split("\n"))
+
+        if not all_files:
+            return DiagnosticCheck("Contribution Safety", "OK", "No local changes detected")
+
+        files = list(all_files)
+
+        SAFE_ZONES = ["docs/", "tests/", "scripts/", ".github/", ".jules/"]
+        SENSITIVE_ZONES = ["src/trading/", "src/models/", "src/core/"]
+        EXPLICIT_SAFE_FILES = [
+            "Makefile",
+            "README.md",
+            "CONTRIBUTING.md",
+            ".gitignore",
+            "pyproject.toml",
+        ]
+
+        safe_files = []
+        sensitive_files = []
+        utility_files = []
+
+        for f in files:
+            is_safe = any(f.startswith(z) for z in SAFE_ZONES) or f in EXPLICIT_SAFE_FILES
+            is_sensitive = any(f.startswith(z) for z in SENSITIVE_ZONES)
+
+            if is_sensitive:
+                sensitive_files.append(f)
+            elif is_safe:
+                safe_files.append(f)
+            else:
+                utility_files.append(f)
+
+        if sensitive_files:
+            return DiagnosticCheck(
+                "Contribution Safety",
+                "WARNING",
+                f"Sensitive zones touched ({len(sensitive_files)} files)",
+                "Trading/Model logic requires multi-signature approval (Jules01/Jules03/Jules05).",
+            )
+        elif utility_files:
+            return DiagnosticCheck(
+                "Contribution Safety",
+                "OK",
+                f"Utility zones touched ({len(utility_files)} files)",
+                "Standard peer review required.",
+            )
+        else:
+            return DiagnosticCheck(
+                "Contribution Safety",
+                "OK",
+                f"Safe zones touched ({len(safe_files)} files)",
+                "Fast-track review eligible.",
+            )
+    except Exception as e:
+        return DiagnosticCheck("Contribution Safety", "WARNING", f"Audit failed: {e}")
 
 
 def main():
@@ -501,6 +581,7 @@ def main():
         check_git_config(),
         check_branch_naming(),
         check_graft_alignment(),
+        check_contribution_safety(),
     ]
 
     version = get_system_version()
