@@ -8,7 +8,7 @@
 --extra-index-url https://download.pytorch.org/whl/cpu
 torch==2.5.1+cpu
 stable-baselines3==2.5.0
-gymnasium==1.0.0
+gymnasium==1.3.0
 numpy==1.26.4
 scipy==1.15.3
 scikit-learn==1.6.1
