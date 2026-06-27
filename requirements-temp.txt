@@ -5,13 +5,13 @@
 # ============================================================
 
 # ── Core ML / RL ────────────────────────────────────────────
-torch==2.12.1+cpu
-stable-baselines3==2.9.0
+torch==2.5.1+cpu
+stable-baselines3==2.5.0
 gymnasium==1.0.0
 numpy==1.26.4
 scipy==1.15.3
 scikit-learn==1.6.1
-pandas==2.3.3
+pandas==2.2.3
 
 # ── Deep Learning Extras ────────────────────────────────────
 
@@ -35,10 +35,10 @@ redis==8.0.0
 prometheus-client==0.25.0
 structlog==25.5.0
 rich==13.9.4
-tqdm==4.68.2
+tqdm==4.67.1
 
 # ── Dashboard / API ─────────────────────────────────────────
-fastapi==0.137.0
+fastapi==0.136.1
 uvicorn[standard]==0.34.0
 
 # ── Configuration ───────────────────────────────────────────
@@ -60,7 +60,7 @@ ruff==0.15.18
 mypy==2.1.0
 
 # ── Utilities ───────────────────────────────────────────────
-python-socketio==5.16.3
+python-socketio==4.6.1
 python-dateutil==2.9.0.post0
 pytz==2026.2
 click==8.4.1
