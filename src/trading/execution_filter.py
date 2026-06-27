@@ -1,7 +1,7 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 src/trading/execution_filter.py
-10-layer entry filter cascade to vet signals before execution.
+11-layer entry filter cascade to vet signals before execution.
 Author : triqbit
 License: MIT
 """
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class ExecutionDecision:
-    """Result of the 6-layer execution filter cascade."""
+    """Result of the 11-layer execution filter cascade."""
 
     signal: TradeSignal
     confidence_score: float
@@ -34,15 +34,16 @@ class ExecutionDecision:
 
     @property
     def is_approved(self) -> bool:
-        """Returns True if the signal passed all 6 layers."""
+        """Returns True if the signal passed all 11 layers."""
         return self.blocked_by is None
+
 
 logger = logging.getLogger(__name__)
 
 
 class ExecutionFilter:
     """
-    Implements a 6-layer validation cascade for trading signals.
+    Implements an 11-layer validation cascade for trading signals.
     Layers:
         1. ATR Volatility Threshold
         2. Trend Angle Confirmation
@@ -84,7 +85,7 @@ class ExecutionFilter:
         **kwargs: Any,
     ) -> ExecutionDecision:
         """
-        Run the full 9-layer filter cascade.
+        Run the full 11-layer filter cascade.
         Evaluates all layers without short-circuiting to capture a full audit trace.
 
         Args:
@@ -395,10 +396,14 @@ class ExecutionFilter:
     ) -> tuple[bool, dict[str, Any]]:
         """Blocks if drift is too high or accuracy is too low."""
         drift_threshold = (
-            self.cfg.model_drift_threshold if self.cfg and hasattr(self.cfg, "model_drift_threshold") else 0.3
+            self.cfg.model_drift_threshold
+            if self.cfg and hasattr(self.cfg, "model_drift_threshold")
+            else 0.3
         )
         accuracy_floor = (
-            self.cfg.model_accuracy_floor if self.cfg and hasattr(self.cfg, "model_accuracy_floor") else 0.45
+            self.cfg.model_accuracy_floor
+            if self.cfg and hasattr(self.cfg, "model_accuracy_floor")
+            else 0.45
         )
 
         drift = model_health.get("drift", 0.0)
@@ -412,7 +417,9 @@ class ExecutionFilter:
             "accuracy_floor": accuracy_floor,
         }
 
-    def _check_performance_guard_with_metrics(self, trade_logger: Any) -> tuple[bool, dict[str, Any]]:
+    def _check_performance_guard_with_metrics(
+        self, trade_logger: Any
+    ) -> tuple[bool, dict[str, Any]]:
         """Blocks if historical win rate is dangerously low."""
         report = trade_logger.read_performance_report()
         win_rate = report.get("win_rate", 1.0)
@@ -420,7 +427,11 @@ class ExecutionFilter:
 
         # Only apply guard after a statistically significant number of trades
         if total_trades < 20:
-            return True, {"win_rate": win_rate, "total_trades": total_trades, "status": "insufficient_data"}
+            return True, {
+                "win_rate": win_rate,
+                "total_trades": total_trades,
+                "status": "insufficient_data",
+            }
 
         floor = 0.45
         passed = win_rate >= floor

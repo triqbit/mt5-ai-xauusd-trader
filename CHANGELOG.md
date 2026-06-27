@@ -52,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implement Institutional Decision Support System (#1086)
 
 ### Fixed
+- **Architecture Synchronization:** Standardized all documentation and source code references to reflect the actual 11-layer Execution Filter validation cascade, resolving inconsistencies where 6, 8, 9, or 10 layers were cited.
 - **Dependency Harmonization:** Aligned `python-socketio` version to 5.14.0 across `requirements.txt` and `pyproject.toml` to resolve synchronization mismatches.
 - Resolve undefined name `batch_idx` in LSTMModel training loop.
 - Resolve starlette and fastapi version conflicts in requirements files.

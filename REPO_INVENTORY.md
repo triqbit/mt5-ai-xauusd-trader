@@ -20,7 +20,7 @@
 - **License:** MIT
 - **Description:** Professional real-time trading strategy monitor with Ray Dalio portfolio allocation
 - **Language:** Python
-- **Key Features:** 8-asset portfolio, 6-layer entry filters, state machine architecture, GUI monitoring
+- **Key Features:** 8-asset portfolio, 11-layer entry filters, state machine architecture, GUI monitoring
 - **Priority:** ⭐⭐⭐ CRITICAL - Production-ready risk management
 - **Compatibility:** Fully compatible - MIT allows commercial use
 
