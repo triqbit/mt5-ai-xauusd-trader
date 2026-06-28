@@ -2030,3 +2030,30 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 74th Consecutive History Graft).
+
+## 2026-06-28 17:30 GMT+4
+
+**Summary:** Seventy-fifth through seventy-ninth consecutive monolithic history grafts detected. Process integrity remains in total collapse.
+
+**Suspected Process Issues:**
+- **Persistent History Destruction:** The `main` branch remains a single-commit node (`e82fb5b`), representing the 79th consecutive total repository replacement. Standard Git-native forensics and regression tracking are non-functional.
+- **Intervening Grafts:** Since the last report (June 26), four additional grafts occurred on June 27 (`1492276`, `b9cfd68`, `f935a7b`, `912c614`), each replacing the entire repository state.
+- **Severe Labeling Drift:** Commit (`e82fb5b`) is titled "DX: update daily PR triage and risk dashboard [2026-06-28] (#1580)", yet it replaced the entire repository (569 files, ~445,000 lines). This continues the pattern of masking total system swaps under DX/documentation labels.
+- **Persistent Global CI Blockage:** CI remains hard-blocked by formatting drift in legacy migrations. Merges continue to bypass all safety gates.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `e82fb5b` (replaces `912c614` and all prior history).
+- PR #1580: Current total system swap (79th graft).
+- Intervening grafts: `912c614`, `f935a7b`, `b9cfd68`, `1492276`.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1580 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merges continue while CI is globally blocked).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository, including core trading and risk logic, is being swapped daily with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The frequency of monolithic grafts has reached its 79th consecutive node. Immediate human intervention is required to restore linear history and stop the use of history-resetting grafts.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `e82fb5b` is mandatory.
+- **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 79th Consecutive History Graft).
