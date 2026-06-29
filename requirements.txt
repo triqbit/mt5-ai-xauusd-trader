@@ -67,7 +67,7 @@ python-socketio==4.6.1
 python-dateutil==2.9.0.post0
 nest-asyncio==1.6.0
 pytz==2026.2
-click==8.4.1
+click==8.4.2
 tabulate==0.10.0
 joblib==1.5.3
 python-telegram-bot==22.8
