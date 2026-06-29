@@ -28,7 +28,7 @@ dependencies = [
     "httpx==0.28.1",
     "psycopg2-binary==2.9.12",
     "sqlalchemy==2.0.51",
-    "alembic==1.18.4",
+    "alembic==1.18.5",
     "redis==8.0.1",
     "prometheus-client==0.25.0",
     "structlog==26.1.0",
