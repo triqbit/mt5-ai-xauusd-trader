@@ -32,7 +32,7 @@ redis==8.0.0
 
 # -- Monitoring & Logging ------------------------------------
 prometheus-client==0.25.0
-structlog==25.5.0
+structlog==26.1.0
 rich==15.0.0
 tqdm==4.68.3
 
