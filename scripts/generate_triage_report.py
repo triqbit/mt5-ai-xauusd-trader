@@ -639,8 +639,8 @@ def generate_report():
         for pr in safe_surface
         if "triage" not in pr["title"].lower() and "dashboard" not in pr["title"].lower()
     ]
-    candidates = (filtered_safe + medium_risk)[:4]
-    if len(candidates) < 3:
+    candidates = (filtered_safe + medium_risk)
+    if len(candidates) < 4:
         stale_candidates = [
             pr for pr in classified_prs if "Stale" in pr["flag"] and pr["risk"] != "Triage Required"
         ]
@@ -652,7 +652,12 @@ def generate_report():
             and "dashboard" not in pr["title"].lower()
         ]
         stale_medium = [pr for pr in stale_candidates if pr["risk"] == "Medium Risk"]
-        candidates.extend((stale_filtered_safe + stale_medium)[: 4 - len(candidates)])
+
+        # Interleave stale safe and medium, but keep most recent first
+        stale_pool = stale_filtered_safe + stale_medium
+        stale_pool.sort(key=lambda x: x["number"], reverse=True)
+
+        candidates.extend(stale_pool[: 4 - len(candidates)])
 
     if not candidates:
         report += "No new candidates identified today.\n"
