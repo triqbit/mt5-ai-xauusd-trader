@@ -512,7 +512,13 @@ def check_contribution_safety():
 
         SAFE_ZONES = ["docs/", "tests/", "scripts/", ".github/", ".jules/"]
         SENSITIVE_ZONES = ["src/trading/", "src/models/", "src/core/"]
-        EXPLICIT_SAFE_FILES = ["Makefile", "README.md", "CONTRIBUTING.md", ".gitignore", "pyproject.toml"]
+        EXPLICIT_SAFE_FILES = [
+            "Makefile",
+            "README.md",
+            "CONTRIBUTING.md",
+            ".gitignore",
+            "pyproject.toml",
+        ]
 
         safe_files = []
         sensitive_files = []
