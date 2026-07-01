@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `9755096d4466b127838f393e3fe6fc2cb679a4f9` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `89a644bd56436a72a2f37436db1a92e04538d28f` is required for all PRs.**
 
-Generated on: 2026-06-30 14:33:57 UTC
+Generated on: 2026-07-01 13:09:11 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Safe Surface update implementing 'DX: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `9755096d4466b127838f393e3fe6fc2cb679a4f9`
+- **Missing items**: Mandatory rebase against commit `89a644bd56436a72a2f37436db1a92e04538d28f`
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1528: docs: improve developer onboarding and contribution experience
 - **Short scope summary**: Medium Risk update implementing 'docs: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
 - **Domains touched**: dependencies, docs, infra/scripts
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `9755096d4466b127838f393e3fe6fc2cb679a4f9`, tests
+- **Missing items**: Mandatory rebase against commit `89a644bd56436a72a2f37436db1a92e04538d28f`, tests
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1525: docs: update process integrity log [2026-06-15]
 - **Short scope summary**: Medium Risk update implementing 'docs: update process integrity log [2026-06-15]' (Candidate for re-validation/review)
 - **Domains touched**: dependencies, docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `9755096d4466b127838f393e3fe6fc2cb679a4f9`, tests
+- **Missing items**: Mandatory rebase against commit `89a644bd56436a72a2f37436db1a92e04538d28f`, tests
 - **Recommendation**: Needs CI success before merge
 
 ---
