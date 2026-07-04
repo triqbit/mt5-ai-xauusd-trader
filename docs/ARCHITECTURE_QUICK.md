@@ -26,7 +26,8 @@ This map identifies the production readiness of various subsystems to ensure tra
 | :--- | :--- | :--- |
 | **Configuration Engine** | 🟢 Production | Pydantic-driven, environment-validated. |
 | **MT5 Connectivity** | 🟢 Production | Stable SDK integration with failover support. |
-| **Risk Management** | 🟢 Production | 10-layer cascade verified with high stability. |
+| **Execution Filter** | 🟢 Production | 11-layer cascade verified with high stability. |
+| **Risk Management** | 🟢 Production | 8-layer cascade for capital and account safety. |
 | **Ensemble Models** | 🟢 Production | Backtest-validated; institutional calibration active. |
 | **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors. |
 | **Decision Support** | 🟢 Production | Structured decision packets and operator dashboard active. |
@@ -39,7 +40,7 @@ This map identifies the production readiness of various subsystems to ensure tra
 1.  **Ingestion:** `MT5Connector` fetches real-time tick and OHLC data.
 2.  **Transformation:** `FeatureEngineering` computes 140+ technical and sentiment indicators.
 3.  **Intelligence:** `RegimeDetector` classifies market state; `DynamicEnsemble` generates a directional signal.
-4.  **Risk Gate:** `RiskManager` and `ExecutionFilter` validate the signal against a 10-layer cascade: ATR Volatility, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown, Model Stability, Performance, Confidence, and Signal Consistency (Flicker Guard).
+4.  **Risk Gate:** `RiskManager` and `ExecutionFilter` validate the signal against a multi-layer cascade. The `RiskManager` implements an 8-layer account-level gate (Circuit Breaker, Daily Loss, etc.), while the `ExecutionFilter` implements an 11-layer execution-specific gate (ATR Volatility, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown, Model Stability, Performance, Confidence, Signal Consistency, and Macro Risk).
 5.  **Allocation:** `CapitalAllocator` determines optimal lot size based on equity and regime.
 6.  **Execution:** `MT5Connector` dispatches the order and monitors for fills/slippage.
 7.  **Observability:** `TradeLogger` records execution details; `Monitor` pushes metrics to Prometheus.
