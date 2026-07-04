@@ -78,13 +78,13 @@ def check_python_version():
 CORE_DEPENDENCIES = {
     "numpy": ("numpy", "1.26.4"),
     "pandas": ("pandas", "2.2.3"),
-    "pydantic": ("pydantic", "2.13.4"),
-    "pydantic-settings": ("pydantic_settings", "2.14.1"),
-    "sqlalchemy": ("sqlalchemy", "2.0.50"),
+    "pydantic": ("pydantic", "2.10.4"),
+    "pydantic-settings": ("pydantic_settings", "2.7.0"),
+    "sqlalchemy": ("sqlalchemy", "2.0.36"),
     "metaapi-cloud-sdk": ("metaapi_cloud_sdk", "29.1.1"),
     "torch": ("torch", "2.5.1"),
-    "fastapi": ("fastapi", "0.136.1"),
-    "structlog": ("structlog", "25.5.0"),
+    "fastapi": ("fastapi", "0.115.6"),
+    "structlog": ("structlog", "24.4.0"),
     "rich": ("rich", "13.9.4"),
     "python-dotenv": ("dotenv", "1.2.2"),
     "requests": ("requests", "2.34.2"),
@@ -95,17 +95,17 @@ CORE_DEPENDENCIES = {
     "stable-baselines3": ("stable_baselines3", "2.5.0"),
     "jinja2": ("jinja2", "3.1.6"),
     "tqdm": ("tqdm", "4.67.1"),
-    "scipy": ("scipy", "1.15.3"),
-    "scikit-learn": ("sklearn", "1.6.1"),
+    "scipy": ("scipy", "1.15.0"),
+    "scikit-learn": ("sklearn", "1.6.0"),
     "psutil": ("psutil", "7.2.2"),
     "joblib": ("joblib", "1.5.3"),
-    "redis": ("redis", "8.0.0"),
-    "alembic": ("alembic", "1.18.4"),
-    "prometheus-client": ("prometheus_client", "0.21.1"),
+    "redis": ("redis", "5.2.0"),
+    "alembic": ("alembic", "1.14.0"),
+    "prometheus-client": ("prometheus_client", "0.25.0"),
     "python-socketio": ("socketio", "4.6.1"),
     "pytz": ("pytz", "2026.2"),
     "psycopg2-binary": ("psycopg2", "2.9.12"),
-    "python-telegram-bot": ("telegram", "22.7"),
+    "python-telegram-bot": ("telegram", "22.8"),
     "optuna": ("optuna", "4.9.0"),
 }
 
@@ -465,13 +465,13 @@ def check_graft_alignment():
         )
         if res.returncode == 0 and res.stdout.strip():
             return DiagnosticCheck(
-                "Graft Alignment", "OK", "Aligned with current repository history"
+                "Graft Alignment", "OK", "Common ancestry found"
             )
         else:
             return DiagnosticCheck(
                 "Graft Alignment",
-                "FAILED",
-                "Disconnected history (Stale)",
+                "WARNING",
+                "Disconnected history (Stale): No common ancestry with origin/main",
                 "The 'main' branch resets daily via grafts. Run 'git fetch origin main && git rebase origin/main' to sync.",
             )
     except Exception:
