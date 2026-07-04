@@ -40,7 +40,7 @@ This map identifies the production readiness of various subsystems to ensure tra
 1.  **Ingestion:** `MT5Connector` fetches real-time tick and OHLC data.
 2.  **Transformation:** `FeatureEngineering` computes 140+ technical and sentiment indicators.
 3.  **Intelligence:** `RegimeDetector` classifies market state; `DynamicEnsemble` generates a directional signal.
-4.  **Risk Gate:** `RiskManager` and `ExecutionFilter` validate the signal against an 11-layer cascade: ATR Volatility, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown, Model Stability, Performance, Confidence, Signal Consistency (Flicker Guard), and Macro Risk Gate.
+4.  **Risk Gate:** `RiskManager` and `ExecutionFilter` validate the signal against a multi-layer cascade. The `RiskManager` implements an 8-layer account-level gate (Circuit Breaker, Daily Loss, etc.), while the `ExecutionFilter` implements an 11-layer execution-specific gate (ATR Volatility, Trend Angle, EMA Sequence, Momentum, Session/Time, Drawdown, Model Stability, Performance, Confidence, Signal Consistency, and Macro Risk).
 5.  **Allocation:** `CapitalAllocator` determines optimal lot size based on equity and regime.
 6.  **Execution:** `MT5Connector` dispatches the order and monitors for fills/slippage.
 7.  **Observability:** `TradeLogger` records execution details; `Monitor` pushes metrics to Prometheus.
