@@ -22,8 +22,8 @@ To ensure safety and prevent domain collision, the repository is governed by a m
 ## 🔍 Alignment Verification Audit
 
 ### 1. Strategy vs. Implementation
-- **Objective:** Institutional-grade XAUUSD trading with a 10-layer risk cascade.
-- **Evidence:** `src/trading/execution_filter.py` correctly implements all 10 layers as defined in the [Architecture Quick-Start](../ARCHITECTURE_QUICK.md).
+- **Objective:** Institutional-grade XAUUSD trading with a dual-stage risk cascade (8 account layers + 11 execution layers).
+- **Evidence:** `src/trading/execution_filter.py` correctly implements all 11 execution layers as defined in the [Architecture Quick-Start](../ARCHITECTURE_QUICK.md).
 - **Status:** 🟢 **ALIGNED**
 
 ### 2. Governance vs. Reality
@@ -34,7 +34,7 @@ To ensure safety and prevent domain collision, the repository is governed by a m
 
 ### 3. Risk Authority
 - **Objective:** Centralized risk management (Central Risk Authority).
-- **Evidence:** `src/trading/risk_manager.py` remains the final arbiter for all trade approvals, preventing logic fragmentation.
+- **Evidence:** `src/trading/risk_manager.py` correctly implements an 8-layer risk filter cascade and remains the final arbiter for all trade approvals.
 - **Status:** 🟢 **ALIGNED**
 
 ---
