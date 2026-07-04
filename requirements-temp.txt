@@ -5,13 +5,13 @@
 # ============================================================
 
 # ── Core ML / RL ────────────────────────────────────────────
-torch==2.12.1+cpu
+torch==2.5.1+cpu
 stable-baselines3==2.5.0
-gymnasium==1.3.0
+gymnasium==1.0.0
 numpy==1.26.4
-scipy==1.15.3
-scikit-learn==1.6.1
-pandas==2.3.3
+scipy==1.15.0
+scikit-learn==1.6.0
+pandas==2.2.3
 
 # ── Deep Learning Extras ────────────────────────────────────
 
@@ -27,24 +27,24 @@ metaapi-cloud-sdk==29.1.1
 
 # ── Database ────────────────────────────────────────────────
 psycopg2-binary==2.9.12
-sqlalchemy==2.0.51
-alembic==1.18.5
-redis==8.0.1
+sqlalchemy==2.0.36
+alembic==1.14.0
+redis==5.2.0
 
 # ── Monitoring & Logging ────────────────────────────────────
 prometheus-client==0.25.0
-structlog==26.1.0
-rich==15.0.0
-tqdm==4.68.3
+structlog==24.4.0
+rich==13.9.4
+tqdm==4.67.1
 
 # ── Dashboard / API ─────────────────────────────────────────
-fastapi==0.138.1
+fastapi==0.115.6
 uvicorn[standard]==0.34.0
 
 # ── Configuration ───────────────────────────────────────────
 python-dotenv==1.2.2
-pydantic==2.13.4
-pydantic-settings==2.14.2
+pydantic==2.10.4
+pydantic-settings==2.7.0
 tomli==2.4.1
 
 # ── Testing ─────────────────────────────────────────────────
@@ -60,7 +60,7 @@ ruff==0.15.20
 mypy==2.1.0
 
 # ── Utilities ───────────────────────────────────────────────
-python-socketio==5.16.2
+python-socketio==4.6.1
 python-dateutil==2.9.0.post0
 pytz==2026.2
 click==8.4.2
