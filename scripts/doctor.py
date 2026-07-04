@@ -472,7 +472,7 @@ def check_graft_alignment():
                 "Graft Alignment",
                 "WARNING",
                 "Disconnected history (Stale): No common ancestry with origin/main",
-                "The 'main' branch resets daily via grafts. Run 'git fetch origin main && git rebase origin/main' to sync.",
+                "The 'main' branch resets daily via grafts. Run 'make resync' to sync your branch.",
             )
     except Exception:
         return DiagnosticCheck("Graft Alignment", "WARNING", "Could not verify graft alignment")

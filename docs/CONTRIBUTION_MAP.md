@@ -85,6 +85,7 @@ Changes to these directories affect the core financial and operational safety of
 3.  **Run `make doctor`:** If any check fails on your system, improving that check or the documentation around it is a great first contribution.
 4.  **Check `docs/status/PR_TRIAGE_DAILY.md`:** Look for PRs categorized as **"Safe Surface"**. This report is updated daily and is the best source for finding approved first-task candidates.
 5.  **Audit `tests/`:** Find a module with low coverage (check `make test` output) and add missing unit tests.
+6.  **Use `make resync`:** Always run this command before submitting to ensure your branch is aligned with the latest daily history graft.
 
 ---
 *This map is maintained by Jules06 (qufuwan). If you are unsure where your change fits, please open a discussion or tag a maintainer.*

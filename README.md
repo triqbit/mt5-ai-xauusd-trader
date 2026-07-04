@@ -172,7 +172,7 @@ We welcome contributions! To ensure safety in this high-turbulence repository:
 
 1.  **Start in a [Safe Zone](./docs/CONTRIBUTION_MAP.md#🟢-safe-zones-recommended-for-first-prs):** Focus on `docs/`, `tests/`, or `scripts/`.
 2.  **Follow the [First Real Contribution](./docs/FIRST_REAL_CONTRIBUTION.md) guide:** A step-by-step path to your first PR.
-3.  **Mandatory Rebase:** Always rebase your branch on the latest `main` graft before submitting.
+3.  **Mandatory Rebase:** Always run `make resync` to align your branch with the latest `main` graft before submitting.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and governance rules.
 

@@ -7,8 +7,9 @@ Welcome to the MT5 AI/ML Trading Bot project! We are thrilled to have you. This 
 Before you start, be aware of two unique factors in this repository:
 
 1.  **History Grafting:** The `main` branch is updated daily via monolithic "grafts" (total repository swaps). This means standard Git history is often unavailable on `main`.
-2.  **Mandatory Rebase:** Because `main` resets daily, your feature branch **must** be rebased onto the latest `main` commit before submission.
-3.  **Environment Stability:** If `make bootstrap` fails, check `docs/status/PROJECT_HEALTH.md` for known dependency conflicts.
+2.  **Mandatory Rebase:** Because `main` resets daily, your feature branch **must** be rebased onto the latest `main` commit before submission. Use `make resync` for an automated sync.
+3.  **CI Blockage:** CI is currently failing globally due to legacy linting errors in `migrations/`. If your PR is in a **Safe Zone**, it will be manually verified.
+4.  **Environment Stability:** If `make bootstrap` fails, check `docs/status/PROJECT_HEALTH.md` for known dependency conflicts.
 
 ---
 
@@ -58,8 +59,7 @@ The doctor will audit your local changes and tell you if you've touched any "Sen
 1.  **Commit with Conventional Commits:** `feat: add disk space check to doctor diagnostics`
 2.  **Final Rebase (Critical):** Always rebase just before pushing to ensure you are on the latest graft:
     ```bash
-    git fetch origin main
-    git rebase origin/main
+    make resync
     ```
 3.  **Push and PR:** Open a PR and tag **Jules06 (@qufuwan)** for review.
 
