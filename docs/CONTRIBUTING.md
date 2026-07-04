@@ -27,21 +27,17 @@ We use a role-based governance model where specific leads oversee different doma
 ### ⚠️ Critical: History Management & Daily Resets
 This repository operates under a high-frequency update model. Please read the following carefully:
 - **Daily History Grafting:** The `main` branch is updated daily via monolithic "grafts" (total repository swaps). This means standard Git history is often unavailable on `main`.
-- **Mandatory Rebase:** Because `main` resets daily, your feature branch **must** be rebased onto the latest `main` commit before submission. Use `git fetch origin main` and `git rebase origin/main`.
+- **Mandatory Rebase:** Because `main` resets daily, your feature branch **must** be rebased onto the latest `main` commit before submission. Use `make resync` for an automated sync.
 - **Environment Stability:** If `make bootstrap` fails, check `docs/status/PROJECT_HEALTH.md` for known dependency conflicts or transient environment issues.
 
 #### 🛠️ Graft Survival Kit (CLI)
 If your branch has diverged significantly or "lost its ancestor" due to a daily graft, use this sequence to resync:
 
 ```bash
-# 1. Update your local main cache
-git fetch origin main
+# Automated sync with latest main graft
+make resync
 
-# 2. Rebase your work onto the new graft
-# If standard rebase fails, you may need to use --onto
-git rebase origin/main
-
-# 3. If you get "no common ancestry" errors:
+# If 'make resync' fails with "no common ancestry" errors:
 # This happens when main is force-pushed with a new history graft.
 git rebase --onto origin/main <old-base-commit> <your-branch-name>
 ```

@@ -38,16 +38,15 @@ Please refer to the following documents before opening a Pull Request:
 
 ## 🛠️ Graft Survival Kit (Rebase Instructions)
 
-Because `main` is force-pushed daily, use these commands to keep your branch synced:
+Because `main` is force-pushed daily, use this command to keep your branch synced:
 
 ```bash
-# 1. Update your local main cache
-git fetch origin main
+# Automated sync with latest main graft
+make resync
+```
 
-# 2. Rebase your work onto the new graft
-git rebase origin/main
-
-# 3. If you get "no common ancestry" errors:
+If `make resync` fails with "no common ancestry" errors:
+```bash
 git rebase --onto origin/main <old-base-commit> <your-branch-name>
 ```
 

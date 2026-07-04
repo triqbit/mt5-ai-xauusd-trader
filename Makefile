@@ -19,13 +19,14 @@ endif
 PYTHON_EXEC := $(shell if [ -f $(PYTHON) ]; then echo $(PYTHON); else echo python3; fi)
 PIP_EXEC := $(shell if [ -f $(PIP) ]; then echo $(PIP); else echo pip3; fi)
 
-.PHONY: help bootstrap doctor test lint audit demo clean init setup validate-config backtest report status emergency-stop daily-summary analytics
+.PHONY: help bootstrap resync doctor test lint audit demo clean init setup validate-config backtest report status emergency-stop daily-summary analytics
 
 help:
 	@echo "MT5 AI/ML Trading Bot - Developer Commands"
 	@echo "------------------------------------------"
 	@echo "doctor    : [REQUIRED] Run system diagnostics and verification"
 	@echo "bootstrap : [REQUIRED] Install dependencies and setup environment"
+	@echo "resync    : [REQUIRED] Sync with latest main graft (Fetch & Rebase)"
 	@echo "setup     : [REQUIRED] Run interactive configuration wizard"
 	@echo "test      : Run unit and integration tests"
 	@echo "lint      : Run ruff linter and formatter"
@@ -43,6 +44,11 @@ help:
 
 bootstrap:
 	bash scripts/bootstrap.sh
+
+resync:
+	@echo "Resyncing with latest main graft..."
+	git fetch origin main
+	git rebase origin/main
 
 doctor:
 	$(PYTHON_EXEC) scripts/doctor.py
