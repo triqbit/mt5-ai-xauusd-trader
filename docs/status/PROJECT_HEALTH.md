@@ -6,9 +6,9 @@ This dashboard provides real-time visibility into the technical health, process 
 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
-| **CI Success Rate** | 🔴 BLOCKED | CI hard-blocked by 6 linting errors in `migrations/env.py`. |
-| **PR Backlog** | 🔴 557 Stale | 100% of open PRs are stale relative to the 88th history graft. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (88 consecutive nodes). |
+| **CI Success Rate** | 🔴 BLOCKED | CI hard-blocked by 122 formatting errors and 6 linting errors in `migrations/env.py`. |
+| **PR Backlog** | 🔴 558 Stale | 100% of open PRs are stale relative to the 92nd history graft. |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (92 consecutive nodes). |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
 ---
@@ -17,21 +17,22 @@ This dashboard provides real-time visibility into the technical health, process 
 
 ### 🧪 CI & Testing
 - **Status:** 🔴 **BLOCKED**
-- **Issue:** Global CI blockage due to 6 linting errors in `migrations/env.py`.
+- **Issue:** Global CI blockage due to 122 formatting violations and 6 linting errors in `migrations/env.py`.
+- **Constraint:** Jules06 cannot unblock CI by formatting restricted domains (e.g., `src/trading/`) as it violates lane boundaries and triggers auto-merge blocks.
 - **Integration Pass Rate:** 🟢 98.5% (Baseline verified June 12, 2026; subsequent merges bypass CI).
 
 ### 🧹 Code Quality (Ruff)
-- **Total Errors:** 136+ (Excluding restricted domains)
+- **Total Errors:** 122 formatting + 136+ linting (Excluding restricted domains)
 - **Key Areas:**
   - `tests/`: 3,400+ issues (Unused imports, unformatted blocks) - *Deferred to avoid noise*.
-  - `src/`: 0 issues (100% clean core).
+  - `src/`: 0 lint issues in core, but many formatting violations.
   - `migrations/`: 6 legacy formatting errors.
-- **Strategy:** Core is 100% clean; resolving `migrations/` lint errors is required to unblock CI.
+- **Strategy:** Core is functionally clean; resolving repository-wide formatting and `migrations/` lint errors is required to unblock CI.
 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
 - **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes.
-- **Current Node:** Commit `7f487f6` (88th consecutive graft).
+- **Current Node:** Commit `a84ecff` (92nd consecutive graft).
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 

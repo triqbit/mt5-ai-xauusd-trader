@@ -639,7 +639,7 @@ def generate_report():
         for pr in safe_surface
         if "triage" not in pr["title"].lower() and "dashboard" not in pr["title"].lower()
     ]
-    candidates = (filtered_safe + medium_risk)
+    candidates = filtered_safe + medium_risk
     if len(candidates) < 4:
         stale_candidates = [
             pr for pr in classified_prs if "Stale" in pr["flag"] and pr["risk"] != "Triage Required"
