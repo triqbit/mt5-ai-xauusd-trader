@@ -1,32 +1,32 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `2627b418503088e96ab652bb4bb3a53d396e62f2` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `4196c8028b8d2427ed18135a410bdf7a4f03286b` is required for all PRs.**
 
-Generated on: 2026-07-05 15:40:00 UTC
+Generated on: 2026-07-06 13:33:19 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
-## 1. PR #1543: DX: improve developer onboarding and contribution experience
-- **Short scope summary**: Safe Surface update implementing 'DX: improve developer onboarding and contribution experience'
-- **Domains touched**: docs
-- **CI status**: pending (Globally blocked by lint errors in `migrations/env.py`)
-- **Missing items**: Mandatory rebase against commit `2627b418503088e96ab652bb4bb3a53d396e62f2`
-- **Recommendation**: Candidate for review (Safe Surface)
-
-## 2. PR #1409: docs: Daily PR triage and risk dashboard [2026-05-23]
-- **Short scope summary**: Safe Surface update implementing 'docs: Daily PR triage and risk dashboard [2026-05-23]'
-- **Domains touched**: docs
-- **CI status**: pending (Globally blocked by lint errors in `migrations/env.py`)
-- **Missing items**: Mandatory rebase against commit `2627b418503088e96ab652bb4bb3a53d396e62f2`
-- **Recommendation**: Candidate for review (Safe Surface)
-
-## 3. PR #1608: chore(deps): bump python-socketio from 4.6.1 to 5.16.2
-- **Short scope summary**: Medium Risk dependency update bumping python-socketio to 5.16.2
+## 1. PR #1618: chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu in the python-ml group
+- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu in the python-ml group' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
-- **CI status**: pending (Globally blocked by lint errors in `migrations/env.py`)
-- **Missing items**: Mandatory rebase against commit `2627b418503088e96ab652bb4bb3a53d396e62f2`, tests, docs
-- **Recommendation**: Needs re-validation and CI success before merge (Medium Risk)
+- **CI status**: pending
+- **Missing items**: Mandatory rebase against commit `4196c8028b8d2427ed18135a410bdf7a4f03286b`
+- **Recommendation**: Needs CI success before merge
+
+## 2. PR #1608: chore(deps): bump python-socketio from 4.6.1 to 5.16.2
+- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump python-socketio from 4.6.1 to 5.16.2' (Candidate for re-validation/review)
+- **Domains touched**: dependencies
+- **CI status**: pending
+- **Missing items**: Mandatory rebase against commit `4196c8028b8d2427ed18135a410bdf7a4f03286b`, tests, docs
+- **Recommendation**: Needs CI success before merge
+
+## 3. PR #1543: DX: improve developer onboarding and contribution experience
+- **Short scope summary**: Safe Surface update implementing 'DX: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
+- **Domains touched**: docs
+- **CI status**: pending
+- **Missing items**: Mandatory rebase against commit `4196c8028b8d2427ed18135a410bdf7a4f03286b`
+- **Recommendation**: Needs CI success before merge
 
 ---
 *Prepared by Jules06 (qufuwan) for Jules05 and human review.*
