@@ -311,6 +311,9 @@ def classify_risk(files, title=""):
     t_lower = title.lower()
     is_likely_safe = any(kw in t_lower for kw in safe_keywords)
 
+    safe_prefixes = ["dx:", "docs:", "chore:", "refactor:", "test:"]
+    has_safe_prefix = any(t_lower.startswith(p) for p in safe_prefixes)
+
     # General check for minor dependency bumps in non-core packages
     safe_deps = [
         "click",
@@ -333,9 +336,7 @@ def classify_risk(files, title=""):
     ]
 
     if not files:
-        # Explicitly prioritize safe prefixes
-        safe_prefixes = ["dx:", "docs:", "chore:", "refactor:", "test:"]
-        if any(t_lower.startswith(p) for p in safe_prefixes):
+        if has_safe_prefix:
             return "Safe Surface", "Heuristic: Title starts with safe prefix."
 
         # Check for safe dependency bumps in title
@@ -358,9 +359,6 @@ def classify_risk(files, title=""):
             all_safe = False
             break
 
-    if all_safe:
-        return "Safe Surface", "Only documentation or tests."
-
     # Check for High Risk
     for f in files:
         for p in high_risk_patterns:
@@ -369,6 +367,13 @@ def classify_risk(files, title=""):
                 if f.endswith(".md"):
                     continue
                 return "High Risk", f"Touches high-risk area: {f}"
+
+    # If it has a safe prefix and didn't touch high risk, treat as safe surface
+    if has_safe_prefix:
+        return "Safe Surface", "Title has safe prefix and no high-risk files touched."
+
+    if all_safe:
+        return "Safe Surface", "Only documentation or tests."
 
     # Check for Medium Risk
     for f in files:
@@ -564,6 +569,12 @@ def generate_report():
 
     # Determine Top 3 (Prioritize "New" PRs over "Stale")
     top_3_items = []
+
+    # Always include Mandatory Rebase as #1 priority if graft is recent
+    top_3_items.append(
+        f"**Mandatory Rebase:** All open PRs require a mandatory rebase against commit `{big_bang_sha}` to ensure compatibility."
+    )
+
     if turbulence_reasons:
         top_3_items.append(f"**Address Turbulence:** {turbulence_reasons[0]}")
 
