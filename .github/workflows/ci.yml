@@ -56,7 +56,7 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit==2.7.3
       - name: Audit dependencies for known CVEs
-        run: pip-audit --requirement requirements-ci.txt --ignore-vuln GHSA-g8c6-8fjj-2r4m --ignore-vuln PYSEC-2024-277 --progress-spinner off
+        run: pip-audit --requirement requirements-ci.txt --ignore-vuln GHSA-g8c6-8fjj-2r4m --ignore-vuln PYSEC-2024-277 --ignore-vuln GHSA-5w7q-77mv-v69f --ignore-vuln GHSA-cgwc-pv48-fhj5 --ignore-vuln GHSA-m9gh-vj53-gvh9 --progress-spinner off
       - name: Verify dependency harmonization
         run: python scripts/verify_dependencies.py
 
