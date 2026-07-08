@@ -464,9 +464,7 @@ def check_graft_alignment():
             ["git", "merge-base", "HEAD", "origin/main"], capture_output=True, text=True
         )
         if res.returncode == 0 and res.stdout.strip():
-            return DiagnosticCheck(
-                "Graft Alignment", "OK", "Common ancestry found"
-            )
+            return DiagnosticCheck("Graft Alignment", "OK", "Common ancestry found")
         else:
             return DiagnosticCheck(
                 "Graft Alignment",
@@ -512,7 +510,13 @@ def check_contribution_safety():
 
         SAFE_ZONES = ["docs/", "tests/", "scripts/", ".github/", ".jules/"]
         SENSITIVE_ZONES = ["src/trading/", "src/models/", "src/core/"]
-        EXPLICIT_SAFE_FILES = ["Makefile", "README.md", "CONTRIBUTING.md", ".gitignore", "pyproject.toml"]
+        EXPLICIT_SAFE_FILES = [
+            "Makefile",
+            "README.md",
+            "CONTRIBUTING.md",
+            ".gitignore",
+            "pyproject.toml",
+        ]
 
         safe_files = []
         sensitive_files = []
