@@ -22,16 +22,16 @@ The system is designed as a modular, event-driven trading engine that separates 
 
 This map identifies the production readiness of various subsystems to ensure transparent expectations for contributors and operators.
 
-| Subsystem | Maturity | Status |
+| Subsystem | Maturity | Verified Evidence |
 | :--- | :--- | :--- |
-| **Configuration Engine** | 🟢 Production | Pydantic-driven, environment-validated. |
-| **MT5 Connectivity** | 🟢 Production | Stable SDK integration with failover support. |
-| **Execution Filter** | 🟢 Production | 11-layer cascade verified with high stability. |
-| **Risk Management** | 🟢 Production | 8-layer cascade for capital and account safety. |
-| **Ensemble Models** | 🟢 Production | Backtest-validated; institutional calibration active. |
+| **Configuration Engine** | 🟢 Production | [Integration Test (May 21)](./testing/INTEGRATION_TEST_RESULTS.md#test-configuration--startup) |
+| **MT5 Connectivity** | 🟢 Production | [Integration Test (May 21)](./testing/INTEGRATION_TEST_RESULTS.md#test-trading-flow-integration) |
+| **Execution Filter** | 🟢 Production | [Complexity Analysis](./audits/PERFORMANCE_COMPLEXITY_REPORT.md) |
+| **Risk Management** | 🟢 Production | [8-Layer Cascade Verified](./audits/ENTERPRISE_EVIDENCE_SCORECARD.md) |
+| **Ensemble Models** | 🟢 Production | [Walk-Forward Report](./audits/walkforward_verification_report.md) |
 | **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors. |
-| **Decision Support** | 🟢 Production | Structured decision packets and operator dashboard active. |
-| **Explainability Engine** | 🟢 Production | Institutional attribution reporting and TUI integration verified. |
+| **Decision Support** | 🟢 Production | [Integration Test (May 21)](./testing/INTEGRATION_TEST_RESULTS.md#test-intelligence--adaptive-weighting) |
+| **Explainability Engine** | 🟢 Production | [Attribution Logging Verified](./testing/INTEGRATION_TEST_RESULTS.md#4-observability) |
 
 ---
 
@@ -61,10 +61,10 @@ To maintain institutional safety in an automated environment, the repository uti
 
 Use these paths to find technical evidence and audit reports:
 
-- **Architecture Decisions:** (See `docs/audits/ADR_AUDIT_REPORT.md` - *Upcoming*)
-- **Security & Compliance:** `docs/audits/ENTERPRISE_EVIDENCE_SCORECARD.md`
-- **System Health:** `docs/status/PROJECT_HEALTH.md`
-- **Performance Benchmarks:** `docs/audits/PERFORMANCE_COMPLEXITY_REPORT.md` (*Upcoming*)
+- **Architecture Decisions:** [docs/audits/ADR_AUDIT_REPORT.md](./audits/ADR_AUDIT_REPORT.md)
+- **Security & Compliance:** [docs/audits/ENTERPRISE_EVIDENCE_SCORECARD.md](./audits/ENTERPRISE_EVIDENCE_SCORECARD.md)
+- **System Health:** [docs/status/PROJECT_HEALTH.md](./status/PROJECT_HEALTH.md)
+- **Performance Benchmarks:** [docs/audits/PERFORMANCE_COMPLEXITY_REPORT.md](./audits/PERFORMANCE_COMPLEXITY_REPORT.md)
 - **Integration Status:** `docs/status/PROCESS_INTEGRITY_LOG.md`
 
 ---
