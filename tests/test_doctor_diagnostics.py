@@ -169,3 +169,56 @@ def test_check_graft_alignment_stale():
         res = doctor.check_graft_alignment()
         assert res.status == "WARNING"
         assert "No common ancestry" in res.message
+
+
+def test_check_venv_active():
+    """Verify venv check passes when active."""
+    with patch("sys.prefix", "/path/to/venv"), patch("sys.base_prefix", "/usr"):
+        res = doctor.check_venv()
+        assert res.status == "OK"
+
+
+def test_check_venv_inactive():
+    """Verify venv check warns when inactive."""
+    # When prefix and base_prefix are same, it's not a venv
+    with patch("sys.prefix", "/usr"), \
+         patch("sys.base_prefix", "/usr"), \
+         patch("sys.real_prefix", create=True) as mock_real:
+
+        # Ensure real_prefix doesn't exist during the check
+        with patch("scripts.doctor.hasattr", side_effect=lambda obj, attr: False if attr == "real_prefix" else hasattr(obj, attr)):
+            res = doctor.check_venv()
+            assert res.status == "WARNING"
+
+
+def test_check_disk_space_ok():
+    """Verify disk space check passes when sufficient."""
+    # return values for total, used, free
+    with patch("shutil.disk_usage", return_value=(100*(2**30), 10*(2**30), 10*(2**30))):
+        res = doctor.check_disk_space()
+        assert res.status == "OK"
+
+
+def test_check_disk_space_failed():
+    """Verify disk space check fails when critical."""
+    with patch("shutil.disk_usage", return_value=(100*(2**30), 99.9*(2**30), 0.1*(2**30))):
+        res = doctor.check_disk_space()
+        assert res.status == "FAILED"
+
+
+def test_get_triage_top_items():
+    """Verify triage scraping logic."""
+    mock_content = """
+## 🔝 Top 3 Items That Matter Right Now
+
+1. **Mandatory Rebase:** Rebase required.
+2. Item two.
+3. Item three.
+
+## Summary Table
+"""
+    with patch("scripts.doctor.Path.exists", return_value=True), \
+         patch("scripts.doctor.Path.read_text", return_value=mock_content):
+        items = doctor.get_triage_top_items()
+        assert len(items) == 3
+        assert "Mandatory Rebase: Rebase required." in items[0]

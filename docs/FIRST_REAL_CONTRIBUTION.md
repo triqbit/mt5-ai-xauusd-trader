@@ -36,14 +36,14 @@ make doctor
 ```
 
 **Ideas for first contributions:**
-- Add a check for available disk space (important for `trades.db`).
 - Add a check for the existence of the `data/` directory.
 - Improve the error message for a failing database connectivity check.
 - Add a check to verify that `docker` is installed if the user is in a Linux environment.
+- Add a check for specific OS-level dependencies (like `libta-lib0`).
 
 ### Step 3: Implement the Check
 
-Open `scripts/doctor.py` and implement a new `DiagnosticCheck`. Use the existing functions like `check_python_version()` as a template.
+Open `scripts/doctor.py` and implement a new `DiagnosticCheck`. Use the existing functions like `check_venv()` or `check_disk_space()` as a template.
 
 ### Step 4: Verify Your Changes
 

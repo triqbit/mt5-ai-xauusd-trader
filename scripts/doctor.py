@@ -75,6 +75,43 @@ def check_python_version():
         return DiagnosticCheck("Python Version", "FAILED", msg, "Install Python 3.10 or higher.")
 
 
+def check_venv():
+    """Verify if the script is running inside a virtual environment."""
+    if hasattr(sys, "real_prefix") or (
+        base_prefix := getattr(sys, "base_prefix", sys.prefix)
+    ) != sys.prefix:
+        return DiagnosticCheck("Virtual Environment", "OK", f"Active: {sys.prefix}")
+    else:
+        return DiagnosticCheck(
+            "Virtual Environment",
+            "WARNING",
+            "No active virtual environment detected",
+            "Run 'make bootstrap' to setup and activate a virtual environment.",
+        )
+
+
+def check_disk_space():
+    """Verify available disk space for database and logs."""
+    try:
+        import shutil
+
+        total, used, free = shutil.disk_usage(".")
+        free_gb = free / (2**30)
+        msg = f"{free_gb:.2f} GB available"
+        if free_gb < 0.5:
+            return DiagnosticCheck(
+                "Disk Space", "FAILED", f"Critical: {msg}", "Free up space for trades.db and logs."
+            )
+        elif free_gb < 2.0:
+            return DiagnosticCheck(
+                "Disk Space", "WARNING", f"Low: {msg}", "Monitor disk usage for database growth."
+            )
+        else:
+            return DiagnosticCheck("Disk Space", "OK", msg)
+    except Exception as e:
+        return DiagnosticCheck("Disk Space", "WARNING", f"Check failed: {e}")
+
+
 CORE_DEPENDENCIES = {
     "numpy": ("numpy", "1.26.4"),
     "pandas": ("pandas", "2.2.3"),
@@ -161,11 +198,7 @@ def check_dependencies(dependencies=None):
             missing.append(display_name)
 
     if missing:
-        remedy = (
-            "Run 'pip install -r requirements-linux.txt'. If versions fail to resolve, check for invalid pins in requirements files."
-            if sys.platform != "win32"
-            else "Run 'pip install -r requirements.txt'. If versions fail to resolve, check for invalid pins in requirements files."
-        )
+        remedy = "Run 'make bootstrap' to install missing dependencies."
         return DiagnosticCheck(
             "Dependencies",
             "FAILED",
@@ -184,7 +217,7 @@ def check_dependencies(dependencies=None):
             "Dependencies",
             "WARNING",
             f"Outdated: {', '.join(outdated)}",
-            "Update dependencies: 'pip install -r requirements.txt'",
+            "Update dependencies: 'make bootstrap'",
         )
     else:
         msg = f"All core libraries present: {', '.join(versions[:3])}..."
@@ -266,7 +299,7 @@ def check_env_file():
             ".env Configuration",
             "FAILED",
             ".env is missing",
-            "Run 'python main.py --setup' or 'make setup' to configure the environment.",
+            "Run 'make setup' to configure the environment.",
         )
 
 
@@ -393,16 +426,11 @@ def check_mt5_config():
     if login != "0" and pwd and server:
         return DiagnosticCheck("MT5 Credentials", "OK", f"Configured for {server}")
     else:
-        remedy = (
-            "Run 'python main.py --setup'. On Linux, you may need MetaAPI credentials."
-            if sys.platform != "win32"
-            else "Run 'python main.py --setup' and provide your MT5 credentials."
-        )
         return DiagnosticCheck(
             "MT5 Credentials",
             "WARNING",
             "Incomplete MT5 configuration",
-            remedy,
+            "Run 'make setup' and provide your MT5 credentials.",
         )
 
 
@@ -498,14 +526,41 @@ def check_graft_alignment():
         if res.returncode == 0 and res.stdout.strip():
             return DiagnosticCheck("Graft Alignment", "OK", "Common ancestry found")
         else:
+            remedy = "Run 'make resync'. If it fails, use: git rebase --onto origin/main <old-base-commit> <your-branch>"
             return DiagnosticCheck(
                 "Graft Alignment",
                 "WARNING",
                 "Disconnected history (Stale): No common ancestry with origin/main",
-                "The 'main' branch resets daily via grafts. Run 'make resync' to sync your branch.",
+                remedy,
             )
     except Exception:
         return DiagnosticCheck("Graft Alignment", "WARNING", "Could not verify graft alignment")
+
+
+def get_triage_top_items():
+    """Scrape Top 3 items from the Daily PR Triage Dashboard."""
+    import re
+
+    triage_path = Path("docs/status/PR_TRIAGE_DAILY.md")
+    if not triage_path.exists():
+        return []
+
+    try:
+        content = triage_path.read_text()
+        # Find the "Top 3 Items" section
+        match = re.search(
+            r"## 🔝 Top 3 Items That Matter Right Now\n\n(.*?)\n\n##", content, re.DOTALL
+        )
+        if match:
+            items_text = match.group(1)
+            # Extract numbered items
+            items = re.findall(r"\d+\.\s+(.*)", items_text)
+            # Clean up markdown bolding
+            return [i.replace("**", "") for i in items]
+    except Exception:
+        pass
+
+    return []
 
 
 def check_contribution_safety():
@@ -597,6 +652,8 @@ def main():
 
     system_checks = [
         check_python_version(),
+        check_venv(),
+        check_disk_space(),
         check_dependencies(),
         check_requirement_harmonization(),
         check_env_file(),
@@ -617,6 +674,8 @@ def main():
 
     version = get_system_version()
 
+    triage_items = get_triage_top_items()
+
     if HAS_RICH:
         console.print(
             Panel(
@@ -626,6 +685,12 @@ def main():
                 border_style="blue",
             )
         )
+
+        if triage_items:
+            triage_text = Text.from_markup("[bold]Top 3 Items That Matter Right Now:[/]\n")
+            for i, item in enumerate(triage_items, 1):
+                triage_text.append(f"{i}. {item}\n", style="yellow")
+            console.print(Panel(triage_text, border_style="yellow", title="🔥 DAILY TRIAGE"))
 
         # System Readiness Table
         table = Table(box=None, expand=True, title="[bold]System Readiness[/]")
@@ -693,6 +758,13 @@ def main():
         # Plain text fallback
         print(f"=== MT5 AI/ML Trading Bot Doctor (v{version}) ===")
         print(f"Platform: {platform.system()} {platform.release()}")
+
+        if triage_items:
+            print("-" * 50)
+            print("TOP 3 ITEMS THAT MATTER RIGHT NOW (docs/status/PR_TRIAGE_DAILY.md)")
+            for i, item in enumerate(triage_items, 1):
+                print(f"{i}. {item}")
+
         print("-" * 50)
         print("--- System Readiness ---")
         failed = False
