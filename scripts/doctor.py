@@ -406,6 +406,38 @@ def check_mt5_config():
         )
 
 
+def check_model_artifacts():
+    """Verify if pre-trained models exist in the models directory."""
+    models_dir = Path("models/trained")
+    if not models_dir.exists():
+        return DiagnosticCheck(
+            "Model Artifacts",
+            "WARNING",
+            "models/trained directory missing",
+            "Run 'make bootstrap' to initialize directories.",
+        )
+
+    required = ["ppo_xauusd.zip", "lstm_xauusd.pt"]
+    found = [f for f in required if (models_dir / f).exists()]
+
+    if len(found) == len(required):
+        return DiagnosticCheck("Model Artifacts", "OK", f"All {len(required)} models present")
+    elif found:
+        return DiagnosticCheck(
+            "Model Artifacts",
+            "WARNING",
+            f"Partial models found: {', '.join(found)}",
+            "Ensure all model weights are downloaded or run 'make demo-synthetic' for simulation.",
+        )
+    else:
+        return DiagnosticCheck(
+            "Model Artifacts",
+            "WARNING",
+            "No pre-trained models found",
+            "Run 'make demo-synthetic' or 'make demo-rl' to explore system features with synthetic data.",
+        )
+
+
 def check_git_config():
     """Verify Git user configuration."""
     try:
@@ -464,9 +496,7 @@ def check_graft_alignment():
             ["git", "merge-base", "HEAD", "origin/main"], capture_output=True, text=True
         )
         if res.returncode == 0 and res.stdout.strip():
-            return DiagnosticCheck(
-                "Graft Alignment", "OK", "Common ancestry found"
-            )
+            return DiagnosticCheck("Graft Alignment", "OK", "Common ancestry found")
         else:
             return DiagnosticCheck(
                 "Graft Alignment",
@@ -512,7 +542,13 @@ def check_contribution_safety():
 
         SAFE_ZONES = ["docs/", "tests/", "scripts/", ".github/", ".jules/"]
         SENSITIVE_ZONES = ["src/trading/", "src/models/", "src/core/"]
-        EXPLICIT_SAFE_FILES = ["Makefile", "README.md", "CONTRIBUTING.md", ".gitignore", "pyproject.toml"]
+        EXPLICIT_SAFE_FILES = [
+            "Makefile",
+            "README.md",
+            "CONTRIBUTING.md",
+            ".gitignore",
+            "pyproject.toml",
+        ]
 
         safe_files = []
         sensitive_files = []
@@ -569,6 +605,7 @@ def main():
         check_database(),
         check_file_permissions(),
         check_mt5_config(),
+        check_model_artifacts(),
     ]
 
     contributor_checks = [
