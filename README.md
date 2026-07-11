@@ -108,7 +108,18 @@ python main.py --setup
 python main.py --check
 ```
 
-### 2. Configuration
+### 2. Quick Evaluation (No-Config Demo)
+You can evaluate the system's analytical and RL capabilities immediately using synthetic data, without requiring MT5 credentials or pre-trained models:
+
+```bash
+# Run strategy benchmark demo (Synthetic OHLCV)
+make demo-synthetic
+
+# Run RL agent evaluation demo (Synthetic environment)
+make demo-rl
+```
+
+### 3. Configuration
 The system features an **Interactive Setup Wizard**. Simply run the bot, and it will offer to guide you through the configuration:
 ```bash
 python main.py
@@ -122,7 +133,7 @@ MT5_SERVER=your_broker_server
 MODE=demo
 ```
 
-### 3. Execution
+### 4. Execution
 The CLI is designed to be **resilient**. Diagnostic commands work even if dependencies are not yet installed:
 
 ```bash
@@ -171,8 +182,9 @@ python main.py --mode live --algo ensemble --confirm-live
 We welcome contributions! To ensure safety in this high-turbulence repository:
 
 1.  **Start in a [Safe Zone](./docs/CONTRIBUTION_MAP.md#🟢-safe-zones-recommended-for-first-prs):** Focus on `docs/`, `tests/`, or `scripts/`.
-2.  **Follow the [First Real Contribution](./docs/FIRST_REAL_CONTRIBUTION.md) guide:** A step-by-step path to your first PR.
-3.  **Mandatory Rebase:** Always run `make resync` to align your branch with the latest `main` graft before submitting.
+2.  **Explore with [Synthetic Demos](#2-quick-evaluation-no-config-demo):** Run `make demo-synthetic` to understand system telemetry.
+3.  **Follow the [First Real Contribution](./docs/FIRST_REAL_CONTRIBUTION.md) guide:** A step-by-step path to your first PR.
+4.  **Mandatory Rebase:** Always run `make resync` to align your branch with the latest `main` graft before submitting.
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full workflow and governance rules.
 
