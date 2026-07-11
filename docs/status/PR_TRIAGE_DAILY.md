@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-07-10 13:28:35 UTC
+**Date:** 2026-07-11 13:32:57 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,7 +10,7 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `1b32aa1adaa750f714adee678d93323e23c9c776` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `2e0789109755885069f3a66ec81f486d30738d37` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (559)
 3. **Re-validate Stale:** Review Safe Surface PR #1618 (chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu in the python-ml group)
 
@@ -19,7 +19,7 @@
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
 | [1618](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1618) | chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu in the python-ml group | dependabot[bot] | `dependabot/pip/python-ml-6eeba57826` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1608](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1608) | chore(deps): bump python-socketio from 4.6.1 to 5.16.2 | dependabot[bot] | `dependabot/pip/python-socketio-5.16.2` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1608](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1608) | chore(deps): bump python-socketio from 4.6.1 to 5.16.2 | dependabot[bot] | `dependabot/pip/python-socketio-5.16.2` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1576](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1576) | DX: improve developer onboarding and contribution experience | triqbit | `dx-improve-onboarding-credibility-5459078260715495313` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1543](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1543) | DX: improve developer onboarding and contribution experience | triqbit | `dx-daily-triage-2026-06-20-qufuwan-7504956792826488201` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1528](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1528) | docs: improve developer onboarding and contribution experience | triqbit | `dx-process-integrity-log-2026-06-16-5084547163796099815` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
@@ -36,8 +36,8 @@
 | [1376](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1376) | Resolve cross-agent conflict in Risk Management API | yxynoty | `jules05-harmonize-risk-api-9770632301630553907` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1372](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1372) | 🔧 Jules05: Resolve cross-agent conflict in Risk Management and Model interfaces | yxynoty | `Jules05-resolve-cross-agent-conflict-13854965436455603502` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1371](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1371) | 🧬 Jules02: Synthetic test scenarios — Risk reconciliation scenarios | xnessom | `jules02/risk-reconciliation-8990552146312303501` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1369](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1369) | 🔐 Jules02: Security hardening — HMAC-SHA256 signature verification for model files | xnessom | `jules02-security-hardening-model-signatures-17851897229134920353` | escalated-risk | unknown | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1367](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1367) | ⚡ Jules05: Workflow simplification — Comprehensive Log Update | yxynoty | `jules05/workflow-simplification-log-7413812354450014762` | escalated-risk | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1369](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1369) | 🔐 Jules02: Security hardening — HMAC-SHA256 signature verification for model files | xnessom | `jules02-security-hardening-model-signatures-17851897229134920353` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1367](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1367) | ⚡ Jules05: Workflow simplification — Comprehensive Log Update | yxynoty | `jules05/workflow-simplification-log-7413812354450014762` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1365](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1365) | feat: enhance rare event simulator with stochastic price paths and integration tests | saysgrok | `feat/rare-event-simulator-enhancements-10851597428787068158` | escalated-risk | pending | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [1359](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1359) | 💡 Jules02: CLI and operator UX improvement — Centralized loop control and observability | xnessom | `feat/jules-ux-improvements-17355899848812806450` | escalated-risk | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1358](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1358) | refine institutional decision support system | saysgrok | `jules/decision-support-refinement-14863980251247551831` | none | unknown | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -589,7 +589,7 @@
 ## ✨ Good Candidates for Review Today
 
 - **PR #1618**: chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu in the python-ml group (dependabot[bot]) [CI: pending] - *Safe Surface*
-- **PR #1608**: chore(deps): bump python-socketio from 4.6.1 to 5.16.2 (dependabot[bot]) [CI: pending] - *Safe Surface*
+- **PR #1608**: chore(deps): bump python-socketio from 4.6.1 to 5.16.2 (dependabot[bot]) [CI: pending] - *Medium Risk*
 - **PR #1543**: DX: improve developer onboarding and contribution experience (triqbit) [CI: pending] - *Safe Surface*
 - **PR #1528**: docs: improve developer onboarding and contribution experience (triqbit) [CI: pending] - *Safe Surface*
 
