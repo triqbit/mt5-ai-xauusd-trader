@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-07-12 14:21:34 UTC
+**Date:** 2026-07-13 13:17:08 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,16 +10,16 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `687f3ddc5e4ed2125a90603b2266018680b7975f` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `777b314ce7a6a8337851f193a1696ab8ce7259b4` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (559)
-3. **Re-validate Stale:** Review Safe Surface PR #1618 (chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu in the python-ml group)
+3. **Re-validate Stale:** Review Safe Surface PR #1649 (chore(deps): bump gymnasium from 1.0.0 to 1.3.0)
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
-| [1618](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1618) | chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu in the python-ml group | dependabot[bot] | `dependabot/pip/python-ml-6eeba57826` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1608](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1608) | chore(deps): bump python-socketio from 4.6.1 to 5.16.2 | dependabot[bot] | `dependabot/pip/python-socketio-5.16.2` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1653](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1653) | chore(deps): bump uvicorn from 0.50.0 to 0.51.0 | dependabot[bot] | `dependabot/pip/uvicorn-0.51.0` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1649](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1649) | chore(deps): bump gymnasium from 1.0.0 to 1.3.0 | dependabot[bot] | `dependabot/pip/gymnasium-1.3.0` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1576](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1576) | DX: improve developer onboarding and contribution experience | triqbit | `dx-improve-onboarding-credibility-5459078260715495313` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1543](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1543) | DX: improve developer onboarding and contribution experience | triqbit | `dx-daily-triage-2026-06-20-qufuwan-7504956792826488201` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1528](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1528) | docs: improve developer onboarding and contribution experience | triqbit | `dx-process-integrity-log-2026-06-16-5084547163796099815` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
@@ -588,8 +588,8 @@
 
 ## ✨ Good Candidates for Review Today
 
-- **PR #1618**: chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu in the python-ml group (dependabot[bot]) [CI: pending] - *Safe Surface*
-- **PR #1608**: chore(deps): bump python-socketio from 4.6.1 to 5.16.2 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1653**: chore(deps): bump uvicorn from 0.50.0 to 0.51.0 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1649**: chore(deps): bump gymnasium from 1.0.0 to 1.3.0 (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #1543**: DX: improve developer onboarding and contribution experience (triqbit) [CI: pending] - *Safe Surface*
 - **PR #1528**: docs: improve developer onboarding and contribution experience (triqbit) [CI: pending] - *Safe Surface*
 
