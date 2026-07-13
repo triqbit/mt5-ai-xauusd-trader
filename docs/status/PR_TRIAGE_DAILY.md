@@ -1,23 +1,24 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-07-13 13:17:08 UTC
+**Date:** 2026-07-13 13:30:42 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
-- High number of open PRs (559)
+- High number of open PRs (560)
 
 ---
 
 ## 🔝 Top 3 Items That Matter Right Now
 
 1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `777b314ce7a6a8337851f193a1696ab8ce7259b4` to ensure compatibility.
-2. **Address Turbulence:** High number of open PRs (559)
-3. **Re-validate Stale:** Review Safe Surface PR #1649 (chore(deps): bump gymnasium from 1.0.0 to 1.3.0)
+2. **Address Turbulence:** High number of open PRs (560)
+3. **Quick Win:** Review Safe PR #1657 (docs: update daily PR triage and merge-readiness checklist [2026-07-13])
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
+| [1657](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1657) | docs: update daily PR triage and merge-readiness checklist [2026-07-13] | triqbit | `dx-daily-triage-2026-07-13-qufuwan-2818206114030538799` | none | pending | Safe Surface | New |
 | [1653](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1653) | chore(deps): bump uvicorn from 0.50.0 to 0.51.0 | dependabot[bot] | `dependabot/pip/uvicorn-0.51.0` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1649](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1649) | chore(deps): bump gymnasium from 1.0.0 to 1.3.0 | dependabot[bot] | `dependabot/pip/gymnasium-1.3.0` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1576](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1576) | DX: improve developer onboarding and contribution experience | triqbit | `dx-improve-onboarding-credibility-5459078260715495313` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -37,7 +38,7 @@
 | [1372](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1372) | 🔧 Jules05: Resolve cross-agent conflict in Risk Management and Model interfaces | yxynoty | `Jules05-resolve-cross-agent-conflict-13854965436455603502` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1371](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1371) | 🧬 Jules02: Synthetic test scenarios — Risk reconciliation scenarios | xnessom | `jules02/risk-reconciliation-8990552146312303501` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1369](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1369) | 🔐 Jules02: Security hardening — HMAC-SHA256 signature verification for model files | xnessom | `jules02-security-hardening-model-signatures-17851897229134920353` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1367](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1367) | ⚡ Jules05: Workflow simplification — Comprehensive Log Update | yxynoty | `jules05/workflow-simplification-log-7413812354450014762` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1367](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1367) | ⚡ Jules05: Workflow simplification — Comprehensive Log Update | yxynoty | `jules05/workflow-simplification-log-7413812354450014762` | escalated-risk | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1365](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1365) | feat: enhance rare event simulator with stochastic price paths and integration tests | saysgrok | `feat/rare-event-simulator-enhancements-10851597428787068158` | escalated-risk | pending | Triage Required | ⚠️ Stale (Pre-Big-Bang) |
 | [1359](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1359) | 💡 Jules02: CLI and operator UX improvement — Centralized loop control and observability | xnessom | `feat/jules-ux-improvements-17355899848812806450` | escalated-risk | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1358](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1358) | refine institutional decision support system | saysgrok | `jules/decision-support-refinement-14863980251247551831` | none | unknown | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -582,7 +583,7 @@
 
 - **High Risk (New):** 0 PRs
 - **Medium Risk (New):** 0 PRs
-- **Safe Surface (New):** 0 PRs
+- **Safe Surface (New):** 1 PR
 - **Triage Required (New):** 0 PRs
 - **Stale (Total):** 559 PRs
 
