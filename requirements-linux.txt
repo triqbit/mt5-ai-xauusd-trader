@@ -58,7 +58,7 @@ hypothesis==6.156.6
 optuna==4.9.0
 pre-commit==4.6.0
 ruff==0.15.21
-mypy==2.1.0
+mypy==2.2.0
 
 # ── Utilities ───────────────────────────────────────────────
 python-socketio==4.6.1
