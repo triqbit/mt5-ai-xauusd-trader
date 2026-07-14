@@ -2731,3 +2731,30 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately until a manual audit is completed and a linear history is established.
 
 **Status:** 🔴 RED (Complete Governance Breakdown - 105th Consecutive History Graft & Rebase Target Erasure).
+
+## 2026-07-14 13:45 UTC
+
+**Summary:** 106th and 107th detected monolithic history grafts. Process integrity remains in total collapse. Traceability failure detected as mandatory rebase targets are erased within hours of being established.
+
+**Suspected Process Issues:**
+- **Persistent History Destruction:** The `main` branch remains a single-commit node (`79a2599`), representing the 107th consecutive node of total repository replacements.
+- **Traceability Black Hole:** A recurring critical failure in the automated workflow was observed. The Daily PR Triage Dashboard (updated July 13th at 14:30 UTC) established `efc9d4d6d1d80f7b274f2c49c45b323c71d617b6` as the mandatory rebase target. However, this commit was overwritten by PR #1659 (`79a2599`) shortly after its creation. This renders the rebase instructions for 559 open PRs invalid and impossible to follow, as the target object is immediately unreachable in the official history.
+- **Severe Labeling Drift (PR #1659):** Commit (`79a2599`) is titled "docs: update daily PR triage and merge-readiness checklist [2026-07-13] (#1659)", yet it replaced the entire repository (570 files, ~446,837 lines).
+- **Persistent Global CI Blockage:** CI remains hard-blocked on `main` by 13 persistent baseline linting errors (I001, E402, F841, RUF059, SIM117) in `migrations/env.py`, `scripts/doctor.py`, and `tests/test_doctor_diagnostics.py`. Merges continue to bypass all safety gates.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `79a2599` (replaces `efc9d4d`, `0306877`, and all prior history).
+- PR #1659: Latest total system swap (107th graft).
+- PR #1658: Intermediary graft (106th graft, commit `efc9d4d`), erased within minutes of its documentation in the dashboard.
+
+**Check Invariants:**
+- [x] Changes go through PRs (PR #1659 used).
+- [ ] CI must pass before merge (**VIOLATED**: Merges continue while CI is globally blocked by baseline lint errors).
+- [!] Risky domains are not being changed casually (**CRITICAL ALERT**: 100% of the repository, including core trading and risk logic, is being swapped daily with ZERO traceability).
+
+**Recommended Follow-ups:**
+- **HIGH PRIORITY — needs human review:** The frequency of monolithic grafts has reached a point where the automation's own rebase guidance is destroyed before it can be acted upon. Immediate human intervention is mandatory to restore linear history and stop the use of history-resetting grafts.
+- **Emergency Audit:** Line-by-line validation of `src/trading/` and `src/core/risk_manager.py` in `79a2599` is required.
+- **Halt All Grafts:** Disable all automated merge and history-resetting logic immediately until a manual audit is completed and a linear history is established.
+
+**Status:** 🔴 RED (Complete Governance Breakdown - 107th Consecutive History Graft & Rebase Target Erasure).

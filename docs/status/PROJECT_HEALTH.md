@@ -6,9 +6,9 @@ This dashboard provides real-time visibility into the technical health, process 
 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
-| **CI Success Rate** | 🔴 BLOCKED | CI hard-blocked by 6 linting errors in `migrations/env.py`. |
-| **PR Backlog** | 🔴 559 Stale | 100% of open PRs are stale relative to the 101st history graft. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (101 consecutive nodes). |
+| **CI Success Rate** | 🔴 BLOCKED | CI hard-blocked by 13 linting errors in `migrations/env.py`. |
+| **PR Backlog** | 🔴 559 Stale | 100% of open PRs are stale relative to the 107th history graft. |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (107 consecutive nodes). |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
 ---
@@ -17,7 +17,7 @@ This dashboard provides real-time visibility into the technical health, process 
 
 ### 🧪 CI & Testing
 - **Status:** 🔴 **BLOCKED**
-- **Issue:** Global CI blockage due to 6 linting errors in `migrations/env.py`.
+- **Issue:** Global CI blockage due to 13 linting errors in `migrations/env.py`.
 - **Integration Pass Rate:** 🟢 98.5% (Baseline verified June 12, 2026; subsequent merges bypass CI).
 
 ### 🧹 Code Quality (Ruff)
@@ -25,13 +25,13 @@ This dashboard provides real-time visibility into the technical health, process 
 - **Key Areas:**
   - `tests/`: 3,400+ issues (Unused imports, unformatted blocks) - *Deferred to avoid noise*.
   - `src/`: 0 issues (100% clean core).
-  - `migrations/`: 6 legacy formatting errors.
+  - `migrations/`: 13 baseline lint errors.
 - **Strategy:** Core is 100% clean; resolving `migrations/` lint errors is required to unblock CI.
 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
 - **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes.
-- **Current Node:** Commit `2e07891` (101st consecutive graft).
+- **Current Node:** Commit `79a2599` (107th consecutive graft).
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
