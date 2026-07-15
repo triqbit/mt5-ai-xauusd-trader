@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-07-14 14:22:29 UTC
+**Date:** 2026-07-15 13:17:05 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,15 +10,15 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `4d73fcebe6edff5a552d56c4fd68fbc27b9964b1` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `4f2c50e8a16de082a864e9b6fad83c36e767a62b` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (560)
-3. **Quick Win:** Review Safe PR #1661 (DX: update process integrity log and project health [2026-07-14])
+3. **Re-validate Stale:** Review Safe Surface PR #1661 (DX: update process integrity log and project health [2026-07-14])
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
-| [1661](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1661) | DX: update process integrity log and project health [2026-07-14] | triqbit | `dx-process-integrity-update-2026-07-14-12746976662363800520` | none | pending | Safe Surface | New |
+| [1661](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1661) | DX: update process integrity log and project health [2026-07-14] | triqbit | `dx-process-integrity-update-2026-07-14-12746976662363800520` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1653](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1653) | chore(deps): bump uvicorn from 0.50.0 to 0.51.0 | dependabot[bot] | `dependabot/pip/uvicorn-0.51.0` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1649](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1649) | chore(deps): bump gymnasium from 1.0.0 to 1.3.0 | dependabot[bot] | `dependabot/pip/gymnasium-1.3.0` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1576](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1576) | DX: improve developer onboarding and contribution experience | triqbit | `dx-improve-onboarding-credibility-5459078260715495313` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -583,9 +583,9 @@
 
 - **High Risk (New):** 0 PRs
 - **Medium Risk (New):** 0 PRs
-- **Safe Surface (New):** 1 PR
+- **Safe Surface (New):** 0 PRs
 - **Triage Required (New):** 0 PRs
-- **Stale (Total):** 559 PRs
+- **Stale (Total):** 560 PRs
 
 ## ✨ Good Candidates for Review Today
 
