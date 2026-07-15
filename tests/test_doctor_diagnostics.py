@@ -181,27 +181,30 @@ def test_check_venv_active():
 def test_check_venv_inactive():
     """Verify venv check warns when inactive."""
     # When prefix and base_prefix are same, it's not a venv
-    with patch("sys.prefix", "/usr"), \
-         patch("sys.base_prefix", "/usr"), \
-         patch("sys.real_prefix", create=True) as mock_real:
-
-        # Ensure real_prefix doesn't exist during the check
-        with patch("scripts.doctor.hasattr", side_effect=lambda obj, attr: False if attr == "real_prefix" else hasattr(obj, attr)):
-            res = doctor.check_venv()
-            assert res.status == "WARNING"
+    with (
+        patch("sys.prefix", "/usr"),
+        patch("sys.base_prefix", "/usr"),
+        patch("sys.real_prefix", create=True),
+        patch(
+            "scripts.doctor.hasattr",
+            side_effect=lambda obj, attr: False if attr == "real_prefix" else hasattr(obj, attr),
+        ),
+    ):
+        res = doctor.check_venv()
+        assert res.status == "WARNING"
 
 
 def test_check_disk_space_ok():
     """Verify disk space check passes when sufficient."""
     # return values for total, used, free
-    with patch("shutil.disk_usage", return_value=(100*(2**30), 10*(2**30), 10*(2**30))):
+    with patch("shutil.disk_usage", return_value=(100 * (2**30), 10 * (2**30), 10 * (2**30))):
         res = doctor.check_disk_space()
         assert res.status == "OK"
 
 
 def test_check_disk_space_failed():
     """Verify disk space check fails when critical."""
-    with patch("shutil.disk_usage", return_value=(100*(2**30), 99.9*(2**30), 0.1*(2**30))):
+    with patch("shutil.disk_usage", return_value=(100 * (2**30), 99.9 * (2**30), 0.1 * (2**30))):
         res = doctor.check_disk_space()
         assert res.status == "FAILED"
 
@@ -217,8 +220,10 @@ def test_get_triage_top_items():
 
 ## Summary Table
 """
-    with patch("scripts.doctor.Path.exists", return_value=True), \
-         patch("scripts.doctor.Path.read_text", return_value=mock_content):
+    with (
+        patch("scripts.doctor.Path.exists", return_value=True),
+        patch("scripts.doctor.Path.read_text", return_value=mock_content),
+    ):
         items = doctor.get_triage_top_items()
         assert len(items) == 3
         assert "Mandatory Rebase: Rebase required." in items[0]
