@@ -181,14 +181,18 @@ def test_check_venv_active():
 def test_check_venv_inactive():
     """Verify venv check warns when inactive."""
     # When prefix and base_prefix are same, it's not a venv
-    with patch("sys.prefix", "/usr"), \
-         patch("sys.base_prefix", "/usr"), \
-         patch("sys.real_prefix", create=True) as mock_real:
-
+    with (
+        patch("sys.prefix", "/usr"),
+        patch("sys.base_prefix", "/usr"),
+        patch("sys.real_prefix", create=True),
         # Ensure real_prefix doesn't exist during the check
-        with patch("scripts.doctor.hasattr", side_effect=lambda obj, attr: False if attr == "real_prefix" else hasattr(obj, attr)):
-            res = doctor.check_venv()
-            assert res.status == "WARNING"
+        patch(
+            "scripts.doctor.hasattr",
+            side_effect=lambda obj, attr: (False if attr == "real_prefix" else hasattr(obj, attr)),
+        ),
+    ):
+        res = doctor.check_venv()
+        assert res.status == "WARNING"
 
 
 def test_check_disk_space_ok():
