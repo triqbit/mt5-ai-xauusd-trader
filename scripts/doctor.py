@@ -77,9 +77,7 @@ def check_python_version():
 
 def check_venv():
     """Verify if the script is running inside a virtual environment."""
-    if hasattr(sys, "real_prefix") or (
-        base_prefix := getattr(sys, "base_prefix", sys.prefix)
-    ) != sys.prefix:
+    if hasattr(sys, "real_prefix") or getattr(sys, "base_prefix", sys.prefix) != sys.prefix:
         return DiagnosticCheck("Virtual Environment", "OK", f"Active: {sys.prefix}")
     else:
         return DiagnosticCheck(
@@ -95,7 +93,7 @@ def check_disk_space():
     try:
         import shutil
 
-        total, used, free = shutil.disk_usage(".")
+        _, _, free = shutil.disk_usage(".")
         free_gb = free / (2**30)
         msg = f"{free_gb:.2f} GB available"
         if free_gb < 0.5:
