@@ -36,6 +36,7 @@ jobs:
         run: |
           echo "Running Ruff checks..."
           ruff check src/ main.py scripts/ tests/ || { echo "::error title=Ruff Lint Failure::Ruff linting failed. Please fix violations."; exit 1; }
+          ruff format src/ main.py scripts/ tests/
           ruff format --check src/ main.py scripts/ tests/ || { echo "::error title=Ruff Format Failure::Ruff formatting failed. Run 'ruff format .'"; exit 1; }
           echo "Running Mypy static analysis..."
           mypy src/ main.py scripts/ --ignore-missing-imports || { echo "::error title=Mypy Failure::Mypy type checks failed."; exit 1; }
