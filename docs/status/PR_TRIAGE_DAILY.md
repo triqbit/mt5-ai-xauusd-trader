@@ -1,23 +1,24 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-07-19 13:15:56 UTC
+**Date:** 2026-07-19 14:29:49 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
-- High number of open PRs (561)
+- High number of open PRs (562)
 
 ---
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `05b7d6a64bc9e2995f0161228ff795ba51e40ec2` to ensure compatibility.
-2. **Address Turbulence:** High number of open PRs (561)
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `d636a05c55f0ed3f3db94457bf9c9d4e4bf9c487` to ensure compatibility.
+2. **Address Turbulence:** High number of open PRs (562)
 3. **Re-validate Stale:** Review Safe Surface PR #1672 (chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu)
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
+| [1681](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1681) | feat(atlas): implement multi-agent LLM macro overlay architecture | showmeyourmind | `feature/atlas-hybrid-integration` | none | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1672](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1672) | chore(deps): bump torch from 2.12.0+cpu to 2.12.1+cpu | dependabot[bot] | `dependabot/pip/torch-2.12.1cpu` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1661](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1661) | DX: update process integrity log and project health [2026-07-14] | triqbit | `dx-process-integrity-update-2026-07-14-12746976662363800520` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1653](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1653) | chore(deps): bump uvicorn from 0.50.0 to 0.51.0 | dependabot[bot] | `dependabot/pip/uvicorn-0.51.0` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -586,7 +587,7 @@
 - **Medium Risk (New):** 0 PRs
 - **Safe Surface (New):** 0 PRs
 - **Triage Required (New):** 0 PRs
-- **Stale (Total):** 561 PRs
+- **Stale (Total):** 562 PRs
 
 ## ✨ Good Candidates for Review Today
 
