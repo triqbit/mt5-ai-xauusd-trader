@@ -86,6 +86,8 @@ include = ["src*"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = ["tests", "scripts"]
+force-exclude = true
 
 [tool.ruff.format]
 # ruff format is the black-compatible formatter
