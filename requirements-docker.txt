@@ -11,7 +11,7 @@ gymnasium==1.0.0
 numpy==1.26.4
 scipy==1.15.0
 scikit-learn==1.6.0
-pandas==2.2.3
+pandas==2.3.3
 
 # -- Technical Analysis --------------------------------------
 TA-Lib==0.7.0
