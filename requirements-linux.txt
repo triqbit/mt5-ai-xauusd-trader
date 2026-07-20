@@ -16,7 +16,7 @@ pandas==2.3.3
 # ── Deep Learning Extras ────────────────────────────────────
 
 # ── Technical Analysis ──────────────────────────────────────
-TA-Lib==0.7.0
+TA-Lib==0.7.1
 
 # ── Data Acquisition ────────────────────────────────────────
 requests==2.34.2
