@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `e7d4135a57e12576e5ff45bebaf519283ae4887a` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `9582786cad437dbf514e7659accf19b576859f35` is required for all PRs.**
 
-Generated on: 2026-07-20 13:18:43 UTC
+Generated on: 2026-07-20 18:00:00 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,22 +11,22 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Safe Surface update implementing 'DX: update process integrity log and project health [2026-07-14]' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `e7d4135a57e12576e5ff45bebaf519283ae4887a`
-- **Recommendation**: Needs CI success before merge
+- **Missing items**: Mandatory rebase against commit `9582786cad437dbf514e7659accf19b576859f35`
+- **Recommendation**: Needs CI success before merge. Candidate for detailed review once rebased.
 
 ## 2. PR #1653: chore(deps): bump uvicorn from 0.50.0 to 0.51.0
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump uvicorn from 0.50.0 to 0.51.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `e7d4135a57e12576e5ff45bebaf519283ae4887a`, tests, docs
-- **Recommendation**: Needs CI success before merge
+- **Missing items**: Mandatory rebase against commit `9582786cad437dbf514e7659accf19b576859f35`, tests, docs
+- **Recommendation**: Needs CI success before merge. Candidate for review.
 
 ## 3. PR #1649: chore(deps): bump gymnasium from 1.0.0 to 1.3.0
 - **Short scope summary**: Safe Surface update implementing 'chore(deps): bump gymnasium from 1.0.0 to 1.3.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `e7d4135a57e12576e5ff45bebaf519283ae4887a`
-- **Recommendation**: Needs CI success before merge
+- **Missing items**: Mandatory rebase against commit `9582786cad437dbf514e7659accf19b576859f35`
+- **Recommendation**: Needs CI success before merge. Candidate for review.
 
 ---
 *Prepared by Jules06 (qufuwan) for Jules05 and human review.*
