@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-07-23 13:32:40 UTC
+**Date:** 2026-07-23 14:20:50 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,7 +10,7 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `04882b628a3059e07fceb072194ab7a2d93f428c` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `a6d6911bb2b2844c72f7d3f528ebf591527b2cbd` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (562)
 3. **Re-validate Stale:** Review Safe Surface PR #1697 (docs: update process integrity log [2026-07-21])
 
@@ -21,7 +21,7 @@
 | [1697](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1697) | docs: update process integrity log [2026-07-21] | triqbit | `process-integrity-log-2026-07-21-qufuwan-17949035639015288261` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1681](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1681) | feat(atlas): implement multi-agent LLM macro overlay architecture | showmeyourmind | `feature/atlas-hybrid-integration` | none | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1661](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1661) | DX: update process integrity log and project health [2026-07-14] | triqbit | `dx-process-integrity-update-2026-07-14-12746976662363800520` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1653](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1653) | chore(deps): bump uvicorn from 0.50.0 to 0.51.0 | dependabot[bot] | `dependabot/pip/uvicorn-0.51.0` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1653](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1653) | chore(deps): bump uvicorn from 0.50.0 to 0.51.0 | dependabot[bot] | `dependabot/pip/uvicorn-0.51.0` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1649](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1649) | chore(deps): bump gymnasium from 1.0.0 to 1.3.0 | dependabot[bot] | `dependabot/pip/gymnasium-1.3.0` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1576](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1576) | DX: improve developer onboarding and contribution experience | triqbit | `dx-improve-onboarding-credibility-5459078260715495313` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1543](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1543) | DX: improve developer onboarding and contribution experience | triqbit | `dx-daily-triage-2026-06-20-qufuwan-7504956792826488201` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
@@ -593,7 +593,7 @@
 
 - **PR #1697**: docs: update process integrity log [2026-07-21] (triqbit) [CI: pending] - *Safe Surface*
 - **PR #1661**: DX: update process integrity log and project health [2026-07-14] (triqbit) [CI: pending] - *Safe Surface*
-- **PR #1653**: chore(deps): bump uvicorn from 0.50.0 to 0.51.0 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1653**: chore(deps): bump uvicorn from 0.50.0 to 0.51.0 (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #1649**: chore(deps): bump gymnasium from 1.0.0 to 1.3.0 (dependabot[bot]) [CI: pending] - *Safe Surface*
 
 ---
