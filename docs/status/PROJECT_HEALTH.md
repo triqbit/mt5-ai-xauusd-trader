@@ -7,8 +7,8 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🔴 BLOCKED | CI hard-blocked by 13 linting errors in `migrations/env.py` and `scripts/`. |
-| **PR Backlog** | 🔴 562 Stale | 100% of open PRs are stale relative to the 127th history graft. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (127 consecutive nodes). |
+| **PR Backlog** | 🔴 562 Stale | 100% of open PRs are stale relative to the 128th history graft. |
+| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (128 consecutive nodes). |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
 ---
@@ -17,7 +17,7 @@ This dashboard provides real-time visibility into the technical health, process 
 
 ### 🧪 CI & Testing
 - **Status:** 🔴 **BLOCKED**
-- **Issue:** Global CI blockage due to 8 persistent linting errors.
+- **Issue:** Global CI blockage due to 8 persistent linting errors in migrations/env.py.
 - **Integration Pass Rate:** 🟢 98.5% (Baseline verified June 12, 2026; subsequent merges bypass CI).
 
 ### 🧹 Code Quality (Ruff)
@@ -26,13 +26,13 @@ This dashboard provides real-time visibility into the technical health, process 
   - `tests/`: 3,400+ issues (Unused imports, unformatted blocks) - *Deferred to avoid noise*.
   - `src/`: 0 issues (100% clean core).
   - `migrations/`: 6 legacy formatting errors.
-  - `scripts/`: 2 persistent linting errors.
-- **Strategy:** Core is 100% clean; resolving baseline lint errors is required to unblock CI.
+  - `scripts/`: 0 persistent linting errors (100% clean).
+- **Strategy:** Core and scripts are 100% clean; resolving baseline lint errors in migrations is required to unblock CI.
 
 ### 📜 Process Integrity
 - **Status:** 🔴 **CRITICAL**
 - **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes.
-- **Current Node:** Commit `e308f62d8260a2ec54f4023d44338c63ff457372` (127th consecutive graft).
+- **Current Node:** Commit `eee73fe37281c21feb7ccfcbfa4216964391ad5c` (128th consecutive graft).
 - **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
@@ -44,9 +44,9 @@ This dashboard provides real-time visibility into the technical health, process 
 | :--- | :--- | :--- |
 | [Enterprise Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md) | Compliance | ✅ Active |
 | [Technical Evidence Index](../audits/README.md) | Navigator | ✅ Active |
-| [Integration Test Results](../testing/INTEGRATION_TEST_RESULTS.md) | System Quality | ✅ Verified (2026-07-23) |
-| [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ✅ Verified (2026-07-23) |
-| Architecture Quick-Start | System Map | ✅ Verified (2026-07-23) |
+| [Integration Test Results](../testing/INTEGRATION_TEST_RESULTS.md) | System Quality | ✅ Verified (2026-07-25) |
+| [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ✅ Verified (2026-07-25) |
+| Architecture Quick-Start | System Map | ✅ Verified (2026-07-25) |
 
 ---
 
