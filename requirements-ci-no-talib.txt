@@ -20,6 +20,7 @@ pydantic-settings==2.14.2
 
 # -- MetaTrader 5 (Cloud Fallback) ---------------------------------
 metaapi-cloud-sdk==29.1.1
+tickerall>=0.1.16
 
 # -- Testing -------------------------------------------------------
 python-socketio==4.6.1
