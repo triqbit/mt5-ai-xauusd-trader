@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `93193254b6b927d0380ff98d53dd5af8ca98830d` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `bd31b074c53f51b26f01e6c349f862cefb2c9b83` is required for all PRs.**
 
-Generated on: 2026-07-26 13:08:28 UTC
+Generated on: 2026-07-26 14:33:55 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Safe Surface update implementing 'docs: update process integrity log [2026-07-21]' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `93193254b6b927d0380ff98d53dd5af8ca98830d`
+- **Missing items**: Mandatory rebase against commit `bd31b074c53f51b26f01e6c349f862cefb2c9b83`
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1661: DX: update process integrity log and project health [2026-07-14]
 - **Short scope summary**: Safe Surface update implementing 'DX: update process integrity log and project health [2026-07-14]' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `93193254b6b927d0380ff98d53dd5af8ca98830d`
+- **Missing items**: Mandatory rebase against commit `bd31b074c53f51b26f01e6c349f862cefb2c9b83`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1653: chore(deps): bump uvicorn from 0.50.0 to 0.51.0
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump uvicorn from 0.50.0 to 0.51.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `93193254b6b927d0380ff98d53dd5af8ca98830d`, tests, docs
+- **Missing items**: Mandatory rebase against commit `bd31b074c53f51b26f01e6c349f862cefb2c9b83`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ---
