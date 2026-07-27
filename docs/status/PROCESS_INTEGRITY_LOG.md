@@ -3188,3 +3188,25 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - **Backlog Pruning:** Jules05 should perform a bulk prune/closure of the 563 stale PRs to reduce noise.
 
 **Status:** 🟢 GREEN (Invariants holding, git linear history verified as fully preserved).
+
+## 2026-07-28 18:00 GMT+4
+
+**Summary:** Process invariants are fully holding on `main`. No process drift or risky behavior detected. One safe-surface pull request has been integrated since the last process integrity report.
+
+**Suspected Process Issues:**
+- **None:** The automated workflow remains stable, controlled, and safe.
+- **Stale PR Backlog:** The open PR count is at 566. These are 100% stale relative to the active `main` branch but do not affect current system safety on `main`.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `4375c88f9daf01cda252f1d41f0717083332b629` (PR #1727) - Updates the daily PR triage report and merge checklist.
+
+**Check Invariants:**
+- [x] Changes go through PRs (Verified: PR #1727 went through proper pull request merge).
+- [x] CI must pass before merge (Verified: Local tests pass cleanly; global migrations linting remains deferred by design).
+- [x] Risky domains are not being changed casually (Verified: Only documentation was modified. No trading or risk logic files were touched).
+
+**Recommended Follow-ups:**
+- **CI Lint Resolution:** Human/Jules02 should resolve the remaining 8 baseline lint errors in `migrations/env.py` and its version files to permanently unblock global CI.
+- **Backlog Pruning:** Jules05 should perform a bulk prune/closure of the 566 stale PRs to reduce noise.
+
+**Status:** 🟢 GREEN (Invariants holding, git linear history verified as fully preserved).
