@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `5698f7b7f7dc1df30012d044a44c6d0fb5e6e964` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `16014eceb84c4f18ea3fcbb5f5ad747dd63e69b6` is required for all PRs.**
 
-Generated on: 2026-07-29 14:11:28 UTC
+Generated on: 2026-07-30 13:11:39 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `5698f7b7f7dc1df30012d044a44c6d0fb5e6e964`, tests, docs
+- **Missing items**: Mandatory rebase against commit `16014eceb84c4f18ea3fcbb5f5ad747dd63e69b6`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1723: chore(deps): bump prometheus-client from 0.25.0 to 0.26.0
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump prometheus-client from 0.25.0 to 0.26.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `5698f7b7f7dc1df30012d044a44c6d0fb5e6e964`, tests, docs
+- **Missing items**: Mandatory rebase against commit `16014eceb84c4f18ea3fcbb5f5ad747dd63e69b6`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1721: chore(deps): bump fastapi from 0.139.2 to 0.140.0
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump fastapi from 0.139.2 to 0.140.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `5698f7b7f7dc1df30012d044a44c6d0fb5e6e964`, tests, docs
+- **Missing items**: Mandatory rebase against commit `16014eceb84c4f18ea3fcbb5f5ad747dd63e69b6`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ---
