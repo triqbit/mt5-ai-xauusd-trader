@@ -49,6 +49,11 @@ git rebase --onto origin/main <old-base-commit> <your-branch-name>
   - `hotfix/`: Emergency production patches directly against `main`
   - `docs/`: Documentation-only improvements
   - `refactor/`: Code reorganization without functional changes
+  - `chore/`: Tasks and developer tools checks (e.g., `chore/add-doctor-checks`)
+  - `test/`: Adding or updating tests (e.g., `test/doctor-coverage`)
+  - `ci/`: Developer workflow and CI configurations (e.g., `ci/harden-checks`)
+  - `perf/`: Performance optimization changes (e.g., `perf/vectorize-sma`)
+  - `style/`: Non-functional style, formatting, or lint-only fixes (e.g., `style: run-ruff-formatter`)
 - **Conventional Commits:** All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat:`, `fix:`, `docs:`, `chore:`, `security:`). This enables automated changelog generation and versioning.
 - **Standards:** Adhere to [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) for linting, typing, and documentation.
 
