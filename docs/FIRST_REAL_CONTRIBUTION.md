@@ -28,6 +28,8 @@ Our repository enforces a strict semantic pull request check using the `amannn/a
 > - `chore:` for developer tool scripts and auxiliary tasks (e.g., `chore: add directory validation check to doctor`)
 > - `test:` for writing or updating unit tests (e.g., `test: add unit tests for doctor checks`)
 > - `fix:` for fixing developer experience utilities (e.g., `fix: resolve doctor syntax error`)
+- `perf:` for performance optimizations (e.g., `perf: optimize vector loops in indicator checks`)
+- `style:` for style, formatting, or lint-only fixes (e.g., `style: run ruff format on doctor`)
 
 ---
 
@@ -158,7 +160,7 @@ Ensure all tests pass and your new check is outputted cleanly!
 
 Before submitting your PR:
 
-1.  **Branch Prefix:** Ensure your branch has a valid prefix (`feature/`, `bugfix/`, `docs/`, `chore/`).
+1.  **Branch Prefix:** Ensure your branch has a valid prefix (`feature/`, `bugfix/`, `hotfix/`, `docs/`, `refactor/`, `chore/`, `test/`, `ci/`, `perf/`, `style/`).
 2.  **Conventional Commits:** Commit your change with an approved semantic type (e.g., `chore: add workspace directory checks to doctor`).
 3.  **Run Governance Suite:** Run the project's governance validator to ensure all files match expectations:
     ```bash
