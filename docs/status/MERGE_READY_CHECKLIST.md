@@ -1,31 +1,31 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `4c1ee90e9da4b1e258fb3876022eae6028db6864` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `8c0ca5ac7e29c40c70de0e702a55568637848101` is required for all PRs.**
 
-Generated on: 2026-08-01 11:10:26 UTC
+Generated on: 2026-08-01 13:25:04 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
 ## 1. PR #1725: chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724
-- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724' (Candidate for re-validation/review)
-- **Domains touched**: dependencies
+- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724' (Candidate for re-validation/review)
+- **Domains touched**: chore, dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `4c1ee90e9da4b1e258fb3876022eae6028db6864`, tests, docs
+- **Missing items**: Mandatory rebase against commit `8c0ca5ac7e29c40c70de0e702a55568637848101`
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1697: docs: update process integrity log [2026-07-21]
 - **Short scope summary**: Safe Surface update implementing 'docs: update process integrity log [2026-07-21]' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `4c1ee90e9da4b1e258fb3876022eae6028db6864`
+- **Missing items**: Mandatory rebase against commit `8c0ca5ac7e29c40c70de0e702a55568637848101`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1661: DX: update process integrity log and project health [2026-07-14]
 - **Short scope summary**: Safe Surface update implementing 'DX: update process integrity log and project health [2026-07-14]' (Candidate for re-validation/review)
-- **Domains touched**: docs
+- **Domains touched**: docs, infra/scripts
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `4c1ee90e9da4b1e258fb3876022eae6028db6864`
+- **Missing items**: Mandatory rebase against commit `8c0ca5ac7e29c40c70de0e702a55568637848101`
 - **Recommendation**: Needs CI success before merge
 
 ---
