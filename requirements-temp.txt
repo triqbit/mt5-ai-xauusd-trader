@@ -32,7 +32,7 @@ alembic==1.14.0
 redis==5.2.0
 
 # ── Monitoring & Logging ────────────────────────────────────
-prometheus-client==0.25.0
+prometheus-client==0.26.0
 structlog==26.1.0
 rich==13.9.4
 tqdm==4.68.4
