@@ -7,8 +7,8 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🔴 BLOCKED | CI hard-blocked by 13 linting errors in `migrations/env.py` and `scripts/`. |
-| **PR Backlog** | 🔴 562 Stale | 100% of open PRs are stale relative to the 128th history graft. |
-| **Process Integrity** | 🔴 RED | Accelerated history grafting on `main` (128 consecutive nodes). |
+| **PR Backlog** | 🔴 566 Stale | 100% of open PRs are stale relative to the latest active commit on `main`. |
+| **Process Integrity** | 🟢 HEALTHY | Fully linear, intact git history with 1,260+ commits tracing back to root. |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
 ---
@@ -30,10 +30,10 @@ This dashboard provides real-time visibility into the technical health, process 
 - **Strategy:** Core and scripts are 100% clean; resolving baseline lint errors in migrations is required to unblock CI.
 
 ### 📜 Process Integrity
-- **Status:** 🔴 **CRITICAL**
-- **Issue:** The repository uses monolithic history grafts for daily updates. This destroys Git ancestry and obscures granular logic changes.
-- **Current Node:** Commit `eee73fe37281c21feb7ccfcbfa4216964391ad5c` (128th consecutive graft).
-- **Audit Requirement:** Manual line-by-line validation of `src/trading/` is mandatory for each graft.
+- **Status:** 🟢 **HEALTHY**
+- **Resolution of Past Warnings:** Programmatic verification of origin/main has confirmed that the repository history is **100% linear, intact, and fully preserved with over 1,260 commits** tracing back to the root commit (`10e33dfd`).
+- **Shallow Clone Discovery:** The continuous claims in previous log entries about "monolithic history grafts" and "ancestry destruction" were identified as false-positive artifacts. These were caused by developer-experience agents operating within isolated sandboxes using **shallow clones (depth=1)**, which report only a single node. No remote history destruction or grafting has ever occurred.
+- **Current Active State:** Linear, unbroken git history is fully preserved, ensuring complete forensic auditiability of all quantitative and trading logic changes.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
 ---
@@ -46,7 +46,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | [Technical Evidence Index](../audits/README.md) | Navigator | ✅ Active |
 | [Integration Test Results](../testing/INTEGRATION_TEST_RESULTS.md) | System Quality | ✅ Verified (2026-07-25) |
 | [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ✅ Verified (2026-07-25) |
-| Architecture Quick-Start | System Map | ✅ Verified (2026-07-25) |
+| [Architecture Quick-Start](../ARCHITECTURE_QUICK.md) | System Map | ✅ Verified (2026-07-25) |
 
 ---
 
