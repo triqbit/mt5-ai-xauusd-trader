@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-08-01 11:10:26 UTC
+**Date:** 2026-08-01 13:25:04 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,7 +10,7 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `4c1ee90e9da4b1e258fb3876022eae6028db6864` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `8c0ca5ac7e29c40c70de0e702a55568637848101` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (563)
 3. **Re-validate Stale:** Review Safe Surface PR #1740 (docs: update daily merge-readiness checklist and PR triage [2026-07-31])
 
@@ -19,7 +19,7 @@
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
 | [1740](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1740) | docs: update daily merge-readiness checklist and PR triage [2026-07-31] | triqbit | `main-16126816414089982301` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1725](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1725) | chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724 | dependabot[bot] | `dependabot/pip/types-setuptools-83.0.0.20260724` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1725](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1725) | chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724 | dependabot[bot] | `dependabot/pip/types-setuptools-83.0.0.20260724` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1712](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1712) | Add optional TickerAll hosted MT5 API path to MT5Connector | miguelangelo78 | `tickerall-provider` | none | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1697](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1697) | docs: update process integrity log [2026-07-21] | triqbit | `process-integrity-log-2026-07-21-qufuwan-17949035639015288261` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1681](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1681) | feat(atlas): implement multi-agent LLM macro overlay architecture | showmeyourmind | `feature/atlas-hybrid-integration` | none | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -592,7 +592,7 @@
 
 ## ✨ Good Candidates for Review Today
 
-- **PR #1725**: chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1725**: chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724 (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #1697**: docs: update process integrity log [2026-07-21] (triqbit) [CI: pending] - *Safe Surface*
 - **PR #1661**: DX: update process integrity log and project health [2026-07-14] (triqbit) [CI: pending] - *Safe Surface*
 - **PR #1543**: DX: improve developer onboarding and contribution experience (triqbit) [CI: pending] - *Safe Surface*
