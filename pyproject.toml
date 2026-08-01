@@ -33,7 +33,7 @@ dependencies = [
     "prometheus-client==0.26.0",
     "structlog==26.1.0",
     "rich==13.9.4",
-    "tqdm==4.68.4",
+    "tqdm==4.70.0",
     "jinja2==3.1.6",
     "fastapi==0.139.2",
     "uvicorn[standard]==0.50.0",
