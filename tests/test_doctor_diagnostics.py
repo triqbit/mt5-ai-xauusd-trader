@@ -137,11 +137,24 @@ def test_check_git_config_missing():
 
 def test_check_branch_naming_valid():
     """Verify branch naming check passes for valid prefixes."""
-    with patch("subprocess.run") as mock_run:
-        mock_run.return_value = MagicMock(stdout="feature/test-branch\n")
-        res = doctor.check_branch_naming()
-        assert res.status == "OK"
-        assert "Valid prefix" in res.message
+    valid_branches = [
+        "feature/test-branch",
+        "bugfix/some-fix",
+        "hotfix/emergency",
+        "docs/update-guide",
+        "refactor/optimize",
+        "chore/deps",
+        "test/add-tests",
+        "ci/fix-pipeline",
+        "perf/speedup",
+        "style/format",
+    ]
+    for branch_name in valid_branches:
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(stdout=f"{branch_name}\n")
+            res = doctor.check_branch_naming()
+            assert res.status == "OK", f"Expected {branch_name} to be valid"
+            assert "Valid prefix" in res.message
 
 
 def test_check_branch_naming_invalid():

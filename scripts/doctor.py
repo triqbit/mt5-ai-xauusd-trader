@@ -499,7 +499,18 @@ def check_branch_naming():
         if branch == "main" or branch == "develop":
             return DiagnosticCheck("Branch Naming", "OK", f"On protected branch: {branch}")
 
-        prefixes = ["feature/", "bugfix/", "hotfix/", "docs/", "refactor/", "chore/"]
+        prefixes = [
+            "feature/",
+            "bugfix/",
+            "hotfix/",
+            "docs/",
+            "refactor/",
+            "chore/",
+            "test/",
+            "ci/",
+            "perf/",
+            "style/",
+        ]
         if any(branch.startswith(p) for p in prefixes):
             return DiagnosticCheck("Branch Naming", "OK", f"Valid prefix: {branch}")
         else:
