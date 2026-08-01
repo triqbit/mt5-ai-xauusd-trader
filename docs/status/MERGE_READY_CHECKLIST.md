@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `6e55f8f63c7a474cbe9794717a45061ffa539ee5` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `4c1ee90e9da4b1e258fb3876022eae6028db6864` is required for all PRs.**
 
-Generated on: 2026-07-31 13:31:32 UTC
+Generated on: 2026-08-01 11:10:26 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `6e55f8f63c7a474cbe9794717a45061ffa539ee5`, tests, docs
+- **Missing items**: Mandatory rebase against commit `4c1ee90e9da4b1e258fb3876022eae6028db6864`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
-## 2. PR #1723: chore(deps): bump prometheus-client from 0.25.0 to 0.26.0
-- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump prometheus-client from 0.25.0 to 0.26.0' (Candidate for re-validation/review)
-- **Domains touched**: dependencies
+## 2. PR #1697: docs: update process integrity log [2026-07-21]
+- **Short scope summary**: Safe Surface update implementing 'docs: update process integrity log [2026-07-21]' (Candidate for re-validation/review)
+- **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `6e55f8f63c7a474cbe9794717a45061ffa539ee5`, tests, docs
+- **Missing items**: Mandatory rebase against commit `4c1ee90e9da4b1e258fb3876022eae6028db6864`
 - **Recommendation**: Needs CI success before merge
 
-## 3. PR #1721: chore(deps): bump fastapi from 0.139.2 to 0.140.0
-- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump fastapi from 0.139.2 to 0.140.0' (Candidate for re-validation/review)
-- **Domains touched**: dependencies
+## 3. PR #1661: DX: update process integrity log and project health [2026-07-14]
+- **Short scope summary**: Safe Surface update implementing 'DX: update process integrity log and project health [2026-07-14]' (Candidate for re-validation/review)
+- **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `6e55f8f63c7a474cbe9794717a45061ffa539ee5`, tests, docs
+- **Missing items**: Mandatory rebase against commit `4c1ee90e9da4b1e258fb3876022eae6028db6864`
 - **Recommendation**: Needs CI success before merge
 
 ---
