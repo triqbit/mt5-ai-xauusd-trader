@@ -11,10 +11,12 @@ from src.trading.mt5_connector import MT5Connector
 def mock_config():
     return TradingConfig(MT5_PASSWORD="test", MT5_SERVER="test")
 
+
 def test_connector_init(mock_config):
     connector = MT5Connector(mock_config)
     assert connector.cfg == mock_config
     assert not connector._is_initialized
+
 
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
@@ -24,6 +26,7 @@ def test_native_initialization(mock_mt5, mock_config):
     assert connector.initialize()
     assert connector._is_initialized
     assert not connector.use_metaapi
+
 
 @patch("src.trading.mt5_connector.MetaApi")
 @patch("src.trading.mt5_connector.METAAPI_AVAILABLE", True)
@@ -43,6 +46,7 @@ def test_metaapi_fallback(mock_metaapi, mock_config):
         assert connector.use_metaapi
         assert connector._is_initialized
 
+
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
 def test_place_order_native(mock_mt5, mock_config):
@@ -58,7 +62,7 @@ def test_place_order_native(mock_mt5, mock_config):
         take_profit=2320.0,
         lot_size=0.1,
         algorithm="ppo",
-        confidence=0.8
+        confidence=0.8,
     )
 
     mock_mt5.symbol_info_tick.return_value = MagicMock(ask=2300.0, bid=2299.0)

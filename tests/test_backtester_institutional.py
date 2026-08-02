@@ -15,6 +15,7 @@ from src.trading.backtester import BacktestEngine
 
 class InstitutionalMockModel:
     """Mock model that returns a steady signal for institutional testing."""
+
     def predict(self, obs):
         return type("Signal", (), {"direction": 1, "confidence": 0.95})
 
@@ -52,17 +53,13 @@ def test_institutional_engine_logic(institutional_data):
         initial_balance=50000.0,
         spread=0.1,
         commission_per_lot=5.0,
-        execution_filter=mock_ef
+        execution_filter=mock_ef,
     )
 
     model = InstitutionalMockModel()
 
     report = engine.run_walk_forward(
-        institutional_data,
-        model,
-        train_window=200,
-        test_window=100,
-        step_size=100
+        institutional_data, model, train_window=200, test_window=100, step_size=100
     )
 
     # Validation checks
@@ -77,6 +74,7 @@ def test_institutional_engine_logic(institutional_data):
     assert report.mae_avg >= 0
     assert report.mfe_avg >= 0
 
+
 def test_institutional_cost_calculation(institutional_data):
     """Verifies that commission and spread are correctly deducted from P&L."""
     mock_ef = MagicMock()
@@ -89,18 +87,14 @@ def test_institutional_cost_calculation(institutional_data):
         initial_balance=10000.0,
         spread=spread,
         commission_per_lot=commission,
-        execution_filter=mock_ef
+        execution_filter=mock_ef,
     )
 
     model = InstitutionalMockModel()
 
     # Run a small slice
     engine.run_walk_forward(
-        institutional_data.iloc[:500],
-        model,
-        train_window=100,
-        test_window=50,
-        step_size=50
+        institutional_data.iloc[:500], model, train_window=100, test_window=50, step_size=50
     )
 
     if engine.trades:
