@@ -28,7 +28,7 @@ metaapi-cloud-sdk==29.1.1
 psycopg2-binary==2.9.12
 sqlalchemy==2.0.51
 alembic==1.14.0
-redis==5.2.0
+redis==8.1.0
 
 # -- Monitoring & Logging ------------------------------------
 prometheus-client==0.26.0
