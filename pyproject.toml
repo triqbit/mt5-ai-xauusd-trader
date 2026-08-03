@@ -19,7 +19,7 @@ dependencies = [
     "stable-baselines3==2.5.0",
     "gymnasium==1.0.0",
     "numpy==2.2.6",
-    "scipy==1.15.0",
+    "scipy==1.15.3",
     "scikit-learn==1.6.0",
     "pandas==2.3.3",
     "TA-Lib==0.7.1",
