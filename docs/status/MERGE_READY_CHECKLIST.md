@@ -1,31 +1,31 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `f5836a3914d2c12b690e31fc0a35ac34b46c997a` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `c32de6f68042e5be9640604f09cbeeefa6062b19` is required for all PRs.**
 
-Generated on: 2026-08-03 13:55:38 UTC
+Generated on: 2026-08-04 18:00:00 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
 ## 1. PR #1757: chore(deps): bump fastapi from 0.140.13 to 0.141.1
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump fastapi from 0.140.13 to 0.141.1' (Candidate for re-validation/review)
-- **Domains touched**: dependencies
+- **Domains touched**: chore, dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `f5836a3914d2c12b690e31fc0a35ac34b46c997a`, tests, docs
+- **Missing items**: Mandatory rebase against commit `c32de6f68042e5be9640604f09cbeeefa6062b19`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1754: chore(deps): bump hypothesis from 6.161.5 to 6.164.0
-- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump hypothesis from 6.161.5 to 6.164.0' (Candidate for re-validation/review)
-- **Domains touched**: dependencies
+- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump hypothesis from 6.161.5 to 6.164.0' (Candidate for re-validation/review)
+- **Domains touched**: chore, dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `f5836a3914d2c12b690e31fc0a35ac34b46c997a`, tests, docs
+- **Missing items**: Mandatory rebase against commit `c32de6f68042e5be9640604f09cbeeefa6062b19`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1752: chore(deps): bump types-pyyaml from 6.0.12.20260518 to 6.0.12.20260724
-- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump types-pyyaml from 6.0.12.20260518 to 6.0.12.20260724' (Candidate for re-validation/review)
-- **Domains touched**: dependencies
+- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump types-pyyaml from 6.0.12.20260518 to 6.0.12.20260724' (Candidate for re-validation/review)
+- **Domains touched**: chore, dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `f5836a3914d2c12b690e31fc0a35ac34b46c997a`, tests, docs
+- **Missing items**: Mandatory rebase against commit `c32de6f68042e5be9640604f09cbeeefa6062b19`
 - **Recommendation**: Needs CI success before merge
 
 ---
