@@ -29,7 +29,7 @@ dependencies = [
     "psycopg2-binary==2.9.12",
     "sqlalchemy==2.0.51",
     "alembic==1.14.0",
-    "redis==5.2.0",
+    "redis==8.1.0",
     "prometheus-client==0.26.0",
     "structlog==26.1.0",
     "rich==13.9.4",
