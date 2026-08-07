@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-08-07 13:11:49 UTC
+**Date:** 2026-08-07 14:32:01 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,7 +10,7 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `7c19f9b1ff1b77281247fe0b11f0ff2aac3f0950` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `4cac5328ee48dc89271cc043bf17a0cdc2cc6766` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (566)
 3. **Re-validate Stale:** Review Safe Surface PR #1740 (docs: update daily merge-readiness checklist and PR triage [2026-07-31])
 
