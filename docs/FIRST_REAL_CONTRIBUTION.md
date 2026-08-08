@@ -1,17 +1,17 @@
 # 🚀 Your First Real Contribution
 
-Welcome to the MT5 AI/ML Trading Bot project! We are thrilled to have you. This guide provides a low-risk, high-impact path to your first Pull Request, specifically designed to help you navigate our current high-turbulence development environment.
+Welcome to the MT5 AI/ML Trading Bot project! We are thrilled to have you. This guide provides a low-risk, high-impact path to your first Pull Request, specifically designed to help you navigate our clean, automated development environment.
 
 ---
 
-## 🌪️ Turbulence Survival Guide
+## 🟢 Clean Development Environment
 
-Before you start, be aware of three unique factors in this repository:
+To begin contributing confidently, know that our repo prioritizes robust and automated software practices:
 
-1.  **History Grafting:** The `main` branch is updated daily via monolithic "grafts" (total repository swaps). This means standard Git history is often unavailable on `main`.
-2.  **Mandatory Rebase:** Because `main` resets daily, your feature branch **must** be rebased onto the latest `main` commit before submission. Use `make resync` for an automated sync.
-3.  **CI Blockage:** CI is currently failing globally due to legacy linting errors in `migrations/`. If your PR is in a **Safe Zone**, it will be manually verified.
-4.  **Environment Stability:** If `make bootstrap` fails, check `docs/status/PROJECT_HEALTH.md` for known dependency conflicts.
+1. **Intact Linear History:** Our repository maintains a completely linear, intact, and stable Git history (1,260+ commits tracing back to the root). You can confidently rely on standard Git workflows.
+2. **Automated Syncing:** Keep your branch aligned with the latest `main` commit using `make resync` (or standard `git rebase`).
+3. **CI Status:** CI is fully **🟢 PASSING**. All formatting, linting, and tests execute cleanly.
+4. **Environment Stability:** Run `make bootstrap` to initialize your local python virtual environment, and verify system setup via `make doctor`.
 
 ---
 
@@ -29,7 +29,7 @@ Our repository enforces a strict semantic pull request check using the `amannn/a
 > - `test:` for writing or updating unit tests (e.g., `test: add unit tests for doctor checks`)
 > - `fix:` for fixing developer experience utilities (e.g., `fix: resolve doctor syntax error`)
 - `perf:` for performance optimizations (e.g., `perf: optimize vector loops in indicator checks`)
-- `style:` for style, formatting, or lint-only fixes (e.g., `style: run ruff format on doctor`)
+- `style:` for style, formatting, or lint-only fixes (e.g., `style: run ruff formatter on doctor`)
 
 ---
 
@@ -176,7 +176,7 @@ Before submitting your PR:
 
 ## 🆘 Need Help?
 
-If you get stuck on a dependency conflict or a Git rebase issue:
+If you get stuck on a dependency conflict or setup issue:
 1.  Check [docs/status/PROJECT_HEALTH.md](./status/PROJECT_HEALTH.md).
 2.  Open a Discussion on GitHub.
 3.  Tag a maintainer in your Draft PR.

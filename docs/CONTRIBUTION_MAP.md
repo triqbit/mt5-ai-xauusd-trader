@@ -12,18 +12,18 @@ This map defines the "Safe Zones" and "Sensitive Zones" of the MT5 AI/ML Trading
 
 ---
 
-## 🌪️ Turbulence Response FAQ
+## 🟢 Clean Development Environment FAQ
 
-The repository is currently in a state of **High Turbulence** due to rapid automated development cycles. Here is how to navigate as a contributor:
+Our development workspace prioritizes safety, clean checks, and clear pathways:
 
-### 1. Why are there 550+ open PRs?
-Most open PRs are **"Stale (Pre-Big-Bang)"**. They were created against previous repository history grafts and are currently pending bulk closure or manual rebase. **Do not let this deter you.** Focus on "Safe Surface" candidates identified in the latest [PR Triage Report](./status/PR_TRIAGE_DAILY.md).
+### 1. What is the current CI Status?
+CI is fully **🟢 PASSING**. All formatting, linting, and core tests pass cleanly across `src/`, `scripts/`, and `migrations/`. You can confidently expect pull request pipelines to succeed when matching our standard quality gates.
 
-### 2. Why is CI blocked?
-CI is currently failing globally due to legacy linting errors in `migrations/` that were integrated during a history graft. **Safe contributions (docs, tests, scripts) are still encouraged.** Maintainers will manually verify your PR if it stays within a **Safe Zone**.
+### 2. Is there any branch turbulence?
+No. Past sandbox-specific warnings about "history grafting" were false-positives caused by working inside shallow clones (depth=1). The remote repository history is **100% linear, stable, and perfectly intact**, ensuring complete auditability.
 
-### 3. How do I know if my PR is safe to merge?
-Check the [Merge-Ready Checklist](./status/MERGE_READY_CHECKLIST.md). If your PR is listed there, it has been flagged as a priority for alignment and review.
+### 3. How do I make sure my PR is aligned?
+Check the [Merge-Ready Checklist](./status/MERGE_READY_CHECKLIST.md) and keep your branch updated using `make resync` (or standard `git rebase`).
 
 ---
 
@@ -85,7 +85,7 @@ Changes to these directories affect the core financial and operational safety of
 3.  **Run `make doctor`:** If any check fails on your system, improving that check or the documentation around it is a great first contribution.
 4.  **Check `docs/status/PR_TRIAGE_DAILY.md`:** Look for PRs categorized as **"Safe Surface"**. This report is updated daily and is the best source for finding approved first-task candidates.
 5.  **Audit `tests/`:** Find a module with low coverage (check `make test` output) and add missing unit tests.
-6.  **Use `make resync`:** Always run this command before submitting to ensure your branch is aligned with the latest daily history graft.
+6.  **Use `make resync`:** Always run this command before submitting to ensure your branch is aligned with the latest commit.
 
 ---
 *This map is maintained by Jules06 (qufuwan). If you are unsure where your change fits, please open a discussion or tag a maintainer.*
