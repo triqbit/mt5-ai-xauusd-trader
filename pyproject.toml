@@ -123,7 +123,7 @@ split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "B011"]   # assert + raise-without-from OK in tests
-"migrations/**" = ["E402"]      # module level imports not at top of file due to sys.path manipulation
+"migrations/**" = ["E402", "I"]  # module level imports & import sorting ignored in migrations
 
 # ===========================================================
 # mypy
