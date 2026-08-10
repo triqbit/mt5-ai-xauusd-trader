@@ -1,28 +1,29 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-08-09 14:03:19 UTC
+**Date:** 2026-08-10 14:10:57 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
-- High number of open PRs (566)
+- High number of open PRs (567)
 
 ---
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `dd6326e1875064b4fad56ae5d7362f40bbdb8582` to ensure compatibility.
-2. **Address Turbulence:** High number of open PRs (566)
-3. **Re-validate Stale:** Review Safe Surface PR #1740 (docs: update daily merge-readiness checklist and PR triage [2026-07-31])
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `4bad2af8960b748b48591b337994e0a7ffc00d2e` to ensure compatibility.
+2. **Address Turbulence:** High number of open PRs (567)
+3. **Re-validate Stale:** Review Safe Surface PR #1784 (chore(deps): bump stable-baselines3 from 2.5.0 to 2.9.0)
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
+| [1788](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1788) | chore(deps): bump metatrader5 from 5.0.6070 to 5.0.6090 | dependabot[bot] | `dependabot/pip/metatrader5-5.0.6090` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1786](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1786) | chore(deps): bump scikit-learn from 1.6.0 to 1.7.2 | dependabot[bot] | `dependabot/pip/scikit-learn-1.7.2` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1784](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1784) | chore(deps): bump stable-baselines3 from 2.5.0 to 2.9.0 | dependabot[bot] | `dependabot/pip/stable-baselines3-2.9.0` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1782](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1782) | chore(deps): bump python-socketio from 4.6.1 to 5.16.4 | dependabot[bot] | `dependabot/pip/python-socketio-5.16.4` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1757](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1757) | chore(deps): bump fastapi from 0.140.13 to 0.141.1 | dependabot[bot] | `dependabot/pip/fastapi-0.141.1` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1754](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1754) | chore(deps): bump hypothesis from 6.161.5 to 6.164.0 | dependabot[bot] | `dependabot/pip/hypothesis-6.164.0` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1752](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1752) | chore(deps): bump types-pyyaml from 6.0.12.20260518 to 6.0.12.20260724 | dependabot[bot] | `dependabot/pip/types-pyyaml-6.0.12.20260724` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1740](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1740) | docs: update daily merge-readiness checklist and PR triage [2026-07-31] | triqbit | `main-16126816414089982301` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1725](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1725) | chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724 | dependabot[bot] | `dependabot/pip/types-setuptools-83.0.0.20260724` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1712](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1712) | Add optional TickerAll hosted MT5 API path to MT5Connector | miguelangelo78 | `tickerall-provider` | none | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1697](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1697) | docs: update process integrity log [2026-07-21] | triqbit | `process-integrity-log-2026-07-21-qufuwan-17949035639015288261` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1681](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1681) | feat(atlas): implement multi-agent LLM macro overlay architecture | showmeyourmind | `feature/atlas-hybrid-integration` | none | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -591,14 +592,14 @@
 - **Medium Risk (New):** 0 PRs
 - **Safe Surface (New):** 0 PRs
 - **Triage Required (New):** 0 PRs
-- **Stale (Total):** 566 PRs
+- **Stale (Total):** 567 PRs
 
 ## ✨ Good Candidates for Review Today
 
-- **PR #1757**: chore(deps): bump fastapi from 0.140.13 to 0.141.1 (dependabot[bot]) [CI: pending] - *Medium Risk*
-- **PR #1754**: chore(deps): bump hypothesis from 6.161.5 to 6.164.0 (dependabot[bot]) [CI: pending] - *Medium Risk*
-- **PR #1752**: chore(deps): bump types-pyyaml from 6.0.12.20260518 to 6.0.12.20260724 (dependabot[bot]) [CI: pending] - *Medium Risk*
-- **PR #1725**: chore(deps): bump types-setuptools from 83.0.0.20260716 to 83.0.0.20260724 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1788**: chore(deps): bump metatrader5 from 5.0.6070 to 5.0.6090 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1786**: chore(deps): bump scikit-learn from 1.6.0 to 1.7.2 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1784**: chore(deps): bump stable-baselines3 from 2.5.0 to 2.9.0 (dependabot[bot]) [CI: pending] - *Safe Surface*
+- **PR #1782**: chore(deps): bump python-socketio from 4.6.1 to 5.16.4 (dependabot[bot]) [CI: pending] - *Medium Risk*
 
 ---
 *Note: This report is generated by Jules06 (qufuwan). Risk classification is based on file paths and heuristics.*
