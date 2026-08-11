@@ -1,4 +1,3 @@
-
 import subprocess
 import sys
 from pathlib import Path
@@ -10,14 +9,12 @@ def test_verify_dependencies_script_success():
     script_path = root / "scripts" / "verify_dependencies.py"
 
     result = subprocess.run(
-        [sys.executable, str(script_path)],
-        capture_output=True,
-        text=True,
-        cwd=str(root)
+        [sys.executable, str(script_path)], capture_output=True, text=True, cwd=str(root)
     )
 
     assert result.returncode == 0
     assert "All overlapping dependencies are harmonized" in result.stdout
+
 
 def test_verify_dependencies_script_failure(tmp_path):
     """Test that verify_dependencies.py fails when there is a mismatch."""
@@ -71,9 +68,7 @@ if __name__ == "__main__":
 """)
 
     result = subprocess.run(
-        [sys.executable, str(test_script), str(tmp_path)],
-        capture_output=True,
-        text=True
+        [sys.executable, str(test_script), str(tmp_path)], capture_output=True, text=True
     )
 
     assert result.returncode == 1

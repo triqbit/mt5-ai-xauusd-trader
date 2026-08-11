@@ -12,7 +12,7 @@ from src.trading.backtester import BacktestEngine
 
 def create_synthetic_data(n_bars=3000):
     start_time = datetime.now()
-    times = [start_time + timedelta(minutes=i*5) for i in range(n_bars)]
+    times = [start_time + timedelta(minutes=i * 5) for i in range(n_bars)]
     data = {
         "time": times,
         "open": np.random.uniform(2300, 2400, n_bars),
@@ -28,10 +28,12 @@ def create_synthetic_data(n_bars=3000):
     df.set_index("time", inplace=True)
     return df
 
+
 class MockModel:
     def predict(self, obs):
         # Always return a HOLD signal
         return TradeSignal(symbol="XAUUSD", direction=0, confidence=0.0)
+
 
 def test_backtest_auditing_integration(tmp_path):
     """
@@ -70,6 +72,7 @@ def test_backtest_auditing_integration(tmp_path):
 
         # metadata_json might be returned as a string in some environments/versions
         import json
+
         metadata = completed.metadata_json
         if isinstance(metadata, str):
             metadata = json.loads(metadata)

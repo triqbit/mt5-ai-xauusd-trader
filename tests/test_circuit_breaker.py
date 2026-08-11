@@ -15,6 +15,7 @@ def mock_config():
     cfg.metaapi_token = None
     return cfg
 
+
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
 def test_circuit_breaker_tripping_full(mock_mt5, mock_config):
@@ -53,6 +54,7 @@ def test_circuit_breaker_tripping_full(mock_mt5, mock_config):
         with pytest.raises(CircuitBreakerError):
             connector.initialize()
 
+
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
 def test_get_rates_trips_breaker_full(mock_mt5, mock_config):
@@ -86,6 +88,7 @@ def test_get_rates_trips_breaker_full(mock_mt5, mock_config):
 
     assert connector.circuit_state == "OPEN"
 
+
 @patch("src.trading.mt5_connector.mt5")
 @patch("src.trading.mt5_connector.MT5_AVAILABLE", True)
 def test_place_order_respects_breaker(mock_mt5, mock_config):
@@ -97,6 +100,7 @@ def test_place_order_respects_breaker(mock_mt5, mock_config):
     mock_mt5.last_error.return_value = (-1, "Connection lost")
 
     from src.core.schemas import TradeSignal
+
     signal = TradeSignal(
         symbol="XAUUSD",
         direction=1,
@@ -105,7 +109,7 @@ def test_place_order_respects_breaker(mock_mt5, mock_config):
         take_profit=2320.0,
         lot_size=0.1,
         algorithm="test",
-        confidence=0.9
+        confidence=0.9,
     )
 
     # First attempt fails and trips breaker.
