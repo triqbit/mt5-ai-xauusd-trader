@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-08-12 13:09:40 UTC
+**Date:** 2026-08-12 14:24:01 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,7 +10,7 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `3054e8e8e0967c34a98c1974b43aadd452a56f3b` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `e57d57b81f04584b2c145194b15e2b660b22d104` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (567)
 3. **Re-validate Stale:** Review Safe Surface PR #1784 (chore(deps): bump stable-baselines3 from 2.5.0 to 2.9.0)
 
@@ -31,13 +31,13 @@
 | [1576](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1576) | DX: improve developer onboarding and contribution experience | triqbit | `dx-improve-onboarding-credibility-5459078260715495313` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1543](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1543) | DX: improve developer onboarding and contribution experience | triqbit | `dx-daily-triage-2026-06-20-qufuwan-7504956792826488201` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1528](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1528) | docs: improve developer onboarding and contribution experience | triqbit | `dx-process-integrity-log-2026-06-16-5084547163796099815` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1525](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1525) | docs: update process integrity log [2026-06-15] | triqbit | `docs/process-integrity-2026-06-15-11231654497632137330` | none | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1470](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1470) | docs: update daily merge-readiness checklist [2026-06-03] | triqbit | `docs-merge-checklist-2026-06-03-12193052405329652474` | none | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1412](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1412) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-product-coherence-improvements-15654352759067746756` | escalated-risk | unknown | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1409](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1409) | docs: Daily PR triage and risk dashboard [2026-05-23] | triqbit | `dx-daily-merge-checklist-2026-05-23-2325326555346100103` | none | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1404](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1404) | 🔗 Jules05: Integration test results [2026-05-23] | yxynoty | `jules05-integration-results-2026-05-23-1111935695238620886` | escalated-risk | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1402](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1402) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-product-coherence-improvements-5365694077499482405` | escalated-risk | unknown | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1395](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1395) | 🤖 Jules05: Auto-merge policy update | yxynoty | `jules05-auto-merge-policy-update-14778474038957274841` | escalated-risk | unknown | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1525](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1525) | docs: update process integrity log [2026-06-15] | triqbit | `docs/process-integrity-2026-06-15-11231654497632137330` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1470](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1470) | docs: update daily merge-readiness checklist [2026-06-03] | triqbit | `docs-merge-checklist-2026-06-03-12193052405329652474` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1412](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1412) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-product-coherence-improvements-15654352759067746756` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1409](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1409) | docs: Daily PR triage and risk dashboard [2026-05-23] | triqbit | `dx-daily-merge-checklist-2026-05-23-2325326555346100103` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1404](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1404) | 🔗 Jules05: Integration test results [2026-05-23] | yxynoty | `jules05-integration-results-2026-05-23-1111935695238620886` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1402](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1402) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-product-coherence-improvements-5365694077499482405` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1395](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1395) | 🤖 Jules05: Auto-merge policy update | yxynoty | `jules05-auto-merge-policy-update-14778474038957274841` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1389](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1389) | 📘 Jules02: Documentation and schema governance — Unified decision funnel schemas | xnessom | `jules02/unified-schemas-5643005943939164146` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1386](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1386) | 💡 Jules02: CLI and operator UX improvement — Configurable polling and setup wizard enhancements | xnessom | `jules02-cli-ux-improvements-8438108481486765359` | escalated-risk | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1384](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1384) | 🔐 Jules02: Security hardening — HMAC-SHA256 model integrity guard | xnessom | `security/model-integrity-guard-13330429797659203878` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
