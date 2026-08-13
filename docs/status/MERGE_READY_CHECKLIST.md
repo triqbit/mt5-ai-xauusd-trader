@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `e57d57b81f04584b2c145194b15e2b660b22d104` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `69551eb0208163d5adccccbdb8925bb74b09d1bd` is required for all PRs.**
 
-Generated on: 2026-08-12 14:24:01 UTC
+Generated on: 2026-08-13 13:30:20 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump metatrader5 from 5.0.6070 to 5.0.6090' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `e57d57b81f04584b2c145194b15e2b660b22d104`, tests, docs
+- **Missing items**: Mandatory rebase against commit `69551eb0208163d5adccccbdb8925bb74b09d1bd`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1786: chore(deps): bump scikit-learn from 1.6.0 to 1.7.2
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump scikit-learn from 1.6.0 to 1.7.2' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `e57d57b81f04584b2c145194b15e2b660b22d104`, tests, docs
+- **Missing items**: Mandatory rebase against commit `69551eb0208163d5adccccbdb8925bb74b09d1bd`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1784: chore(deps): bump stable-baselines3 from 2.5.0 to 2.9.0
 - **Short scope summary**: Safe Surface update implementing 'chore(deps): bump stable-baselines3 from 2.5.0 to 2.9.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `e57d57b81f04584b2c145194b15e2b660b22d104`
+- **Missing items**: Mandatory rebase against commit `69551eb0208163d5adccccbdb8925bb74b09d1bd`
 - **Recommendation**: Needs CI success before merge
 
 ---
