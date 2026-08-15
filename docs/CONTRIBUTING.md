@@ -24,22 +24,22 @@ We use a role-based governance model where specific leads oversee different doma
 - **Setup Environment:** Use Python 3.11+. Follow the [Setup Guide](../SETUP_GUIDE.md).
 - **Consult the [Contribution Map](./CONTRIBUTION_MAP.md):** Identify if your change falls into a **Safe Zone** (docs, tests) or a **Sensitive Zone** (trading logic, models, core).
 
-### ⚠️ Critical: History Management & Daily Resets
-This repository operates under a high-frequency update model. Please read the following carefully:
-- **Daily History Grafting:** The `main` branch is updated daily via monolithic "grafts" (total repository swaps). This means standard Git history is often unavailable on `main`.
-- **Mandatory Rebase:** Because `main` resets daily, your feature branch **must** be rebased onto the latest `main` commit before submission. Use `make resync` for an automated sync.
+### 🛠️ Git Workflow & Synchronization
+This repository maintains a **100% linear, stable, and intact Git history** on `main`. To keep your pull request clean and easy to review:
+- **Linear History:** The `main` branch maintains a complete linear history tracing back to the repository's root.
+- **Branch Synchronization:** Keep your feature branch synchronized with `main` before submitting your PR. Use `make resync` for an automated sync.
 - **Environment Stability:** If `make bootstrap` fails, check `docs/status/PROJECT_HEALTH.md` for known dependency conflicts or transient environment issues.
 
-#### 🛠️ Graft Survival Kit (CLI)
-If your branch has diverged significantly or "lost its ancestor" due to a daily graft, use this sequence to resync:
+#### 🛠️ Synchronization Kit (CLI)
+To synchronize your branch with the latest `main` commit, run:
 
 ```bash
-# Automated sync with latest main graft
+# Automated sync with latest main
 make resync
 
-# If 'make resync' fails with "no common ancestry" errors:
-# This happens when main is force-pushed with a new history graft.
-git rebase --onto origin/main <old-base-commit> <your-branch-name>
+# Or manually rebase against main:
+git fetch origin main
+git rebase origin/main
 ```
 
 ### 2. Implementation
