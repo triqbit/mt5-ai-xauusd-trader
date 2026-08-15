@@ -166,7 +166,7 @@ python main.py --mode live --algo ensemble --confirm-live
 | [**Architecture Quick-Start**](./docs/ARCHITECTURE_QUICK.md) | **Primary technical overview and system maturity map.** |
 | [**Pre-Production Checklist**](./docs/PREPROD_CHECKLIST.md) | **Mandatory deployment gate checklist for production releases.** |
 | [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) | Technical roadmap and implementation milestones. |
-| [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
+| [ENTERPRISE_STANDARDS.md](./docs/ENTERPRISE_STANDARDS.md) | Coding standards, CI/CD requirements, and security policies. |
 | [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) | Step-by-step instructions for Docker and Cloud deployment. |
 | [DATABASE_STANDARDS.md](./DATABASE_STANDARDS.md) | Schemas for trade logging and performance tracking. |
 | [**SLO & Reliability Targets**](./docs/SLO_TARGETS.md) | **Measurable reliability standards and error budget framework.** |
