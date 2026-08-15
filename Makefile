@@ -29,7 +29,7 @@ help:
 	@echo "------------------------------------------"
 	@echo "doctor         : [REQUIRED] Run system diagnostics and verification"
 	@echo "bootstrap      : [REQUIRED] Install dependencies and setup environment"
-	@echo "resync         : [REQUIRED] Sync with latest main graft (Fetch & Rebase)"
+	@echo "resync         : [REQUIRED] Sync with latest main (Fetch & Rebase)"
 	@echo "setup          : [REQUIRED] Run interactive configuration wizard"
 	@echo "test           : Run unit and integration tests"
 	@echo "lint           : Run ruff linter and formatter"
@@ -51,7 +51,7 @@ bootstrap:
 	bash scripts/bootstrap.sh
 
 resync:
-	@echo "Resyncing with latest main graft..."
+	@echo "Resyncing with latest main..."
 	git fetch origin main
 	git rebase origin/main
 
