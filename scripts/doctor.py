@@ -654,7 +654,33 @@ def check_contribution_safety():
         return DiagnosticCheck("Contribution Safety", "WARNING", f"Audit failed: {e}")
 
 
+def _reexecute_in_venv_if_available():
+    """Auto-detect repo venv when run with system python and re-execute seamlessly."""
+    # Check if already running in a virtualenv
+    in_venv = hasattr(sys, "real_prefix") or getattr(sys, "base_prefix", sys.prefix) != sys.prefix
+    if in_venv or os.environ.get("_DOCTOR_REEXEC"):
+        return
+
+    root = Path(__file__).resolve().parents[1]
+    venv_python = (
+        root / "venv" / "Scripts" / "python.exe"
+        if sys.platform == "win32"
+        else root / "venv" / "bin" / "python"
+    )
+
+    if venv_python.exists():
+        env = os.environ.copy()
+        env["_DOCTOR_REEXEC"] = "1"
+        try:
+            result = subprocess.run([str(venv_python)] + sys.argv, env=env)
+            sys.exit(result.returncode)
+        except Exception:
+            pass
+
+
 def main():
+    _reexecute_in_venv_if_available()
+
     # Ensure root is in path
     root = Path(__file__).resolve().parents[1]
     sys.path.append(str(root))
