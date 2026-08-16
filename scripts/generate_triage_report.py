@@ -689,7 +689,7 @@ def generate_report():
     # Generate Merge-Readiness Checklist (Strictly Low/Medium Risk)
     checklist = "# Merge-Readiness Checklist\n\n"
     checklist += "> [!IMPORTANT]\n"
-    checklist += f"> **Critical Repository State Notice:** The `main` branch is currently operating under a history-grafting model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `{big_bang_sha}` is required for all PRs.**\n\n"
+    checklist += f"> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `{big_bang_sha}` is required for all PRs.**\n\n"
     checklist += f"Generated on: {now.strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n"
     checklist += "This checklist identifies top promising PRs for immediate review.\n\n"
 
