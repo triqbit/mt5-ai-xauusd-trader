@@ -672,7 +672,7 @@ def _reexecute_in_venv_if_available():
         env = os.environ.copy()
         env["_DOCTOR_REEXEC"] = "1"
         try:
-            result = subprocess.run([str(venv_python)] + sys.argv, env=env)
+            result = subprocess.run([str(venv_python), *sys.argv], env=env)
             sys.exit(result.returncode)
         except Exception:
             pass
