@@ -1,32 +1,32 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `9a879179b7ef499ca27cf5fcad2f509ffa7bde97` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `22b02b1c10377afe7b08901068297fa62b2cc20b` is required for all PRs.**
 
-Generated on: 2026-08-16 17:40:00 UTC
+Generated on: 2026-08-17 13:13:36 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
-## 1. PR #1788: chore(deps): bump metatrader5 from 5.0.6070 to 5.0.6090
-- **Short scope summary**: Dependency update bumping MetaTrader5 Python package from 5.0.6070 to 5.0.6090.
+## 1. PR #1820: chore(deps): bump pydantic-settings from 2.14.2 to 2.15.0
+- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump pydantic-settings from 2.14.2 to 2.15.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `9a879179b7ef499ca27cf5fcad2f509ffa7bde97`, test verification
-- **Recommendation**: Candidate for review (needs passing CI and rebase against main)
+- **Missing items**: Mandatory rebase against commit `22b02b1c10377afe7b08901068297fa62b2cc20b`
+- **Recommendation**: Needs CI success before merge
 
-## 2. PR #1786: chore(deps): bump scikit-learn from 1.6.0 to 1.7.2
-- **Short scope summary**: Dependency update bumping scikit-learn machine learning library from 1.6.0 to 1.7.2.
+## 2. PR #1788: chore(deps): bump metatrader5 from 5.0.6070 to 5.0.6090
+- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump metatrader5 from 5.0.6070 to 5.0.6090' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `9a879179b7ef499ca27cf5fcad2f509ffa7bde97`, test verification
-- **Recommendation**: Candidate for review (needs passing CI and rebase against main)
+- **Missing items**: Mandatory rebase against commit `22b02b1c10377afe7b08901068297fa62b2cc20b`, tests, docs
+- **Recommendation**: Needs CI success before merge
 
-## 3. PR #1784: chore(deps): bump stable-baselines3 from 2.5.0 to 2.9.0
-- **Short scope summary**: Dependency update bumping stable-baselines3 reinforcement learning package from 2.5.0 to 2.9.0.
+## 3. PR #1782: chore(deps): bump python-socketio from 4.6.1 to 5.16.4
+- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump python-socketio from 4.6.1 to 5.16.4' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `9a879179b7ef499ca27cf5fcad2f509ffa7bde97`
-- **Recommendation**: Candidate for review (needs passing CI and rebase against main)
+- **Missing items**: Mandatory rebase against commit `22b02b1c10377afe7b08901068297fa62b2cc20b`, tests, docs
+- **Recommendation**: Needs CI success before merge
 
 ---
 *Prepared by Jules06 (qufuwan) for Jules05 and human review.*
