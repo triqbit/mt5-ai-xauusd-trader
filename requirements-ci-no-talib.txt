@@ -34,7 +34,7 @@ requests==2.34.2
 httpx==0.28.1
 structlog==26.1.0
 rich==13.9.4
-gymnasium==1.0.0
+gymnasium==1.3.0
 jinja2==3.1.6
 prometheus-client==0.26.0
 psutil==7.2.2
