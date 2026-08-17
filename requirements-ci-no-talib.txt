@@ -10,7 +10,7 @@ scikit-learn==1.6.0
 pandas==2.3.3
 
 # -- Database ------------------------------------------------------
-sqlalchemy==2.0.51
+sqlalchemy==2.0.52
 alembic==1.19.0
 redis==8.1.0
 
