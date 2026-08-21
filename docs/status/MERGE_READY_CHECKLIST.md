@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `75520c03d4a56e013545300c7448633184ddd001` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `c66d01a7e75f11e917460c82daba3193454867bc` is required for all PRs.**
 
-Generated on: 2026-08-20 14:25:00 UTC
+Generated on: 2026-08-21 13:30:11 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Safe Surface update implementing 'chore(deps): bump pydantic-settings from 2.14.2 to 2.15.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `75520c03d4a56e013545300c7448633184ddd001`
+- **Missing items**: Mandatory rebase against commit `c66d01a7e75f11e917460c82daba3193454867bc`
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1788: chore(deps): bump metatrader5 from 5.0.6070 to 5.0.6090
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump metatrader5 from 5.0.6070 to 5.0.6090' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `75520c03d4a56e013545300c7448633184ddd001`, tests, docs
+- **Missing items**: Mandatory rebase against commit `c66d01a7e75f11e917460c82daba3193454867bc`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1782: chore(deps): bump python-socketio from 4.6.1 to 5.16.4
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump python-socketio from 4.6.1 to 5.16.4' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `75520c03d4a56e013545300c7448633184ddd001`, tests, docs
+- **Missing items**: Mandatory rebase against commit `c66d01a7e75f11e917460c82daba3193454867bc`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ---
