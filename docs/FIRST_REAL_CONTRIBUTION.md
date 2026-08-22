@@ -166,7 +166,7 @@ Before submitting your PR:
     ```bash
     ./venv/bin/python3 -m pytest tests/test_governance_vitals.py --noconftest
     ```
-4.  **Resync with Main (Critical):** Always rebase just before pushing to ensure you are on the latest graft:
+4.  **Resync with Main (Critical):** Always rebase just before pushing to ensure you are on the latest commit on main:
     ```bash
     make resync
     ```
