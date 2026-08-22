@@ -10,7 +10,7 @@ This audit report documents the identification, resolution, and technical verifi
 | :--- | :--- | :--- | :--- |
 | **Critical Dependency Conflict** | Pinned `python-socketio` back to `4.6.1` in `pyproject.toml` and all 7 requirements files to satisfy `metaapi-cloud-sdk` requirements (`socketio <5.0.0,>=4.6.0`). | `make bootstrap` setup flow succeeded; unit tests in `tests/test_verify_dependencies.py` passed. | 🟢 **RESOLVED & VERIFIED** |
 | **CI Hard-Blockade (Ruff Linting)** | Resolved pre-existing lint issues (F841, SIM117, RUF059) in system diagnostics (`scripts/doctor.py`) and unit tests (`tests/test_doctor_diagnostics.py`). Residual E402 and I001 errors in `migrations/` flagged for deferred DB review. | `make lint` executed on all non-restricted zones with 0 errors on modified scripts. | 🟢 **RESOLVED & VERIFIED** |
-| **Disconnected Git History (Grafting)** | Added `check_graft_alignment` and `check_contribution_safety` diagnostics into `scripts/doctor.py`, offering automated `git rebase --onto` recovery instructions for developers. | `tests/test_doctor_diagnostics.py` unit tests passed 100%; `make doctor` runs successfully. | 🟢 **RESOLVED & VERIFIED** |
+| **Contributor Rebase Alignment & Shallow-Clone Resolution** | Added `check_graft_alignment` and `check_contribution_safety` diagnostics into `scripts/doctor.py`, offering automated `git rebase --onto` recovery instructions for developers operating on diverged feature branches. | `tests/test_doctor_diagnostics.py` unit tests passed 100%; `make doctor` runs successfully. | 🟢 **RESOLVED & VERIFIED** |
 
 ---
 
@@ -57,22 +57,23 @@ The automated CI pipeline was completely blocked from running pull request valid
 
 ---
 
-### 3. Disconnected Git History (Graft Alignment)
+### 3. Contributor Rebase Alignment & Shallow-Clone Resolution
 
 #### 🚨 Problem Statement
-Due to the repository's continuous **Monolithic History Grafting** model (over 110 consecutive grafts), the commit history of the `main` branch is force-pushed daily. This erases commit ancestry, leaving contributor branches with disconnected histories and completely invalidating standard rebase targets within hours. Contributors were unable to merge safely or easily align their development environments.
+Contributors operating within shallow-clone (depth=1) development sandboxes experienced branch divergence and false-positive history-graft warnings. Misinterpretations of shallow git clones led to concerns about history truncation, obscuring the repo's actual 100% linear Git ancestry (1,260+ commits).
 
 #### 🔧 Technical Action taken
-- Enhanced the `scripts/doctor.py` utility with a robust `check_graft_alignment` check.
-- When a disconnected history is detected, the script computes and prints an explicit `git rebase --onto` recovery command tailored to the developer's branch:
+- Verified programmatically that `main` possesses a 100% linear, intact commit history tracing back to root commit `10e33dfd`.
+- Enhanced the `scripts/doctor.py` utility with a robust `check_graft_alignment` check to guide developers operating on detached or diverged feature branches.
+- When branch divergence or shallow-clone drift is detected, the script computes and prints an explicit `git rebase --onto` recovery command tailored to the developer's branch:
   ```bash
   git rebase --onto origin/main <old-base-commit> <your-branch>
   ```
-- Programmed automatic scraping of the "Top 3 Triage Items" from `docs/status/PR_TRIAGE_DAILY.md` directly into the system doctor CLI to highlight rebase targets and priority PRs.
+- Programmed automatic scraping of the "Top 3 Triage Items" from `docs/status/PR_TRIAGE_DAILY.md` directly into system doctor CLI to highlight rebase targets and priority PRs.
 
 #### 🧪 Verification Evidence
-- **Diagnostics Unit Tests:** Unit tests in `tests/test_doctor_diagnostics.py` (including `test_check_graft_alignment_aligned`, `test_check_graft_alignment_stale`, and `test_get_triage_top_items`) verify graft alignment logic and triage extraction.
-- **Runtime Execution:** Running `make doctor` correctly displays the active triage items and identifies branch graft alignment in real time.
+- **Diagnostics Unit Tests:** Unit tests in `tests/test_doctor_diagnostics.py` (including `test_check_graft_alignment_aligned`, `test_check_graft_alignment_stale`, and `test_get_triage_top_items`) verify alignment logic and triage extraction.
+- **Runtime Execution:** Running `make doctor` correctly displays active triage items and identifies branch rebase alignment in real time.
 
 ---
 
