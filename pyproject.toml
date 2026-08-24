@@ -71,7 +71,7 @@ test = [
     "types-redis==4.6.0.20241004",
     "types-requests==2.33.0.20260712",
     "types-python-dateutil==2.9.0.20260807",
-    "types-setuptools==83.0.0.20260807",
+    "types-setuptools==84.0.0.20260812",
     "types-PyYAML==6.0.12.20260724",
 ]
 
