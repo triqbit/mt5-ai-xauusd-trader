@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `7be545bfbefd8c52d30198c9279160750e99ce48` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `12236c5efd152b2b90ab2ddfeef1893c18d15752` is required for all PRs.**
 
-Generated on: 2026-08-26 13:29:01 UTC
+Generated on: 2026-08-26 14:10:07 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump metatrader5 from 5.0.6070 to 5.0.6090' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `7be545bfbefd8c52d30198c9279160750e99ce48`, tests, docs
+- **Missing items**: Mandatory rebase against commit `12236c5efd152b2b90ab2ddfeef1893c18d15752`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1697: docs: update process integrity log [2026-07-21]
 - **Short scope summary**: Safe Surface update implementing 'docs: update process integrity log [2026-07-21]' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `7be545bfbefd8c52d30198c9279160750e99ce48`
+- **Missing items**: Mandatory rebase against commit `12236c5efd152b2b90ab2ddfeef1893c18d15752`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1661: DX: update process integrity log and project health [2026-07-14]
 - **Short scope summary**: Safe Surface update implementing 'DX: update process integrity log and project health [2026-07-14]' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `7be545bfbefd8c52d30198c9279160750e99ce48`
+- **Missing items**: Mandatory rebase against commit `12236c5efd152b2b90ab2ddfeef1893c18d15752`
 - **Recommendation**: Needs CI success before merge
 
 ---
