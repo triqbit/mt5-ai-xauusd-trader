@@ -23,7 +23,7 @@ aiohttp==3.14.3
 httpx==0.28.1
 
 # ── MetaTrader 5 ────────────────────────────────────────────
-MetaTrader5==5.0.6070; sys_platform == 'win32'
+MetaTrader5==5.0.6090; sys_platform == 'win32'
 metaapi-cloud-sdk==29.1.1
 
 # ── Database ────────────────────────────────────────────────
