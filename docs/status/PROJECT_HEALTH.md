@@ -44,9 +44,9 @@ This dashboard provides real-time visibility into the technical health, process 
 | :--- | :--- | :--- |
 | [Enterprise Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md) | Compliance | ✅ Active |
 | [Technical Evidence Index](../audits/README.md) | Navigator | ✅ Active |
-| [Integration Test Results](../testing/INTEGRATION_TEST_RESULTS.md) | System Quality | ✅ Verified (2026-07-25) |
-| [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ✅ Verified (2026-07-25) |
-| [Architecture Quick-Start](../ARCHITECTURE_QUICK.md) | System Map | ✅ Verified (2026-07-25) |
+| [Integration Test Results](../testing/INTEGRATION_TEST_RESULTS.md) | System Quality | ✅ Verified |
+| [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ✅ Verified |
+| [Architecture Quick-Start](../ARCHITECTURE_QUICK.md) | System Map | ✅ Verified |
 
 ---
 
