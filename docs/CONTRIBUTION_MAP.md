@@ -6,7 +6,7 @@ This map defines the "Safe Zones" and "Sensitive Zones" of the MT5 AI/ML Trading
 
 | Zone | Path | Risk Level | Review Requirement | Evidence Required |
 | :--- | :--- | :--- | :--- | :--- |
-| **Safe Zone** | `docs/`, `tests/`, `scripts/` | 🟢 Low | Standard Peer Review | Unit Tests / Doc Lint |
+| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile` | 🟢 Low | Standard Peer Review | Unit Tests / Doc Lint |
 | **Utility Zone** | `src/utils/`, `src/analytics/` | 🟡 Medium | Domain Expert Review | Integration Tests |
 | **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/` | 🔴 High | Lead + Multi-Signature | Backtests + Stress Tests |
 
@@ -24,6 +24,11 @@ No. Past sandbox-specific warnings about "history grafting" were false-positives
 
 ### 3. How do I make sure my PR is aligned?
 Check the [Merge-Ready Checklist](./status/MERGE_READY_CHECKLIST.md) and keep your branch updated using `make resync` (or standard `git rebase`).
+
+### 4. What PR title format is required?
+Our CI enforces semantic PR titles via `.github/workflows/commit-check.yml`.
+- **Allowed prefixes:** `feat`, `fix`, `docs`, `chore`, `test`, `refactor`, `style`, `perf`, `ci`.
+- **Note:** Do NOT use non-standard prefixes like `DX:` in PR titles; use `docs:` for documentation/onboarding PRs or `chore:` for DX tool scripts.
 
 ---
 
