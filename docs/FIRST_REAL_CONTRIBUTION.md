@@ -52,9 +52,11 @@ git checkout -b feature/doctor-enhancement
 
 ### Step 2: Identify a Diagnostic Gap
 
-Run the doctor script using the local virtual environment and look for missing checks that would be helpful for a new user:
+Run the doctor script using `make doctor` or python and look for missing checks that would be helpful for a new user:
 ```bash
-./venv/bin/python3 scripts/doctor.py
+make doctor
+# Or directly:
+python3 scripts/doctor.py
 ```
 
 **Ideas for first contributions:**
@@ -142,14 +144,16 @@ def test_check_workspace_directories_ok():
 
 ### 3. Run and Verify Your Unit Tests Locally
 
-We enforce clean test outcomes before any code is reviewed. Always run the tests inside the virtual environment:
+We enforce clean test outcomes before any code is reviewed. Always run tests using your active python environment or pytest:
 
 ```bash
-# Run only doctor diagnostic unit tests
-./venv/bin/python3 -m pytest tests/test_doctor_diagnostics.py
+# Run doctor diagnostic tests via pytest or unittest
+pytest tests/test_doctor_diagnostics.py
+# Or using unittest:
+PYTHONPATH=. python3 -m unittest tests/test_doctor_diagnostics.py
 
 # Verify the complete system health via system doctor
-./venv/bin/python3 scripts/doctor.py
+make doctor
 ```
 
 Ensure all tests pass and your new check is outputted cleanly!
@@ -164,7 +168,7 @@ Before submitting your PR:
 2.  **Conventional Commits:** Commit your change with an approved semantic type (e.g., `chore: add workspace directory checks to doctor`).
 3.  **Run Governance Suite:** Run the project's governance validator to ensure all files match expectations:
     ```bash
-    ./venv/bin/python3 -m pytest tests/test_governance_vitals.py --noconftest
+    pytest tests/test_governance_vitals.py --noconftest
     ```
 4.  **Resync with Main (Critical):** Always rebase just before pushing to ensure you are on the latest commit on main:
     ```bash

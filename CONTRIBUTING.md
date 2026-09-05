@@ -20,19 +20,32 @@ We actively encourage and review Pull Requests in **Safe Zones** (docs, tests, s
 
 Please refer to the following documents before opening a Pull Request:
 
-1. **[Contributing Guide](./docs/CONTRIBUTING.md):** Detailed workflow, branching strategy, and quality gates.
-2. **[Contribution Map](./docs/CONTRIBUTION_MAP.md):** Understanding "Safe Zones" vs. "Sensitive Zones" to pick your first task.
-3. **[Your First Real Contribution](./docs/FIRST_REAL_CONTRIBUTION.md):** A step-by-step tutorial for new contributors.
-4. **[Architecture Quick-Start](./docs/ARCHITECTURE_QUICK.md):** Technical overview of system components and maturity levels.
+1. **[Contribution Map](./docs/CONTRIBUTION_MAP.md):** Safe Zones vs. Sensitive Zones directory matrix.
+2. **[Your First Real Contribution](./docs/FIRST_REAL_CONTRIBUTION.md):** Step-by-step tutorial for new contributors.
+3. **[Architecture Quick-Start](./docs/ARCHITECTURE_QUICK.md):** Technical overview of system components and maturity levels.
+4. **[Enterprise Standards](./docs/ENTERPRISE_STANDARDS.md):** Enterprise coding and quality standards.
 
 ---
 
-## 🚦 Quick Rules & "Safe Zones"
+## 🚦 System Safe Zones & Review Matrix
 
-- **Keep Aligned:** Always rebase or synchronize your branch with the latest `main` commit before submitting.
-- **Safe Zones:** We encourage new contributors to start with `docs/`, `tests/`, or `scripts/`. These have a faster path to merge.
-- **Multi-Signature:** Changes to trading logic, models, or core infrastructure require multi-signature approval from domain leads.
-- **Quality Gates:** All PRs must pass automated linting, type-checking, security scans, and maintain ≥85% test coverage.
+To help contributors start safely, system paths are categorized into clear review risk tiers:
+
+| Zone | Path | Risk Level | Review Requirement | Recommended First Contribution |
+| :--- | :--- | :--- | :--- | :--- |
+| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile` | 🟢 Low | Standard Peer Review | Yes (Documentation, Unit Tests, Developer Scripts) |
+| **Utility Zone** | `src/utils/`, `src/analytics/` | 🟡 Medium | Domain Lead Review | Secondary (Helpers, Telemetry, Analytics reports) |
+| **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/` | 🔴 High | Lead + Multi-Signature | No (Core Execution, Models, Risk Engine) |
+
+---
+
+## 🚦 Quick Rules & Guidelines
+
+- **Keep Aligned:** Always rebase or synchronize your branch with the latest `main` commit before submitting (`make resync`).
+- **PR Title & Branch Rules:** CI enforces semantic PR titles (`docs:`, `chore:`, `test:`, `fix:`, `feat:`, `perf:`, `style:`, `refactor:`, `ci:`). **Do NOT use `DX:` prefix in PR titles or commits.**
+- **Safe Zone Focus:** New contributors are strongly advised to start in `docs/`, `tests/`, or `scripts/` for a fast, friction-free path to merge.
+- **Multi-Signature:** Changes to Sensitive Zones (`src/trading/`, `src/models/`, `src/core/`) require multi-signature approval from domain leads.
+- **Quality Gates:** All PRs must pass automated linting, type-checking, security scans, and maintain high test coverage.
 
 ---
 
