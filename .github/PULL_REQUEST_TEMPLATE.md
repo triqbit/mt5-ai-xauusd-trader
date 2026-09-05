@@ -12,7 +12,7 @@ Fixes # (issue)
 - [ ] 🛡️ Security / Governance update
 
 ## 🛡️ Contribution Safety Checklist
-Before submitting, please categorize your PR based on the [Contribution Map](docs/CONTRIBUTION_MAP.md):
+Before submitting, please categorize your PR based on the [Contribution Map](../docs/CONTRIBUTION_MAP.md):
 
 - [ ] **Safety Zone:** I have verified my PR falls into:
   - [ ] 🟢 **Safe Zone** (docs, tests, scripts)

@@ -22,7 +22,7 @@ Built on an architectural foundation that integrates 25+ top-tier quantitative f
 The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prioritize transparency, evidence-based development, and clear system boundaries.
 
 - **[Architecture Quick-Start](./docs/ARCHITECTURE_QUICK.md):** 5-minute overview of system components, data flow, and maturity levels.
-- **[System Maturity Map](./docs/ARCHITECTURE_QUICK.md#🚦-system-maturity-map):** Transparent status of production vs. experimental subsystems with direct evidence routing.
+- **[System Maturity Map](./docs/ARCHITECTURE_QUICK.md#system-maturity-map):** Transparent status of production vs. experimental subsystems with direct evidence routing.
 - **[Scientific Rigor](./docs/BENCHMARKING.md):** Institutional benchmarking framework using Sharpe, Sortino, Wilcoxon P-Values, and statistical outperformance metrics.
 - **[Technical Health Dashboard](./docs/status/PROJECT_HEALTH.md):** Real-time visibility into technical debt, CI status, and process integrity.
 - **[Audit Evidence](./docs/audits/README.md):** Direct routing to verified walk-forward reports, ADRs, and security scorecards.
@@ -182,7 +182,7 @@ python main.py --mode live --algo ensemble --confirm-live
 
 We welcome contributions! To ensure safety in this high-turbulence repository:
 
-1.  **Start in a [Safe Zone](./docs/CONTRIBUTION_MAP.md#🟢-safe-zones-recommended-for-first-prs):** Focus on `docs/`, `tests/`, or `scripts/`.
+1.  **Start in a [Safe Zone](./docs/CONTRIBUTION_MAP.md#safe-zones-recommended-for-first-prs):** Focus on `docs/`, `tests/`, or `scripts/`.
 2.  **Explore with [Synthetic Demos](#2-quick-evaluation-no-config-demo):** Run `make demo-synthetic` to understand system telemetry.
 3.  **Follow the [First Real Contribution](./docs/FIRST_REAL_CONTRIBUTION.md) guide:** A step-by-step path to your first PR.
 4.  **Mandatory Rebase:** Always run `make resync` to align your branch with the latest `main` commit before submitting.

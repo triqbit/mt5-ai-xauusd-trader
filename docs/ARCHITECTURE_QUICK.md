@@ -18,19 +18,20 @@ The system is designed as a modular, event-driven trading engine that separates 
 
 ---
 
+<a name="system-maturity-map"></a>
 ## 🚦 System Maturity Map
 
 This map identifies the production readiness of various subsystems to ensure transparent expectations for contributors and operators.
 
 | Subsystem | Maturity | Verified Evidence |
 | :--- | :--- | :--- |
-| **Configuration Engine** | 🟢 Production | [Integration Test](./testing/INTEGRATION_TEST_RESULTS.md#test-configuration--startup) |
+| **Configuration Engine** | 🟢 Production | [Integration Test](./testing/INTEGRATION_TEST_RESULTS.md#test-configuration-startup) |
 | **MT5 Connectivity** | 🟢 Production | [Integration Test](./testing/INTEGRATION_TEST_RESULTS.md#test-trading-flow-integration) |
 | **Execution Filter** | 🟢 Production | [Complexity Analysis](./audits/PERFORMANCE_COMPLEXITY_REPORT.md) |
 | **Risk Management** | 🟢 Production | [8-Layer Cascade Verified](./audits/ENTERPRISE_EVIDENCE_SCORECARD.md) |
 | **Ensemble Models** | 🟢 Production | [Walk-Forward Report](./audits/walkforward_verification_report.md) |
 | **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors. |
-| **Decision Support** | 🟢 Production | [Integration Test](./testing/INTEGRATION_TEST_RESULTS.md#test-intelligence--adaptive-weighting) |
+| **Decision Support** | 🟢 Production | [Integration Test](./testing/INTEGRATION_TEST_RESULTS.md#test-intelligence-adaptive-weighting) |
 | **Explainability Engine** | 🟢 Production | [Attribution Logging Verified](./testing/INTEGRATION_TEST_RESULTS.md#4-observability) |
 
 ---

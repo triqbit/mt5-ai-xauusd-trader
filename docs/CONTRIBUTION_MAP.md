@@ -32,6 +32,7 @@ Our CI enforces semantic PR titles via `.github/workflows/commit-check.yml`.
 
 ---
 
+<a name="safe-zones-recommended-for-first-prs"></a>
 ## 🟢 Safe Zones (Recommended for First PRs)
 
 These areas are perfect for new contributors to get familiar with the project and provide immediate value with minimal risk to trading operations.
