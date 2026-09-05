@@ -19,7 +19,7 @@ This document records the results of the end-to-end integration tests conducted 
 **Follow-up required:**
 - None.
 
-<a name="test-configuration--startup"></a>
+<a name="test-configuration-startup"></a>
 ### Test: Configuration & Startup
 **Status:** ✅ Pass
 **Latency:** < 10 ms (Startup validation)
@@ -47,7 +47,7 @@ This document records the results of the end-to-end integration tests conducted 
 - Harmonize Risk API (PR #1372).
 - Implement `MT5Connector.close_position` to support emergency flattening.
 
-<a name="test-intelligence--adaptive-weighting"></a>
+<a name="test-intelligence-adaptive-weighting"></a>
 ### Test: Intelligence & Adaptive Weighting
 **Status:** ✅ Pass
 **Latency:** ~40-50 ms (Feature Engineering + Inference)
