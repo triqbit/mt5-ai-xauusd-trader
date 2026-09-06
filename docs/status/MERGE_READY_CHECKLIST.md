@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `b6327f910eb63e89a07048585bb0c380d408ecc0` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `f341996a351a66381055e9c15568eace5be38935` is required for all PRs.**
 
-Generated on: 2026-09-06 13:17:09 UTC
+Generated on: 2026-09-06 14:37:07 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Safe Surface update implementing 'docs: update process integrity log [2026-07-21]' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `b6327f910eb63e89a07048585bb0c380d408ecc0`
+- **Missing items**: Mandatory rebase against commit `f341996a351a66381055e9c15568eace5be38935`
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1661: DX: update process integrity log and project health [2026-07-14]
 - **Short scope summary**: Safe Surface update implementing 'DX: update process integrity log and project health [2026-07-14]' (Candidate for re-validation/review)
 - **Domains touched**: docs
-- **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `b6327f910eb63e89a07048585bb0c380d408ecc0`
+- **CI status**: unknown
+- **Missing items**: Mandatory rebase against commit `f341996a351a66381055e9c15568eace5be38935`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1543: DX: improve developer onboarding and contribution experience
 - **Short scope summary**: Safe Surface update implementing 'DX: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `b6327f910eb63e89a07048585bb0c380d408ecc0`
+- **Missing items**: Mandatory rebase against commit `f341996a351a66381055e9c15568eace5be38935`
 - **Recommendation**: Needs CI success before merge
 
 ---
