@@ -39,7 +39,8 @@ def test_risk_manager_circuit_breaker_on_volatile_data(mock_cfg, trade_logger):
 
     # Simulate a series of equity updates reflecting a crash
     risk.update_equity(10000.0)  # Peak
-    risk.update_equity(8400.0)  # 16% drawdown (limit is 15%)
+    # Default max_drawdown is 30%
+    risk.update_equity(6500.0)  # 35% drawdown
 
     signal = TradeSignal(
         symbol="XAUUSD",
