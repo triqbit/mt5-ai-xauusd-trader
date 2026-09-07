@@ -82,6 +82,8 @@ Defines immutable hard limits and automatic circuit breakers to protect capital,
   - **Graduated Penalty**: If `context_stability < 0.70`, apply a linear confidence penalty (up to 15%).
   - **Hard Block**: If `context_stability < 0.40`, force a `HOLD` signal to prevent trading in unstable or indeterminate market states.
 - **Entropy Guard**: Monitor divergence between sub-model confidences. If internal consensus is weak (std > 0.25), apply a 10% safety penalty to final confidence.
+- **Regime-Adaptive Hardening**: Automatically tightens safety thresholds during `NEWS_SHOCK` and `VOLATILE_BREAKOUT` regimes. Drift limits are reduced by 0.1, accuracy floors increased by 0.05, and minimum confidence requirements raised (to 0.70 for News Shock, 0.65 for Volatile Breakout).
+- **Regime Stability Guard**: Blocks all execution if the market's regime transition score exceeds 0.8, indicating extreme instability and low prediction reliability.
 - **Calibration Threshold**: Halt trading if Expected Calibration Error (ECE) > 0.25
 - **Daily Retraining**: Update model daily with latest data
 
