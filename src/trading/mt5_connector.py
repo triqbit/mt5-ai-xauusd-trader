@@ -93,9 +93,7 @@ class MT5Connector:
     Supports both native Windows SDK and MetaAPI cloud fallback for cross-platform support.
     """
 
-    def __init__(
-        self, config: TradingConfig, monitor: Optional["Monitor"] = None
-    ) -> None:
+    def __init__(self, config: TradingConfig, monitor: Optional["Monitor"] = None) -> None:
         """
         Initialize the connector with configuration.
 
@@ -338,7 +336,6 @@ class MT5Connector:
                 df["time"] = pd.to_datetime(df["time"], unit="s")
                 return df
             else:
-
                 candles = self._run_async(
                     self.metaapi_connection.get_historical_candles(symbol, timeframe, None, n_bars)
                 )
@@ -355,9 +352,7 @@ class MT5Connector:
             raise MT5DataError(f"Unexpected data retrieval error: {e}") from e
 
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
-    def get_ticks_range(
-        self, symbol: str, date_from: datetime, date_to: datetime
-    ) -> pd.DataFrame:
+    def get_ticks_range(self, symbol: str, date_from: datetime, date_to: datetime) -> pd.DataFrame:
         """
         Fetch historical tick data for a specific date range.
 
@@ -741,7 +736,9 @@ class MT5Connector:
                 err_code, err_desc = mt5.last_error()
                 if err_code in [-1, 10001, 10002, 10003, 10004]:
                     self._is_initialized = False
-                raise MT5DataError(f"Failed to get symbol info for {symbol}: {err_desc} (code: {err_code})")
+                raise MT5DataError(
+                    f"Failed to get symbol info for {symbol}: {err_desc} (code: {err_code})"
+                )
             return {
                 "name": info.name,
                 "tradable": info.trade_mode != mt5.SYMBOL_TRADE_MODE_DISABLED,
@@ -764,7 +761,9 @@ class MT5Connector:
                 }
             except Exception as e:
                 self._is_initialized = False
-                raise MT5DataError(f"MetaAPI get_symbol_specification failed for {symbol}: {e}") from e
+                raise MT5DataError(
+                    f"MetaAPI get_symbol_specification failed for {symbol}: {e}"
+                ) from e
 
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def find_symbols(self, pattern: str) -> List[str]:
@@ -782,12 +781,84 @@ class MT5Connector:
                 err_code, err_desc = mt5.last_error()
                 if err_code in [-1, 10001, 10002, 10003, 10004]:
                     self._is_initialized = False
-                raise MT5DataError(f"Failed to find symbols with pattern {pattern}: {err_desc} (code: {err_code})")
+                raise MT5DataError(
+                    f"Failed to find symbols with pattern {pattern}: {err_desc} (code: {err_code})"
+                )
             return [s.name for s in symbols]
         else:
             # For MetaAPI, we'd need to fetch all and filter, which is slow.
             # Return empty or a simple guess.
             return [pattern.upper()]
+
+    @with_retry((MT5ExecutionError, MT5ConnectionError), max_retries=2)
+    def close_position(self, ticket: int) -> bool:
+        """
+        Close an open position by ticket ID.
+        Essential for emergency liquidation and circuit breaker response.
+
+        Args:
+            ticket: The unique ticket ID of the position.
+
+        Returns:
+            bool: True if close request was successful.
+        """
+        return self.breaker(self._close_position_logic)(ticket)
+
+    def _close_position_logic(self, ticket: int) -> bool:
+        """Internal close position logic."""
+        if not self._is_initialized:
+            self.initialize()
+
+        logger.info("position_close_attempt", ticket=ticket)
+
+        if not self.use_metaapi:
+            # Native MT5: Need to find position first to get its properties
+            positions = mt5.positions_get(ticket=ticket)
+            if positions is None or len(positions) == 0:
+                logger.warning("position_not_found_for_close", ticket=ticket)
+                return False
+
+            pos = positions[0]
+            symbol = pos.symbol
+            volume = pos.volume
+            order_type = (
+                mt5.ORDER_TYPE_SELL if pos.type == mt5.POSITION_TYPE_BUY else mt5.ORDER_TYPE_BUY
+            )
+
+            tick = mt5.symbol_info_tick(symbol)
+            price = tick.bid if order_type == mt5.ORDER_TYPE_SELL else tick.ask
+
+            request = {
+                "action": mt5.TRADE_ACTION_DEAL,
+                "symbol": symbol,
+                "volume": volume,
+                "type": order_type,
+                "position": ticket,
+                "price": price,
+                "magic": 20240419,
+                "comment": "Emergency Close",
+                "type_time": mt5.ORDER_TIME_GTC,
+                "type_filling": mt5.ORDER_FILLING_IOC,
+            }
+
+            result = mt5.order_send(request)
+            if result is None or result.retcode != mt5.TRADE_RETCODE_DONE:
+                err_code = result.retcode if result else -1
+                err_msg = result.comment if result else "Unknown error"
+                logger.error("position_close_failed", ticket=ticket, error=err_msg, code=err_code)
+                raise MT5ExecutionError(f"Failed to close position {ticket}: {err_msg}") from None
+
+            logger.info("position_close_success", ticket=ticket)
+            return True
+        else:
+            try:
+                # MetaAPI close
+                self._run_async(self.metaapi_connection.close_position(str(ticket)))
+                logger.info("metaapi_position_close_success", ticket=ticket)
+                return True
+            except Exception as e:
+                logger.error("metaapi_position_close_failed", ticket=ticket, error=str(e))
+                raise MT5ExecutionError(f"MetaAPI failed to close position {ticket}: {e}") from e
 
 
 __all__ = ["TIMEFRAME_MAP", "MT5Connector"]
