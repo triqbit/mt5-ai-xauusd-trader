@@ -636,7 +636,9 @@ def test_invalid_executable_state_validation(mock_explanation, mock_regime, mock
 
 def test_status_level_consistency_validation(mock_explanation, mock_regime, mock_macro_risk):
     """Verify that status level cannot be EXECUTE if is_executable is False."""
-    with pytest.raises(ValidationError, match="Status level cannot be EXECUTE if is_executable is False"):
+    with pytest.raises(
+        ValidationError, match="Status level cannot be EXECUTE if is_executable is False"
+    ):
         DecisionPacket(
             symbol="XAUUSD",
             direction=SignalDirection.BUY,

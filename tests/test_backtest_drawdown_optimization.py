@@ -1,4 +1,3 @@
-
 import unittest
 from datetime import datetime
 from unittest.mock import MagicMock
@@ -15,7 +14,7 @@ class TestBacktestDrawdownOptimization(unittest.TestCase):
             symbol="XAUUSD",
             initial_balance=10000.0,
             feature_engineer=mock_fe,
-            execution_filter=mock_ef
+            execution_filter=mock_ef,
         )
 
     def test_max_equity_tracking(self):
@@ -30,12 +29,16 @@ class TestBacktestDrawdownOptimization(unittest.TestCase):
         # Scenario 2: Equity decreases (drawdown)
         self.engine.balance = 10300.0
         self.engine._record_equity(datetime.now(), 2000.0, [])
-        self.assertEqual(self.engine.max_equity, 10500.0, "max_equity should stay at the previous peak")
+        self.assertEqual(
+            self.engine.max_equity, 10500.0, "max_equity should stay at the previous peak"
+        )
 
         # Scenario 3: New peak
         self.engine.balance = 11000.0
         self.engine._record_equity(datetime.now(), 2000.0, [])
-        self.assertEqual(self.engine.max_equity, 11000.0, "max_equity should update to the new peak")
+        self.assertEqual(
+            self.engine.max_equity, 11000.0, "max_equity should update to the new peak"
+        )
 
     def test_drawdown_calculation_parity(self):
         """Verifies that the O(1) drawdown calculation is mathematically correct."""
@@ -50,6 +53,7 @@ class TestBacktestDrawdownOptimization(unittest.TestCase):
 
         expected_drawdown = (12000.0 - 11400.0) / 12000.0
         self.assertAlmostEqual(drawdown, expected_drawdown, places=7)
+
 
 if __name__ == "__main__":
     unittest.main()

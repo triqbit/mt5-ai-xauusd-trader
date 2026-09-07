@@ -5,7 +5,6 @@ tests/test_decision_support_validation.py
 Tests for DecisionSupportSystem schemas and validation.
 """
 
-
 import pytest
 from pydantic import ValidationError
 
@@ -30,8 +29,9 @@ def valid_performance():
         win_rate=0.65,
         win_loss_ratio=1.2,
         max_drawdown=0.15,
-        total_trades=100
+        total_trades=100,
     )
+
 
 @pytest.fixture
 def mock_explanation():
@@ -46,21 +46,21 @@ def mock_explanation():
         risk_assessment=RiskAssessment(passed=True, risk_reward_ratio=2.0),
         regime_context=RegimeContext(regime_name="Trending"),
         human_readable_summary="OK",
-        machine_attribution={}
+        machine_attribution={},
     )
+
 
 @pytest.fixture
 def valid_regime():
     return RegimeInfo(
-        label=MarketRegime.TRENDING,
-        confidence=0.8,
-        volatility_index=1.0,
-        transition_score=0.1
+        label=MarketRegime.TRENDING, confidence=0.8, volatility_index=1.0, transition_score=0.1
     )
+
 
 @pytest.fixture
 def valid_macro_risk():
     return RiskStatus(is_blocked=False, risk_multiplier=1.0)
+
 
 def test_performance_context_win_rate_bounds():
     """Verify win_rate is constrained between 0 and 1."""
@@ -69,13 +69,17 @@ def test_performance_context_win_rate_bounds():
     with pytest.raises(ValidationError):
         PerformanceContext(win_rate=-0.1, total_trades=10)
 
+
 def test_performance_context_frozen():
     """Verify PerformanceContext is immutable."""
     perf = PerformanceContext(win_rate=0.5, total_trades=10)
     with pytest.raises(ValidationError):
-        perf.win_rate = 0.6 # type: ignore
+        perf.win_rate = 0.6  # type: ignore
 
-def test_decision_packet_executable_consistency(mock_explanation, valid_regime, valid_macro_risk, valid_performance):
+
+def test_decision_packet_executable_consistency(
+    mock_explanation, valid_regime, valid_macro_risk, valid_performance
+):
     """Verify executable state invariants in DecisionPacket."""
     # Cannot be executable if BLOCKED
     with pytest.raises(ValidationError) as exc:
@@ -90,7 +94,7 @@ def test_decision_packet_executable_consistency(mock_explanation, valid_regime, 
             explanation=mock_explanation,
             regime=valid_regime,
             macro_risk=valid_macro_risk,
-            performance=valid_performance
+            performance=valid_performance,
         )
     assert "decision cannot be executable with a blocked status level" in str(exc.value).lower()
 
@@ -108,11 +112,14 @@ def test_decision_packet_executable_consistency(mock_explanation, valid_regime, 
             explanation=mock_explanation,
             regime=valid_regime,
             macro_risk=valid_macro_risk,
-            performance=valid_performance
+            performance=valid_performance,
         )
     assert "decision cannot be executable with active blocking reasons" in str(exc.value).lower()
 
-def test_decision_packet_frozen(mock_explanation, valid_regime, valid_macro_risk, valid_performance):
+
+def test_decision_packet_frozen(
+    mock_explanation, valid_regime, valid_macro_risk, valid_performance
+):
     """Verify DecisionPacket is immutable."""
     packet = DecisionPacket(
         symbol="XAUUSD",
@@ -125,12 +132,15 @@ def test_decision_packet_frozen(mock_explanation, valid_regime, valid_macro_risk
         explanation=mock_explanation,
         regime=valid_regime,
         macro_risk=valid_macro_risk,
-        performance=valid_performance
+        performance=valid_performance,
     )
     with pytest.raises(ValidationError):
-        packet.symbol = "BTCUSD" # type: ignore
+        packet.symbol = "BTCUSD"  # type: ignore
 
-def test_decision_packet_extra_forbid(mock_explanation, valid_regime, valid_macro_risk, valid_performance):
+
+def test_decision_packet_extra_forbid(
+    mock_explanation, valid_regime, valid_macro_risk, valid_performance
+):
     """Verify extra fields are forbidden."""
     with pytest.raises(ValidationError):
         DecisionPacket(
@@ -145,5 +155,5 @@ def test_decision_packet_extra_forbid(mock_explanation, valid_regime, valid_macr
             regime=valid_regime,
             macro_risk=valid_macro_risk,
             performance=valid_performance,
-            untrusted_field="injection" # type: ignore
+            untrusted_field="injection",  # type: ignore
         )
