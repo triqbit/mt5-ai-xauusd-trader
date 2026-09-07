@@ -11,6 +11,21 @@ and clear operational semantics.
 from enum import Enum, IntEnum
 from typing import Literal
 
+# --- Centralized Domain Literals ---
+# These literals ensure type safety and consistency across config, models, and execution.
+
+# Supported ML algorithm architectures
+ALGORITHM_TYPE = Literal["ppo", "dreamer", "lstm", "ensemble"]
+
+# Supported hardware accelerators for model inference
+DEVICE_TYPE = Literal["cpu", "cuda", "mps", "auto"]
+
+# Supported execution modes
+EXECUTION_MODE = Literal["demo", "live", "backtest"]
+
+# Standardized logging levels
+LOG_LEVEL_TYPE = Literal["DEBUG", "INFO", "WARNING", "ERROR"]
+
 # --- Validation Patterns ---
 # Enforces institutional naming conventions for financial instruments.
 SYMBOL_PATTERN = r"^[A-Z0-9]{3,20}$"

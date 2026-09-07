@@ -21,7 +21,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from src.core.constants import SYMBOL_PATTERN, SignalDirection
+from src.core.constants import ALGORITHM_TYPE, SYMBOL_PATTERN, SignalDirection
 
 
 class TradeSignal(BaseModel):
@@ -53,7 +53,9 @@ class TradeSignal(BaseModel):
         ..., gt=0, description="The target profit taking price (must be positive)"
     )
     lot_size: float = Field(..., ge=0.01, description="The position size in lots (minimum 0.01)")
-    algorithm: str = Field(..., description="The name of the algorithm that generated this signal")
+    algorithm: ALGORITHM_TYPE = Field(
+        ..., description="The name of the algorithm that generated this signal"
+    )
     confidence: float = Field(
         ...,
         ge=0.0,
