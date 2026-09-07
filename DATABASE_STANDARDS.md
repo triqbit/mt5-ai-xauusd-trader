@@ -393,3 +393,7 @@ To ensure enterprise-grade reliability when using SQLite:
 
 ### Implementation Note (v1.3) - Observability
 - **Slow Query Logging**: The system implements automated slow query detection via SQLAlchemy event listeners. Queries exceeding `SLOW_QUERY_THRESHOLD` (default: 1.0s) are logged as warnings for performance monitoring.
+
+### Implementation Note (v1.4) - Operational State Reconciliation
+- **State Recovery**: The `TradeLogger` provides `get_reconciliation_data()` and `get_open_trades()` to restore the bot's risk context (daily loss trackers, drawdown circuit breakers, and position mapping) after a restart.
+- **Data Integrity**: Reconciliation ensures that intraday risk limits are respected even if the process is interrupted, preventing over-trading or limit breaches post-recovery.
