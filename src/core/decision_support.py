@@ -346,11 +346,11 @@ class DecisionSupportSystem:
             summary += "Strategic alignment is weak or divergent, suggesting non-ideal conditions. "
 
         if status == DecisionStatus.EXECUTE:
-            summary += "Signal demonstrates maximum confluence and satisfies all institutional guardrails for automated execution."
+            summary += "ModelSignal demonstrates maximum confluence and satisfies all institutional guardrails for automated execution."
         elif status == DecisionStatus.REVIEW:
-            summary += "Signal is technically valid but requires manual oversight due to moderate confidence or specific risk factors."
+            summary += "ModelSignal is technically valid but requires manual oversight due to moderate confidence or specific risk factors."
         elif status == DecisionStatus.CAUTION:
-            summary += "Signal carries elevated operational risk; reduced sizing or manual rejection is recommended."
+            summary += "ModelSignal carries elevated operational risk; reduced sizing or manual rejection is recommended."
 
         return summary
 
@@ -668,7 +668,7 @@ class DecisionSupportSystem:
             # 4. Attribution Summary (Text)
             attribution_summary = Panel(
                 Text(packet.explanation.human_readable_summary),
-                title="🔍 Signal Attribution Summary",
+                title="🔍 ModelSignal Attribution Summary",
                 border_style="yellow",
             )
 

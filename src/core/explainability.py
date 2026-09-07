@@ -840,7 +840,7 @@ class SignalExplainer:
                 f"[bold {status_color}]{explanation.direction.name}[/bold {status_color}] for [bold]{explanation.symbol}[/bold]\n"
                 f"Confidence: [bold]{explanation.total_confidence:.1%}[/bold]\n\n"
                 f"{explanation.human_readable_summary}",
-                title="Trade Signal Explanation",
+                title="Trade ModelSignal Explanation",
                 subtitle=f"ID: {explanation.signal_id or 'N/A'} | {explanation.timestamp.strftime('%Y-%m-%d %H:%M:%S UTC')}",
                 box=box.DOUBLE,
             )

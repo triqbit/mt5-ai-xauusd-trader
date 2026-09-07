@@ -53,7 +53,7 @@ class ExecutionFilter:
         7. Model Stability
         8. Performance Guard
         9. Confidence Threshold
-        10. Signal Consistency
+        10. ModelSignal Consistency
         11. Macro Risk Gate
     """
 
@@ -184,7 +184,7 @@ class ExecutionFilter:
             **conf_metrics,
         }
 
-        # Layer 10: Signal Consistency
+        # Layer 10: ModelSignal Consistency
         cons_passed, cons_metrics = self._check_signal_consistency_with_metrics(
             signal.symbol, signal.direction
         )

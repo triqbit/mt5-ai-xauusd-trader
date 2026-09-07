@@ -16,7 +16,7 @@ from src.trading.backtester import BacktestEngine
 class InstitutionalMockModel:
     """Mock model that returns a steady signal for institutional testing."""
     def predict(self, obs):
-        return type("Signal", (), {"direction": 1, "confidence": 0.95})
+        return type("ModelSignal", (), {"direction": 1, "confidence": 0.95})
 
 
 @pytest.fixture

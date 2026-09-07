@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from src.core.constants import SignalDirection
-from src.models.base_model import Signal
+from src.core.schemas import ModelSignal
 from src.models.dreamer_agent import DreamerAgent
 from src.models.lstm_model import LSTMAttentionModel, LSTMModel, LSTMPricePredictor
 from src.models.ppo_agent import PPOAgent
@@ -19,7 +19,7 @@ def test_ppo_agent_stub():
     # Test predict when model is None
     obs = np.zeros((20, 140))
     signal = agent.predict(obs)
-    assert isinstance(signal, Signal)
+    assert isinstance(signal, ModelSignal)
     assert signal.direction == SignalDirection.HOLD
     assert signal.confidence == 0.0
     assert "error" in signal.metadata
@@ -71,7 +71,7 @@ def test_lstm_model_stub():
     # Even if torch is missing, it should handle gracefully (returning HOLD)
     obs = np.zeros((20, 10))
     signal = agent.predict(obs)
-    assert isinstance(signal, Signal)
+    assert isinstance(signal, ModelSignal)
     if agent.model is not None:
         assert isinstance(agent.model, LSTMPricePredictor)
         assert signal.direction in [
@@ -90,7 +90,7 @@ def test_lstm_model_attention():
         assert isinstance(agent.model, LSTMAttentionModel)
         obs = np.zeros((20, 10))
         signal = agent.predict(obs)
-        assert isinstance(signal, Signal)
+        assert isinstance(signal, ModelSignal)
     else:
         pytest.skip("PyTorch not available")
 
@@ -99,7 +99,7 @@ def test_dreamer_agent_stub():
     agent = DreamerAgent()
     obs = np.zeros((20, 140))
     signal = agent.predict(obs)
-    assert isinstance(signal, Signal)
+    assert isinstance(signal, ModelSignal)
     assert signal.direction == SignalDirection.HOLD
     assert signal.confidence == 0.0
     assert signal.metadata["status"] == "placeholder"

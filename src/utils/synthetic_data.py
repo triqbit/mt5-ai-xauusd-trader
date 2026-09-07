@@ -16,7 +16,7 @@ import pandas as pd
 from src.core.constants import EventCategory, EventImpact, SignalDirection
 from src.core.schemas import TradeSignal
 from src.data.event_models import MacroEvent, RiskStatus
-from src.models.base_model import Signal
+from src.core.schemas import ModelSignal
 from src.models.regime_detector import MarketRegime, RegimeInfo
 from src.trading.capital_allocator import AllocationRequest, StrategyConfig
 
@@ -609,7 +609,7 @@ class ExecutionScenarioBuilder:
         return signal, df
 
     def atr_failure(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
-        """Signal during extreme volatility spike (ATR failure)."""
+        """ModelSignal during extreme volatility spike (ATR failure)."""
         df = self.gen.generate(n_steps=200, regime="ranging", volatility=0.0005)
         # Spike ATR at the end by blowing up the range of the last candle
         last_idx = df.index[-1]
@@ -640,12 +640,12 @@ class ExecutionScenarioBuilder:
         return signal, df, sat
 
     def drawdown_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame, float]:
-        """Signal with excessive drawdown (e.g., 0.35)."""
+        """ModelSignal with excessive drawdown (e.g., 0.35)."""
         signal, df = self.passing_buy(symbol)
         return signal, df, 0.35
 
     def confidence_violation(self, symbol: str = "XAUUSD") -> tuple[TradeSignal, pd.DataFrame]:
-        """Signal with confidence below threshold (0.4)."""
+        """ModelSignal with confidence below threshold (0.4)."""
         signal, df = self.passing_buy(symbol)
         # Ensure open market time and handle frozen Pydantic model
         signal = signal.model_copy(
@@ -680,7 +680,7 @@ class ExecutionScenarioBuilder:
     def performance_violation(
         self, symbol: str = "XAUUSD"
     ) -> tuple[TradeSignal, pd.DataFrame, Any]:
-        """Signal with a mocked trade logger reporting low win rate."""
+        """ModelSignal with a mocked trade logger reporting low win rate."""
         signal, df = self.passing_buy(symbol)
 
         # We define a simple dummy class to avoid importing MagicMock at the top level of src
@@ -1561,28 +1561,28 @@ class EnsembleScenarioBuilder:
 
     def consensus_signals(
         self, direction: SignalDirection, confidence: float = 0.8
-    ) -> dict[str, Signal]:
+    ) -> dict[str, ModelSignal]:
         """All models agree on a direction."""
         return {
-            "ppo": Signal(direction=direction, confidence=confidence),
-            "dreamer": Signal(direction=direction, confidence=confidence),
-            "lstm": Signal(direction=direction, confidence=confidence),
+            "ppo": ModelSignal(direction=direction, confidence=confidence),
+            "dreamer": ModelSignal(direction=direction, confidence=confidence),
+            "lstm": ModelSignal(direction=direction, confidence=confidence),
         }
 
-    def dissent_signals(self) -> dict[str, Signal]:
+    def dissent_signals(self) -> dict[str, ModelSignal]:
         """Models have conflicting BUY/SELL directions."""
         return {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.8),
-            "dreamer": Signal(direction=SignalDirection.SELL, confidence=0.8),
-            "lstm": Signal(direction=SignalDirection.HOLD, confidence=0.0),
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.8),
+            "dreamer": ModelSignal(direction=SignalDirection.SELL, confidence=0.8),
+            "lstm": ModelSignal(direction=SignalDirection.HOLD, confidence=0.0),
         }
 
-    def veto_signals(self, direction: SignalDirection) -> dict[str, Signal]:
+    def veto_signals(self, direction: SignalDirection) -> dict[str, ModelSignal]:
         """Models agree on direction but one has very low confidence (<0.4)."""
         return {
-            "ppo": Signal(direction=direction, confidence=0.9),
-            "dreamer": Signal(direction=direction, confidence=0.35),  # Trigger veto
-            "lstm": Signal(direction=direction, confidence=0.9),
+            "ppo": ModelSignal(direction=direction, confidence=0.9),
+            "dreamer": ModelSignal(direction=direction, confidence=0.35),  # Trigger veto
+            "lstm": ModelSignal(direction=direction, confidence=0.9),
         }
 
     def regime_context(self, regime: MarketRegime, transition_score: float = 0.0) -> RegimeInfo:

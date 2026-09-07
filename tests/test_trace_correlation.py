@@ -38,7 +38,7 @@ def test_trace_id_propagation(audit_logger, trade_logger):
     # 2. Log to Audit trail
     audit_logger.log(actor="test_actor", action="test_action", details="Test details")
 
-    # 3. Log Signal
+    # 3. Log ModelSignal
     signal_data = {
         "symbol": "XAUUSD",
         "direction": 1,

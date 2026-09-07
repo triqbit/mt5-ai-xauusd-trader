@@ -276,7 +276,7 @@ class BacktestEngine:
                         stats_timers["normalization"] += time.perf_counter() - t0
 
                         try:
-                            # Standard Signal object or fallback to raw int
+                            # Standard ModelSignal object or fallback to raw int
                             t0 = time.perf_counter()
                             signal_obj = model.predict(obs)
                             direction = int(signal_obj.direction)
@@ -288,7 +288,7 @@ class BacktestEngine:
                         if direction != 0:
                             atr = atr_vals[abs_idx]
                             if not np.isnan(atr) and atr > 0:
-                                # 3. Prepare Signal and Validate with Filter Cascade
+                                # 3. Prepare ModelSignal and Validate with Filter Cascade
                                 signal = TradeSignal(
                                     symbol=self.symbol,
                                     direction=direction,

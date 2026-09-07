@@ -18,7 +18,7 @@ class SimpleMockModel:
     def __init__(self, direction=1):
         self.direction = direction
     def predict(self, obs):
-        return type("Signal", (), {"direction": self.direction, "confidence": 0.9})
+        return type("ModelSignal", (), {"direction": self.direction, "confidence": 0.9})
 
 @pytest.fixture
 def test_data():

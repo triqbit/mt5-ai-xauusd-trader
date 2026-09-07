@@ -33,7 +33,7 @@ def test_backtester_scalability(large_sample_data):
 
     class MockModel:
         def predict(self, obs):
-            return type("Signal", (), {"direction": 1, "confidence": 0.8})
+            return type("ModelSignal", (), {"direction": 1, "confidence": 0.8})
 
     start = time.perf_counter()
     report = engine.run_walk_forward(

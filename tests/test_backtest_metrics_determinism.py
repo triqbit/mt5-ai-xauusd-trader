@@ -17,7 +17,7 @@ class ConstantModel:
         self.direction = direction
         self.confidence = confidence
     def predict(self, obs):
-        return type("Signal", (), {"direction": self.direction, "confidence": self.confidence})
+        return type("ModelSignal", (), {"direction": self.direction, "confidence": self.confidence})
 
 @pytest.fixture
 def backtest_builder():

@@ -87,9 +87,9 @@ def mock_ensemble():
         model = EnsembleModel(device="cpu")
         model.ppo_agent = MagicMock()
         from src.core.constants import SignalDirection
-        from src.models.base_model import Signal
+        from src.core.schemas import ModelSignal
 
-        model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
+        model.ppo_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.8)
         return model
 
 
