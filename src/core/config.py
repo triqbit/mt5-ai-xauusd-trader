@@ -54,6 +54,19 @@ class TradingConfig(BaseSettings):
         default="", description="Unique account identifier for MetaAPI provisioning"
     )
 
+    # ── TickerAll (hosted MT5 API - https://tickerall.com) ───────────────────────
+    tickerall_api_key: SecretStr = Field(
+        default="",
+        description="TickerAll hosted MT5 API key (cf_api_...). When set, TickerAll "
+        "is used as the cloud provider (preferred over MetaAPI); runs on any OS "
+        "with no local terminal.",
+    )
+    tickerall_account_id: SecretStr = Field(
+        default="",
+        description="TickerAll connected-account id. Optional: if omitted and the "
+        "key has a single account, it is used automatically.",
+    )
+
     # ── Trading parameters ─────────────────────────────────────────────────────
     symbol: str = Field(
         default="XAUUSD",
@@ -130,9 +143,15 @@ class TradingConfig(BaseSettings):
     allocator_max_total_heat: float = Field(default=0.70, description="Max 70% of budget committed")
     allocator_max_symbol_risk: float = Field(default=0.40, description="Max 40% per symbol")
     allocator_max_family_risk: float = Field(default=0.40, description="Max 40% per model family")
-    allocator_performance_step: float = Field(default=0.05, description="Adjustment step for performance")
-    allocator_decay_rate: float = Field(default=0.001, description="Rate at which multiplier returns to 1.0")
-    allocator_soft_limit_buffer: float = Field(default=0.10, description="Buffer for diversification guard")
+    allocator_performance_step: float = Field(
+        default=0.05, description="Adjustment step for performance"
+    )
+    allocator_decay_rate: float = Field(
+        default=0.001, description="Rate at which multiplier returns to 1.0"
+    )
+    allocator_soft_limit_buffer: float = Field(
+        default=0.10, description="Buffer for diversification guard"
+    )
 
     # Volatility Thresholds
     volatility_high_threshold: float = Field(
