@@ -1,18 +1,19 @@
 """
 MT5 AI/ML Trading Bot - Enterprise Edition
 tests/test_execution_filter.py
-Unit tests for the 6-layer execution filter.
+Unit tests for the execution filter cascade.
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 
 import numpy as np
 import pandas as pd
 import pytest
+from unittest.mock import MagicMock
 
 from src.core.config import TradingConfig
 from src.core.schemas import TradeSignal
-from src.trading.execution_filter import ExecutionFilter
+from src.trading.execution_filter import ExecutionFilter, ExecutionDecision
 
 
 @pytest.fixture
@@ -214,25 +215,81 @@ def test_drawdown_exact_limit_fail(filter_engine):
     # filter_engine.max_drawdown is 0.12 by default
     assert filter_engine._check_drawdown_limit(0.12) is False
 
+# --- Extended Layers ---
+def test_model_stability_pass(filter_engine):
+    health = {"drift": 0.1, "accuracy": 0.8}
+    passed, _ = filter_engine._check_model_stability_with_metrics(health)
+    assert passed is True
+
+def test_model_stability_fail(filter_engine):
+    health = {"drift": 0.5, "accuracy": 0.8}
+    passed, _ = filter_engine._check_model_stability_with_metrics(health)
+    assert passed is False
+
+def test_performance_guard_pass(filter_engine):
+    logger = MagicMock()
+    logger.read_performance_report.return_value = {"win_rate": 0.6, "total_trades": 50}
+    passed, _ = filter_engine._check_performance_guard_with_metrics(logger)
+    assert passed is True
+
+def test_performance_guard_fail(filter_engine):
+    logger = MagicMock()
+    logger.read_performance_report.return_value = {"win_rate": 0.3, "total_trades": 50}
+    passed, _ = filter_engine._check_performance_guard_with_metrics(logger)
+    assert passed is False
+
+def test_confidence_threshold_pass(filter_engine, buy_signal):
+    passed, _ = filter_engine._check_confidence_threshold_with_metrics(buy_signal)
+    assert passed is True
+
+def test_confidence_threshold_fail(filter_engine, buy_signal):
+    low_conf_signal = buy_signal.model_copy(update={"confidence": 0.4})
+    passed, _ = filter_engine._check_confidence_threshold_with_metrics(low_conf_signal)
+    assert passed is False
+
+def test_signal_consistency_pass(filter_engine):
+    # Same direction twice
+    filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)
+    passed, _ = filter_engine._check_signal_consistency_with_metrics("XAUUSD", 1)
+    assert passed is True
+
+def test_signal_consistency_fail(filter_engine):
+    # Flickering direction
+    for d in [1, -1, 1, -1, 1]:
+        filter_engine._check_signal_consistency_with_metrics("XAUUSD", d)
+    passed, metrics = filter_engine._check_signal_consistency_with_metrics("XAUUSD", -1)
+    assert passed is False
+    assert metrics["changes"] > 3
+
 # --- Full Cascade ---
 def test_full_cascade_pass(filter_engine, buy_signal, bullish_data):
-    ts = datetime(2023, 10, 10, 10, 0, 0)
+    ts = datetime(2023, 10, 10, 10, 0, 0, tzinfo=UTC)
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
     assert decision.is_approved is True
     assert decision.blocked_by is None
     assert decision.confidence_score == buy_signal.confidence
 
 def test_full_cascade_blocked_by_session(filter_engine, buy_signal, bullish_data):
-    ts = datetime(2023, 10, 14, 10, 0, 0) # Sat
+    ts = datetime(2023, 10, 14, 10, 0, 0, tzinfo=UTC) # Sat
     decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
     assert decision.is_approved is False
     assert decision.blocked_by == "SESSION_CLOSED"
 
 def test_full_cascade_blocked_by_drawdown(filter_engine, buy_signal, bullish_data):
-    ts = datetime(2023, 10, 10, 10, 0, 0)
+    ts = datetime(2023, 10, 10, 10, 0, 0, tzinfo=UTC)
     decision = filter_engine.validate(buy_signal, bullish_data, 0.15, timestamp=ts)
     assert decision.is_approved is False
     assert decision.blocked_by == "DRAWDOWN_LIMIT"
+
+def test_full_cascade_priority(filter_engine, buy_signal, bullish_data):
+    """Ensures the first failing layer is reported when multiple layers fail."""
+    # EMA fails (Layer 3) and Session fails (Layer 5)
+    ts = datetime(2023, 10, 14, 10, 0, 0, tzinfo=UTC) # Sat (Session fails)
+    bullish_data.loc[bullish_data.index[-1], "base_M5_ema_8"] = 0 # EMA fails
+
+    decision = filter_engine.validate(buy_signal, bullish_data, 0.05, timestamp=ts)
+    assert decision.is_approved is False
+    assert decision.blocked_by == "EMA_SEQUENCE"
 
 def test_config_integration(buy_signal):
     """Verifies that ExecutionFilter correctly uses parameters from TradingConfig."""
@@ -257,7 +314,7 @@ def test_config_integration(buy_signal):
 
 def test_validate_with_precomputed_metrics_only(filter_engine, buy_signal):
     """Verifies optimization path: validate works with None market_data if metrics are provided."""
-    ts = datetime(2023, 10, 10, 10, 0, 0)
+    ts = datetime(2023, 10, 10, 10, 0, 0, tzinfo=UTC)
     precomputed = {
         "atr_volatility": {"current_atr": 1.0, "avg_atr": 1.0},
         "trend_angle": {"slope": 1.0},
