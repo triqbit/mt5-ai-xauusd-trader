@@ -108,6 +108,18 @@ class PerformanceContext(BaseModel):
         le=0.0,
         description="Conditional Value at Risk (Expected Shortfall) at 95% confidence.",
     )
+    trade_frequency: float = Field(
+        0.0, ge=0.0, description="Average number of trades per day."
+    )
+    avg_hold_time: float = Field(
+        0.0, ge=0.0, description="Average trade duration in hours."
+    )
+    profit_concentration: float = Field(
+        0.0,
+        ge=0.0,
+        le=1.0,
+        description="Percentage of total profit from top 10% of trades (0.0 to 1.0).",
+    )
     total_trades: int = Field(0, ge=0, description="Count of trades analyzed in this window.")
 
 
@@ -272,6 +284,9 @@ class DecisionSupportSystem:
             sqn=performance_metrics.get("sqn", 0.0),
             max_drawdown=performance_metrics.get("max_drawdown", 0.0),
             cvar_95=performance_metrics.get("cvar_95", 0.0),
+            trade_frequency=performance_metrics.get("trade_frequency", 0.0),
+            avg_hold_time=performance_metrics.get("avg_hold_time", 0.0),
+            profit_concentration=performance_metrics.get("profit_concentration", 0.0),
             total_trades=int(performance_metrics.get("total_trades", 0)),
         )
 
@@ -377,7 +392,10 @@ class DecisionSupportSystem:
         consensus_score = consensus_strength * 40.0
 
         # 2. Regime Score (0-30)
-        regime_score = regime.confidence * 30.0
+        # Refinement: Average regime confidence with strategy-specific alignment
+        regime_score = (
+            (regime.confidence + explanation.regime_context.regime_alignment_score) / 2.0
+        ) * 30.0
 
         # 3. Risk & Safety Score (0-30)
         # Weights: 20% for Risk/Reward quality, 10% for Macro safety
@@ -634,7 +652,10 @@ class DecisionSupportSystem:
                 f"🎯 Win Rate:      [bold {wr_color}]{packet.performance.win_rate:.1%}[/]  |  "
                 f"🔢 Trades: {packet.performance.total_trades}\n"
                 f"💎 SQN Score:     [bold {sqn_color}]{packet.performance.sqn:.2f}[/]  |  "
-                f"📉 CVaR(95): [bold {cvar_color}]{packet.performance.cvar_95:.2%}[/]"
+                f"📉 CVaR(95): [bold {cvar_color}]{packet.performance.cvar_95:.2%}[/]\n"
+                f"🕒 Avg Hold:     [bold]{packet.performance.avg_hold_time:.1f}h[/]  |  "
+                f"🔄 Freq: [bold]{packet.performance.trade_frequency:.1f} t/d[/]\n"
+                f"🎯 Concentration: [bold]{packet.performance.profit_concentration:.1%}[/]"
             )
             perf_panel = Panel(perf_content, title="📊 Recent Performance", border_style="magenta")
 
@@ -726,6 +747,9 @@ class DecisionSupportSystem:
                 f"RF {packet.performance.recovery_factor:.2f} | "
                 f"Win% {packet.performance.win_rate:.1%} | "
                 f"W/L {packet.performance.win_loss_ratio:.2f}\n"
+                f"            Hold: {packet.performance.avg_hold_time:.1f}h | "
+                f"Freq: {packet.performance.trade_frequency:.1f} t/d | "
+                f"Conc: {packet.performance.profit_concentration:.1%}\n"
             )
             res += f"MACRO: {'BLOCKED' if packet.macro_risk.is_blocked else 'OK'} (Insight: {packet.macro_risk.reason})\n"
 
