@@ -411,6 +411,7 @@ class EnsembleModel(BaseModel):
             **kwargs: Additional context:
                 seq (np.ndarray): Sequence data for the LSTM model.
                 regime_info (RegimeInfo): Market regime information.
+                symbol (str): Trading symbol identifier.
 
         Returns:
             Signal: Consolidated ensemble signal.
@@ -422,7 +423,7 @@ class EnsembleModel(BaseModel):
         # PPO prediction
         if self.ppo_agent is not None:
             with profile("inference_ppo"):
-                votes["ppo"] = self.ppo_agent.predict(features, regime_info=regime_info)
+                votes["ppo"] = self.ppo_agent.predict(features, **kwargs)
                 self.dynamic_ensemble.record_prediction(
                     "ppo", votes["ppo"].direction, votes["ppo"].confidence
                 )
@@ -430,7 +431,7 @@ class EnsembleModel(BaseModel):
         # Dreamer prediction
         if self.dreamer_agent is not None:
             with profile("inference_dreamer"):
-                votes["dreamer"] = self.dreamer_agent.predict(features, regime_info=regime_info)
+                votes["dreamer"] = self.dreamer_agent.predict(features, **kwargs)
                 self.dynamic_ensemble.record_prediction(
                     "dreamer", votes["dreamer"].direction, votes["dreamer"].confidence
                 )
@@ -440,7 +441,7 @@ class EnsembleModel(BaseModel):
             with profile("inference_lstm"):
                 # Use seq if provided, otherwise fallback to features
                 lstm_input = seq if seq is not None else features
-                votes["lstm"] = self.lstm_model.predict(lstm_input, regime_info=regime_info)
+                votes["lstm"] = self.lstm_model.predict(lstm_input, **kwargs)
                 self.dynamic_ensemble.record_prediction(
                     "lstm", votes["lstm"].direction, votes["lstm"].confidence
                 )

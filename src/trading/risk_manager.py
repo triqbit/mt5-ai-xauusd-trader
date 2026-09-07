@@ -20,7 +20,9 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Dict, Optional
+from typing import Any, Dict, List, Optional
+
+import pandas as pd
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
@@ -81,6 +83,8 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
+        market_data: Optional[pd.DataFrame] = None,
+        open_positions: Optional[List[Dict[str, Any]]] = None,
     ) -> bool:
         """
         Run the full 8-layer risk filter cascade.
@@ -93,6 +97,16 @@ class RiskManager:
             rejection_reason = "Daily loss limit reached"
         elif not self._check_max_positions():
             rejection_reason = "Max positions reached"
+        elif open_positions is not None and not self._check_directional_exposure(
+            signal, open_positions
+        ):
+            rejection_reason = "Max directional exposure reached"
+        elif (
+            open_positions is not None
+            and market_data is not None
+            and not self._check_total_notional(signal, open_positions, market_data)
+        ):
+            rejection_reason = "Total notional exposure exceeds limit"
         elif not self._check_symbol_allocation(signal.symbol):
             rejection_reason = f"Symbol {signal.symbol} not in portfolio"
         elif not self._check_minimum_confidence(signal.confidence):
@@ -147,6 +161,76 @@ class RiskManager:
             lot_size,
         )
         return lot_size
+
+    def size_position_atr(self, symbol: str, market_data: pd.DataFrame) -> float:
+        """
+        ATR-based position sizing according to RISK_LIMITS.md.
+
+        Logic:
+          - Compare 14-period ATR to 30-day average.
+          - Normal Volatility: 100% position size.
+          - High Volatility (>1.5x): Reduce to 75% position size.
+          - Very High Volatility (>2x): Reduce to 50% position size.
+          - Extreme Volatility (>3x): HALT (0.0 lots).
+
+        Additional Constraints:
+          - Daily loss level multiplier (100%, 50%, 25%, 0%).
+          - Max Position Size (10% of account equity per trade).
+        """
+        if market_data.empty or "atr" not in market_data.columns:
+            return self.cfg.min_lot_size
+
+        current_atr = market_data["atr"].iloc[-1]
+        avg_atr = market_data["atr"].tail(8640).mean()  # Approx 30 days of M5
+
+        vol_multiplier = 1.0
+        ratio = current_atr / avg_atr if avg_atr > 0 else 1.0
+
+        if ratio > getattr(self.cfg, "volatility_extreme_threshold", 3.0):
+            return 0.0
+        elif ratio > getattr(self.cfg, "volatility_very_high_threshold", 2.0):
+            vol_multiplier = 0.5
+        elif ratio > getattr(self.cfg, "volatility_high_threshold", 1.5):
+            vol_multiplier = 0.75
+
+        # Multiplier based on daily loss level
+        loss_pct = (
+            abs(self.daily.realised_pnl) / self.daily.peak_equity
+            if self.daily.peak_equity > 0
+            else 0
+        )
+        level = 0
+        if self.daily.realised_pnl < 0:
+            if loss_pct >= self.cfg.max_daily_loss:
+                level = 4
+            elif loss_pct >= getattr(self.cfg, "daily_loss_lvl3", 0.05):
+                level = 3
+            elif loss_pct >= getattr(self.cfg, "daily_loss_lvl2", 0.03):
+                level = 2
+            elif loss_pct >= getattr(self.cfg, "daily_loss_lvl1", 0.01):
+                level = 1
+
+        mapping = {0: 1.0, 1: 1.0, 2: 0.5, 3: 0.25, 4: 0.0}
+        loss_multiplier = mapping.get(level, 0.0)
+        total_multiplier = vol_multiplier * loss_multiplier
+
+        if total_multiplier <= 0:
+            return 0.0
+
+        # Sizing: risk 1% (cfg.risk_per_trade) of balance
+        risk_amount = self.balance * self.cfg.risk_per_trade
+        # ATR * 100 converts gold ATR to $ per lot
+        lot_size = (risk_amount / (current_atr * 100)) * total_multiplier
+
+        # Cap at Max Position Size (10% of equity)
+        max_notional = self.balance * getattr(self.cfg, "max_position_size_pct", 0.1)
+        price = market_data["close"].iloc[-1]
+        max_lots = max_notional / (price * 100)
+
+        final_lots = min(lot_size, max_lots)
+        final_lots = max(self.cfg.min_lot_size, round(final_lots, 2))
+
+        return final_lots
 
     def update_equity(self, current_equity: float) -> None:
         """Call after every closed trade or on heartbeat."""
@@ -266,6 +350,36 @@ class RiskManager:
             logger.debug("R:R %.2f below minimum %.2f", rr, min_rr)
             return False
         return True
+
+    def _check_directional_exposure(
+        self, signal: TradeSignal, open_positions: List[Dict[str, Any]]
+    ) -> bool:
+        """Layer 4: 30% net directional exposure."""
+        net_lots = 0.0
+        for pos in open_positions:
+            vol = pos.get("volume", 0.0)
+            if pos.get("type") == 0:  # BUY
+                net_lots += vol
+            else:  # SELL
+                net_lots -= vol
+
+        net_lots += self.cfg.min_lot_size if signal.direction > 0 else -self.cfg.min_lot_size
+        price_estimate = 2300.0  # Gold estimate
+        notional = abs(net_lots) * price_estimate * 100
+        exposure_pct = notional / self.balance if self.balance > 0 else 1.0
+
+        limit = getattr(self.cfg, "max_single_direction_pct", 0.3)
+        return exposure_pct <= limit
+
+    def _check_total_notional(
+        self, signal: TradeSignal, open_positions: List[Dict[str, Any]], market_data: pd.DataFrame
+    ) -> bool:
+        """Layer 4: Total notional < 100% equity."""
+        total_lots = sum(pos.get("volume", 0.0) for pos in open_positions) + self.cfg.min_lot_size
+        price = market_data["close"].iloc[-1] if not market_data.empty else 2300.0
+        total_notional = total_lots * price * 100
+        limit = getattr(self.cfg, "max_total_notional_pct", 1.0)
+        return total_notional < (self.balance * limit)
 
 
 __all__ = ["ALLOCATION_WEIGHTS", "DailyStats", "RiskManager"]

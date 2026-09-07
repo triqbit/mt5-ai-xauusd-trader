@@ -82,7 +82,7 @@
 - **Conflict**: The `BaseModel.predict` method is overly restrictive (`features: np.ndarray`), while `EnsembleModel` and `TransformerModel` require additional context like sequences or market regime info.
 - **Agents**: Jules01, Jules04
 - **Impact**: Medium. Leads to ugly `hasattr` or `isinstance` checks in `main.py`, breaking polymorphism.
-- **Resolution**: Harmonize `BaseModel.predict` to accept `**kwargs` for flexible context passing.
+- **Resolution**: Harmonize `BaseModel.predict` to accept `**kwargs` for flexible context passing. Forward `kwargs` from ensemble to sub-agents. (Resolved 2026-05-20)
 - **Owner**: Jules05
 
 ### 2. `TimeSeriesTransformer` Exclusion from CLI
@@ -104,4 +104,20 @@
 - **Agents**: Jules01, Jules02
 - **Impact**: Low. Purely a coherence/clarity issue as current mappings are correct but inconsistent.
 - **Resolution**: Standardize all model outputs to `Signal` using `SignalDirection` and clarify `ModelAction` usage in enums.
+- **Owner**: Jules05
+
+## [2026-05-20] - Risk Management Harmonization & API Consolidation
+
+### 1. Duplicated Risk Logic (RiskEngine vs RiskManager)
+- **Conflict**: Redundant 8-layer cascade implementations in `risk_engine.py` and `risk_manager.py`. `RiskEngine` had superior exposure logic but was not the primary manager used in production.
+- **Agents**: Jules01, Jules02
+- **Impact**: High. Fragmented safety gates and increased maintenance debt.
+- **Resolution**: Merged `_check_directional_exposure` and `_check_total_notional` into `RiskManager`. Merged ATR-based sizing as `size_position_atr`. Deleted `risk_engine.py`.
+- **Owner**: Jules05
+
+### 2. Risk API Export Gap
+- **Conflict**: `src/trading/__init__.py` was missing exports for `RiskManager` and `AuditedRiskManager`, forcing direct file imports in `main.py`.
+- **Agents**: Jules01, Jules05
+- **Impact**: Low. Violates encapsulation.
+- **Resolution**: Updated `src/trading/__init__.py` to export the harmonized risk API.
 - **Owner**: Jules05
