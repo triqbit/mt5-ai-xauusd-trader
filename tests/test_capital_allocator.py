@@ -21,6 +21,7 @@ def allocator():
         total_budget=100000.0,
         max_symbol_risk=0.4,
         max_family_risk=0.4,
+        max_strategy_risk=0.8,  # Set higher for tests to avoid interfering with heat limits
         max_total_heat=0.7,
         performance_step=0.1,
         decay_rate=0.01,
@@ -268,6 +269,7 @@ def test_request_allocation_zero_cap(allocator):
     # This shouldn't happen with Pydantic validation (gt=0), but let's test logic if cap was 0
     # Actually Pydantic will raise error on StrategyConfig creation.
     from pydantic import ValidationError
+
     with pytest.raises(ValidationError):
         StrategyConfig(
             strategy_id="s1",
@@ -323,7 +325,7 @@ def test_rejection_history(allocator):
         strategy_id="s1",
         symbol="XAUUSD",
         model_family="RL",
-        capital_cap=1000.0,
+        capital_cap=100000.0,
     )
     allocator.add_strategy(config)
 
@@ -345,7 +347,9 @@ def test_diversification_score(allocator):
     assert allocator.get_diversification_score() == 1.0
 
     s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
-    s2 = StrategyConfig(strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0)
+    s2 = StrategyConfig(
+        strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0
+    )
     allocator.add_strategy(s1)
     allocator.add_strategy(s2)
 
@@ -450,7 +454,9 @@ def test_cooling_off_mechanism(allocator):
     # 4th loss -> stays floored
     allocator.update_strategy_performance("s1", -100.0)
     assert allocator.strategies["s1"].consecutive_losses == 4
-    assert allocator.strategies["s1"].performance_multiplier == 0.0  # multiplier can go below 0.1 if step continues
+    assert (
+        allocator.strategies["s1"].performance_multiplier == 0.0
+    )  # multiplier can go below 0.1 if step continues
 
     # Win -> resets consecutive losses
     allocator.update_strategy_performance("s1", 100.0)
@@ -651,6 +657,7 @@ def test_from_config():
     mock_config = MagicMock(spec=TradingConfig)
     mock_config.allocator_max_symbol_risk = 0.5
     mock_config.allocator_max_family_risk = 0.6
+    mock_config.allocator_max_strategy_risk = 0.35
     mock_config.allocator_max_total_heat = 0.8
     mock_config.allocator_performance_step = 0.02
     mock_config.allocator_decay_rate = 0.005
@@ -661,6 +668,7 @@ def test_from_config():
     assert allocator.total_budget == 200000.0
     assert allocator.max_symbol_risk == 0.5
     assert allocator.max_family_risk == 0.6
+    assert allocator.max_strategy_risk == 0.35
     assert allocator.max_total_heat == 0.8
     assert allocator.performance_step == 0.02
     assert allocator.decay_rate == 0.005
@@ -706,7 +714,9 @@ def test_diversification_score_multi_factor(allocator):
     """
     # Scenario A: 2 strategies, 2 symbols, 2 families (Perfectly diversified)
     s1 = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
-    s2 = StrategyConfig(strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0)
+    s2 = StrategyConfig(
+        strategy_id="s2", symbol="EURUSD", model_family="LSTM", capital_cap=100000.0
+    )
     allocator.add_strategy(s1)
     allocator.add_strategy(s2)
     allocator.update_allocation("s1", 10000.0)
@@ -719,8 +729,12 @@ def test_diversification_score_multi_factor(allocator):
     allocator.strategies.clear()
     allocator.current_allocations.clear()
 
-    s1_b = StrategyConfig(strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
-    s2_b = StrategyConfig(strategy_id="s2", symbol="XAUUSD", model_family="RL", capital_cap=100000.0)
+    s1_b = StrategyConfig(
+        strategy_id="s1", symbol="XAUUSD", model_family="RL", capital_cap=100000.0
+    )
+    s2_b = StrategyConfig(
+        strategy_id="s2", symbol="XAUUSD", model_family="RL", capital_cap=100000.0
+    )
     allocator.add_strategy(s1_b)
     allocator.add_strategy(s2_b)
     allocator.update_allocation("s1", 10000.0)
@@ -734,3 +748,97 @@ def test_diversification_score_multi_factor(allocator):
     assert score_b == pytest.approx(0.4)
 
     assert score_b < score_a
+
+
+def test_max_strategy_risk_enforcement(allocator):
+    """Verify that global max_strategy_risk is enforced."""
+    allocator.soft_limit_buffer = 0.0
+    allocator.max_strategy_risk = 0.2
+
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=100000.0,
+    )
+    allocator.add_strategy(config)
+
+    # Request 25% risk, should be rejected (Limit 20%)
+    result = allocator.request_allocation("s1", 0.25)
+    assert result.is_allowed is False
+    assert result.rejection_code == RejectionCode.STRATEGY_CONCENTRATION_LIMIT
+
+    # Request 15% risk, should be allowed
+    result_ok = allocator.request_allocation("s1", 0.15)
+    assert result_ok.is_allowed is True
+    assert result_ok.allocated_risk_pct == 0.15
+
+
+def test_incremental_allocation(allocator):
+    """Test increase_allocation and decrease_allocation."""
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+    )
+    allocator.add_strategy(config)
+
+    allocator.increase_allocation("s1", 1000.0)
+    assert allocator.current_allocations["s1"] == 1000.0
+
+    allocator.increase_allocation("s1", 500.0)
+    assert allocator.current_allocations["s1"] == 1500.0
+
+    allocator.decrease_allocation("s1", 200.0)
+    assert allocator.current_allocations["s1"] == 1300.0
+
+    allocator.decrease_allocation("s1", 2000.0)  # Should floor at 0
+    assert allocator.current_allocations["s1"] == 0.0
+
+
+def test_route_allocation_tie_breaker(allocator):
+    """Verify performance_multiplier tie-breaker in route_allocation."""
+    s1 = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+        performance_multiplier=1.2,
+    )
+    s2 = StrategyConfig(
+        strategy_id="s2",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=50000.0,
+        performance_multiplier=1.5,
+    )
+
+    allocator.add_strategy(s1)
+    allocator.add_strategy(s2)
+
+    # Both strategies give same diversification score because they are identical in symbol/family
+    # and currently have 0 allocation. Performance multiplier should break the tie.
+    result = allocator.route_allocation("XAUUSD", 0.01)
+    assert result.strategy_id == "s2"
+
+
+def test_capital_cap_with_existing_allocation(allocator):
+    """Verify capital_cap accounts for current allocations."""
+    config = StrategyConfig(
+        strategy_id="s1",
+        symbol="XAUUSD",
+        model_family="RL",
+        capital_cap=5000.0,
+    )
+    allocator.add_strategy(config)
+
+    # Already allocated 4000
+    allocator.update_allocation("s1", 4000.0)
+
+    # Requesting 2000 (2%) should be capped to 1000 (1%)
+    result = allocator.request_allocation("s1", 0.02)
+    assert result.is_allowed is True
+    assert result.allocated_amount == 1000.0
+    assert result.allocated_risk_pct == 0.01
+    assert result.was_capped is True
