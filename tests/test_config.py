@@ -33,5 +33,6 @@ def test_config_risk_validation(monkeypatch):
     monkeypatch.setenv("MT5_PASSWORD", "test")
     monkeypatch.setenv("MT5_SERVER", "test")
     monkeypatch.setenv("RISK_PER_TRADE", "0.03")  # 3% - should fail
-    with pytest.raises(ValueError, match="risk_per_trade"):
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError, match="RISK_PER_TRADE"):
         TradingConfig()

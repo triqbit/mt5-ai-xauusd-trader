@@ -237,12 +237,30 @@ class RiskEngine:
         if self.peak_equity <= 0:
             return True
         drawdown = (self.peak_equity - self.balance) / self.peak_equity
+
         if drawdown >= self.cfg.max_drawdown:
             logger.critical("CIRCUIT BREAKER: Drawdown %.2f%% hit limit", drawdown * 100)
             if self.monitor:
                 self.monitor.alert_circuit_breaker(drawdown)
             return False
+
+        if drawdown >= self.cfg.drawdown_lvl4:
+            logger.warning("Drawdown Level 4 (%.2f%%): Halting new entries", drawdown * 100)
+            return False
+
         return True
+
+    def get_drawdown_multiplier(self) -> float:
+        """Multiplier based on drawdown level (RISK_LIMITS.md 6.1)."""
+        if self.peak_equity <= 0:
+            return 1.0
+        drawdown = (self.peak_equity - self.balance) / self.peak_equity
+
+        if drawdown >= self.cfg.drawdown_lvl3:
+            return 0.50
+        if drawdown >= self.cfg.drawdown_lvl2:
+            return 0.75
+        return 1.0
 
     def get_daily_loss_level(self) -> int:
         """
