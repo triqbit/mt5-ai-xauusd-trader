@@ -42,7 +42,7 @@ To help contributors start safely, system paths are categorized into clear revie
 ## 🚦 Quick Rules & Guidelines
 
 - **Keep Aligned:** Always rebase or synchronize your branch with the latest `main` commit before submitting (`make resync`).
-- **PR Title & Branch Rules:** CI enforces semantic PR titles (`docs:`, `chore:`, `test:`, `fix:`, `feat:`, `perf:`, `style:`, `refactor:`, `ci:`). **Do NOT use `DX:` prefix in PR titles or commits.**
+- **PR Title & Branch Rules:** CI enforces semantic PR titles (`docs:`, `chore:`, `test:`, `fix:`, `feat:`, `perf:`, `style:`, `refactor:`, `ci:`). **Subject must start with a lowercase letter** (e.g., `docs: improve guide` NOT `docs: Improve guide`). **Do NOT use `DX:` prefix in PR titles or commits.**
 - **Safe Zone Focus:** New contributors are strongly advised to start in `docs/`, `tests/`, or `scripts/` for a fast, friction-free path to merge.
 - **Multi-Signature:** Changes to Sensitive Zones (`src/trading/`, `src/models/`, `src/core/`) require multi-signature approval from domain leads.
 - **Quality Gates:** All PRs must pass automated linting, type-checking, security scans, and maintain high test coverage.

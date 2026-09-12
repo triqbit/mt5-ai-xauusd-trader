@@ -23,7 +23,8 @@ Our repository enforces a strict semantic pull request check using the `amannn/a
 > **Do NOT use the "DX:" prefix in your Pull Request Title or commit messages.**
 > Even though our developer experience team uses "DX" internally, the CI checker **rejects** the `DX:` prefix.
 >
-> **Allowed Semantic Prefixes:**
+> **Allowed Semantic Prefixes & Casing Rules:**
+> - The PR title subject after the prefix **must start with a lowercase letter** (e.g., `docs: improve developer guide` NOT `docs: Improve developer guide`).
 > - `docs:` for documentation and onboarding enhancements (e.g., `docs: improve developer onboarding guide`)
 > - `chore:` for developer tool scripts and auxiliary tasks (e.g., `chore: add directory validation check to doctor`)
 > - `test:` for writing or updating unit tests (e.g., `test: add unit tests for doctor checks`)
