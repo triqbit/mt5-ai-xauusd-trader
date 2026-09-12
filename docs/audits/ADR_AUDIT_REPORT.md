@@ -51,6 +51,17 @@ This report documents the key architectural decisions governing the MT5 AI/ML Tr
 
 ---
 
+## 🔍 Evidence Routing & Technical Navigation
+
+| Evidence Artifact | Purpose | Status |
+| :--- | :--- | :--- |
+| [Technical Project Health Dashboard](../status/PROJECT_HEALTH.md) | Real-time visibility into technical debt, CI status, and PR backlog. | ✅ Active |
+| [Architecture Quick-Start](../ARCHITECTURE_QUICK.md) | 5-minute system overview and maturity map. | ✅ Verified |
+| [Enterprise Evidence Scorecard](./ENTERPRISE_EVIDENCE_SCORECARD.md) | Mapping of subsystem maturity to verified integration/audit evidence. | ✅ Active |
+| [Technical Audit Center](./README.md) | Central index of all verification and audit reports. | ✅ Active |
+
+---
+
 ## 🏛️ Governance Context
 
 This ADR Audit Report is maintained by **Jules06 (Technical Credibility & Evidence Surface Engine)**. It is updated weekly to reflect the current verified state of the repository's architectural foundation.

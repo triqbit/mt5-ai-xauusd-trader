@@ -7,7 +7,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟢 PASSING | 100% clean Ruff linter and formatter checks validated under local virtual environment. |
-| **PR Backlog** | 🔴 566 Stale | 100% of open PRs are stale relative to the latest active commit on `main`. |
+| **PR Backlog** | 🔴 564 Stale | 100% of open PRs are stale relative to the latest active commit on `main`. |
 | **Process Integrity** | 🟢 HEALTHY | Fully linear, intact git history with 1,260+ commits tracing back to root. |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
