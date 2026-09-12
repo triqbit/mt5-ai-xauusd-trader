@@ -28,6 +28,7 @@ Check the [Merge-Ready Checklist](./status/MERGE_READY_CHECKLIST.md) and keep yo
 ### 4. What PR title format is required?
 Our CI enforces semantic PR titles via `.github/workflows/commit-check.yml`.
 - **Allowed prefixes:** `feat`, `fix`, `docs`, `chore`, `test`, `refactor`, `style`, `perf`, `ci`.
+- **Subject Casing:** The subject after the prefix **must start with a lowercase letter** (e.g., `docs: improve guide`, NOT `docs: Improve guide`).
 - **Note:** Do NOT use non-standard prefixes like `DX:` in PR titles; use `docs:` for documentation/onboarding PRs or `chore:` for DX tool scripts.
 
 ---
