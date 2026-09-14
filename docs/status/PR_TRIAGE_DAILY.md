@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-09-13 14:15:43 UTC
+**Date:** 2026-09-14 14:29:06 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,7 +10,7 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `2b88adb282d1baf26992b747510c5c54f3156e88` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `025e47109feaafafc0f07b8921952cb6ba1e8b2d` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (564)
 3. **Re-validate Stale:** Review Safe Surface PR #1905 (chore(deps): bump torch from 2.13.0+cpu to 2.14.0+cpu)
 
@@ -18,7 +18,7 @@
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
-| [1907](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1907) | chore(deps): bump metatrader5 from 5.0.6147 to 5.0.6162 | dependabot[bot] | `dependabot/pip/metatrader5-5.0.6162` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1938](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1938) | chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 | dependabot[bot] | `dependabot/pip/types-pyyaml-6.0.12.20260906` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1905](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1905) | chore(deps): bump torch from 2.13.0+cpu to 2.14.0+cpu | dependabot[bot] | `dependabot/pip/torch-2.14.0cpu` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1740](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1740) | docs: update daily merge-readiness checklist and PR triage [2026-07-31] | triqbit | `main-16126816414089982301` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1712](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1712) | Add optional TickerAll hosted MT5 API path to MT5Connector | miguelangelo78 | `tickerall-provider` | none | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -593,7 +593,7 @@
 
 ## ✨ Good Candidates for Review Today
 
-- **PR #1907**: chore(deps): bump metatrader5 from 5.0.6147 to 5.0.6162 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1938**: chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 (dependabot[bot]) [CI: pending] - *Medium Risk*
 - **PR #1905**: chore(deps): bump torch from 2.13.0+cpu to 2.14.0+cpu (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #1697**: docs: update process integrity log [2026-07-21] (triqbit) [CI: pending] - *Safe Surface*
 - **PR #1661**: DX: update process integrity log and project health [2026-07-14] (triqbit) [CI: pending] - *Safe Surface*

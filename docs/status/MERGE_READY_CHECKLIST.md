@@ -1,31 +1,31 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `2b88adb282d1baf26992b747510c5c54f3156e88` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `025e47109feaafafc0f07b8921952cb6ba1e8b2d` is required for all PRs.**
 
-Generated on: 2026-09-13 14:15:43 UTC
+Generated on: 2026-09-14 14:29:06 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
-## 1. PR #1907: chore(deps): bump metatrader5 from 5.0.6147 to 5.0.6162
-- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump metatrader5 from 5.0.6147 to 5.0.6162' (Candidate for re-validation/review)
+## 1. PR #1938: chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906
+- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `2b88adb282d1baf26992b747510c5c54f3156e88`, tests, docs
+- **Missing items**: Mandatory rebase against commit `025e47109feaafafc0f07b8921952cb6ba1e8b2d`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #1905: chore(deps): bump torch from 2.13.0+cpu to 2.14.0+cpu
 - **Short scope summary**: Safe Surface update implementing 'chore(deps): bump torch from 2.13.0+cpu to 2.14.0+cpu' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `2b88adb282d1baf26992b747510c5c54f3156e88`
+- **Missing items**: Mandatory rebase against commit `025e47109feaafafc0f07b8921952cb6ba1e8b2d`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1697: docs: update process integrity log [2026-07-21]
 - **Short scope summary**: Safe Surface update implementing 'docs: update process integrity log [2026-07-21]' (Candidate for re-validation/review)
 - **Domains touched**: docs
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `2b88adb282d1baf26992b747510c5c54f3156e88`
+- **Missing items**: Mandatory rebase against commit `025e47109feaafafc0f07b8921952cb6ba1e8b2d`
 - **Recommendation**: Needs CI success before merge
 
 ---
