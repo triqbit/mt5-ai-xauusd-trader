@@ -27,7 +27,7 @@ httpx==0.28.1
 metaapi-cloud-sdk==29.1.1
 
 # ── Database ────────────────────────────────────────────────
-psycopg2-binary==2.9.12
+psycopg2-binary==2.9.13
 sqlalchemy==2.0.52
 alembic==1.19.2
 redis==8.1.0
