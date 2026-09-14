@@ -2,6 +2,28 @@
 
 This log tracks the health and safety of the autonomous workflow for the `mt5-ai-xauusd-trader` repository.
 
+## 2026-09-14 18:00 GMT+4
+
+**Summary:** Process invariants are holding on `main` (🟡 AMBER), with a global CI failure detected following the merge of PR #1937 (`b6e0d66`). Bumping `ruff` from 0.16.6 to 0.16.7 introduced new formatting rules that cause Fast Validation CI (`ruff format .`) to fail across 120 codebase files.
+
+**Suspected Process Issues:**
+- **Global CI Fast Validation Failure:** Bumping `ruff` to 0.16.7 in PR #1937 triggered formatting failures across 120 files in `tests/`, `src/`, and `migrations/`. In accordance with Jules06 role limits, trading logic and code files must not be fixed directly by Jules06.
+- **Stale PR Backlog:** The open PR count is at 562 open PRs. These are stale relative to the active `main` branch but do not affect current system safety on `main`.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `b6e0d66` (PR #1937) - Bumps ruff from 0.16.6 to 0.16.7.
+
+**Check Invariants:**
+- [x] Changes go through PRs (Verified: PR #1937 went through proper pull request merge).
+- [ ] CI must pass before merge (**AMBER / UNFULFILLED**: Fast Validation CI failed due to ruff 0.16.7 formatting rules across codebase).
+- [x] Risky domains are not being changed casually (Verified: Only dependency version configuration / ruff bump modified. No trading, risk, or execution logic files were touched).
+
+**Recommended Follow-ups:**
+- **Ruff Format Execution:** Jules02 or human operator should run `ruff format .` across the repository or pin ruff formatting settings to resolve Fast Validation CI.
+- **Backlog Pruning:** Jules05 should perform a bulk prune/closure of the 562 stale PRs to reduce noise.
+
+**Status:** 🟡 AMBER (Invariants holding on PR process & domain safety; Fast Validation CI failing due to ruff 0.16.7 formatting drift).
+
 ## 2026-09-13 18:00 GMT+4
 
 **Summary:** Process invariants are fully holding on `main`. No process drift or risky behavior detected. One safe-surface pull request updating the daily merge-readiness checklist and PR triage report has been integrated since the last process integrity report.
