@@ -2,6 +2,7 @@
 MT5 AI/ML Trading Bot - CLI and UX Tests
 tests/test_cli_ux.py
 """
+
 import logging
 import os
 from unittest.mock import MagicMock, patch
@@ -16,16 +17,20 @@ from src.core.config import get_config
 def test_cli_argument_precedence():
     """Verify that CLI arguments override environment variables."""
     # Mock sys.argv to simulate: python main.py --mode demo --symbol BTCUSD
-    with patch("sys.argv", ["main.py", "--mode", "demo", "--symbol", "BTCUSD"]), \
-         patch.dict(os.environ, {
-             "MODE": "live",
-             "SYMBOL": "XAUUSD",
-             "MT5_PASSWORD": "test",
-             "MT5_SERVER": "test",
-             "DATABASE_URL": "postgresql://user:pass@localhost/db"
-         }), \
-         patch("main.configure_logging"):
-
+    with (
+        patch("sys.argv", ["main.py", "--mode", "demo", "--symbol", "BTCUSD"]),
+        patch.dict(
+            os.environ,
+            {
+                "MODE": "live",
+                "SYMBOL": "XAUUSD",
+                "MT5_PASSWORD": "test",
+                "MT5_SERVER": "test",
+                "DATABASE_URL": "postgresql://user:pass@localhost/db",
+            },
+        ),
+        patch("main.configure_logging"),
+    ):
         # We need to clear the lru_cache of get_config
         get_config.cache_clear()
 
@@ -44,27 +49,30 @@ def test_cli_argument_precedence():
 
 def test_check_flag_exits_early():
     """Verify that --check flag runs health checks and exits with 0."""
-    with patch("sys.argv", ["main.py", "--check"]), \
-         patch("main.configure_logging"), \
-         patch("src.trading.mt5_connector.MT5Connector.initialize", return_value=True), \
-         patch("src.trading.mt5_connector.MT5Connector.shutdown"), \
-         patch("src.core.config_validator.ConfigValidator.validate") as mock_validate, \
-         patch("src.core.health.HealthChecker.get_full_report") as mock_report, \
-         patch.dict(os.environ, {
-             "MT5_LOGIN": "123456",
-             "MT5_PASSWORD": "ValidPassword",
-             "MT5_SERVER": "ValidServer",
-             "DATABASE_URL": "postgresql://user:pass@localhost/db"
-         }):
-
+    with (
+        patch("sys.argv", ["main.py", "--check"]),
+        patch("main.configure_logging"),
+        patch("src.trading.mt5_connector.MT5Connector.initialize", return_value=True),
+        patch("src.trading.mt5_connector.MT5Connector.shutdown"),
+        patch("src.core.config_validator.ConfigValidator.validate") as mock_validate,
+        patch("src.core.health.HealthChecker.get_full_report") as mock_report,
+        patch.dict(
+            os.environ,
+            {
+                "MT5_LOGIN": "123456",
+                "MT5_PASSWORD": "ValidPassword",
+                "MT5_SERVER": "ValidServer",
+                "DATABASE_URL": "postgresql://user:pass@localhost/db",
+            },
+        ),
+    ):
         from src.core.config_validator import ValidationResult
+
         mock_validate.return_value = ValidationResult(success=True, errors=[])
 
         from src.core.health import HealthReport, HealthStatus
-        mock_report.return_value = HealthReport(
-            status=HealthStatus.HEALTHY,
-            components={}
-        )
+
+        mock_report.return_value = HealthReport(status=HealthStatus.HEALTHY, components={})
 
         get_config.cache_clear()
         # main() should return 0 when --check is successful
@@ -85,16 +93,18 @@ def test_mt5_connection_troubleshooting_tips(caplog):
     # Ensure caplog captures INFO level
     caplog.set_level(logging.INFO)
 
-    with patch("src.trading.mt5_connector.MT5_AVAILABLE", True), \
-         patch("src.trading.mt5_connector.mt5") as mock_mt5, \
-         patch("src.trading.mt5_connector.METAAPI_AVAILABLE", False):
-
+    with (
+        patch("src.trading.mt5_connector.MT5_AVAILABLE", True),
+        patch("src.trading.mt5_connector.mt5") as mock_mt5,
+        patch("src.trading.mt5_connector.METAAPI_AVAILABLE", False),
+    ):
         # Simulate 'Terminal not found' error
         mock_mt5.initialize.return_value = False
         mock_mt5.last_error.return_value = (-5, "Terminal not found")
         mock_mt5.RES_E_NOT_FOUND = -5
 
         from src.core.exceptions import MT5ConnectionError
+
         connector = MT5Connector(mock_cfg)
         with pytest.raises(MT5ConnectionError):
             connector.initialize()

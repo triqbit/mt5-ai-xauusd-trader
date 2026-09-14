@@ -23,13 +23,13 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
     def test_veto_power_active(self):
         """Verify that a weak contributing model triggers a Veto HOLD."""
         # Weighted consensus would be high, but one model is weak
-        self.ensemble.dynamic_ensemble.get_weights = MagicMock(return_value={
-            "ppo": 0.5, "dreamer": 0.5, "lstm": 0.0
-        })
+        self.ensemble.dynamic_ensemble.get_weights = MagicMock(
+            return_value={"ppo": 0.5, "dreamer": 0.5, "lstm": 0.0}
+        )
 
         signals = {
             "ppo": Signal(direction=SignalDirection.BUY, confidence=0.9),
-            "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.35), # Weak!
+            "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.35),  # Weak!
         }
 
         result = self.ensemble.aggregate_signals(signals)
@@ -43,9 +43,9 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
     def test_regime_adaptive_consensus_high(self):
         """Verify that NEWS_SHOCK raises the consensus threshold to 80%."""
         # Weighted consensus = 0.70 (usually enough, but not for NEWS_SHOCK)
-        self.ensemble.dynamic_ensemble.get_weights = MagicMock(return_value={
-            "ppo": 1.0, "dreamer": 0.0, "lstm": 0.0
-        })
+        self.ensemble.dynamic_ensemble.get_weights = MagicMock(
+            return_value={"ppo": 1.0, "dreamer": 0.0, "lstm": 0.0}
+        )
 
         signals = {
             "ppo": Signal(direction=SignalDirection.BUY, confidence=0.70),
@@ -60,7 +60,10 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
 
         # 2. News Shock regime (threshold 0.80)
         news_regime = RegimeInfo(
-            label=MarketRegime.NEWS_SHOCK, confidence=1.0, transition_score=0.0, volatility_index=5.0
+            label=MarketRegime.NEWS_SHOCK,
+            confidence=1.0,
+            transition_score=0.0,
+            volatility_index=5.0,
         )
         result_news = self.ensemble.aggregate_signals(signals, regime_info=news_regime)
         self.assertEqual(result_news.direction, SignalDirection.HOLD)
@@ -68,9 +71,9 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
 
     def test_transition_aware_threshold_increase(self):
         """Verify that high transition score increases threshold by 10%."""
-        self.ensemble.dynamic_ensemble.get_weights = MagicMock(return_value={
-            "ppo": 1.0, "dreamer": 0.0, "lstm": 0.0
-        })
+        self.ensemble.dynamic_ensemble.get_weights = MagicMock(
+            return_value={"ppo": 1.0, "dreamer": 0.0, "lstm": 0.0}
+        )
 
         signals = {
             "ppo": Signal(direction=SignalDirection.BUY, confidence=0.65),
@@ -88,9 +91,9 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
 
     def test_cumulative_threshold_hardening(self):
         """Verify that regime and transition hardening are cumulative."""
-        self.ensemble.dynamic_ensemble.get_weights = MagicMock(return_value={
-            "ppo": 1.0, "dreamer": 0.0, "lstm": 0.0
-        })
+        self.ensemble.dynamic_ensemble.get_weights = MagicMock(
+            return_value={"ppo": 1.0, "dreamer": 0.0, "lstm": 0.0}
+        )
 
         signals = {
             "ppo": Signal(direction=SignalDirection.BUY, confidence=0.85),
@@ -98,7 +101,10 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
 
         # News Shock (0.80) + Transition (0.10) = 0.90
         danger_regime = RegimeInfo(
-            label=MarketRegime.NEWS_SHOCK, confidence=1.0, transition_score=0.9, volatility_index=5.0
+            label=MarketRegime.NEWS_SHOCK,
+            confidence=1.0,
+            transition_score=0.9,
+            volatility_index=5.0,
         )
         result = self.ensemble.aggregate_signals(signals, regime_info=danger_regime)
 
@@ -115,6 +121,7 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
         result = self.ensemble.aggregate_signals(signals)
         self.assertEqual(result.direction, SignalDirection.HOLD)
         self.assertEqual(result.metadata.get("reason"), "Dissent conflict")
+
 
 if __name__ == "__main__":
     unittest.main()

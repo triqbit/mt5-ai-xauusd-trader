@@ -182,7 +182,9 @@ class PPOAgent(BaseModel):
                         distribution = self.model.policy.get_distribution(obs_tensor)
                         # distribution.distribution.probs has shape (batch, n_actions)
                         probs_batch = distribution.distribution.probs.cpu().numpy()
-                        probs = probs_batch[0]  # Get probabilities for the first (and only) observation
+                        probs = probs_batch[
+                            0
+                        ]  # Get probabilities for the first (and only) observation
                         probabilities = probs.tolist()
                         confidence = float(probs[action_val])
                 except Exception as prob_err:
