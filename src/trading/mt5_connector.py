@@ -48,6 +48,7 @@ from src.core.exceptions import (
 from src.core.resilience import CircuitBreaker
 from src.core.retry import with_retry
 from src.core.schemas import TradeSignal
+from src.trading.tickerall_backend import TickerAllBackend
 
 # Apply nest_asyncio to allow nested loops (MetaAPI SDK uses asyncio)
 nest_asyncio.apply()
@@ -93,9 +94,7 @@ class MT5Connector:
     Supports both native Windows SDK and MetaAPI cloud fallback for cross-platform support.
     """
 
-    def __init__(
-        self, config: TradingConfig, monitor: Optional["Monitor"] = None
-    ) -> None:
+    def __init__(self, config: TradingConfig, monitor: Optional["Monitor"] = None) -> None:
         """
         Initialize the connector with configuration.
 
@@ -109,6 +108,8 @@ class MT5Connector:
         self.metaapi: Any | None = None
         self.metaapi_account: Any | None = None
         self.metaapi_connection: Any | None = None
+        self.use_tickerall: bool = False
+        self.tickerall: TickerAllBackend | None = None
         self._is_initialized: bool = False
         self._background_tasks: set[asyncio.Task] = set()
 
@@ -162,6 +163,7 @@ class MT5Connector:
             mt5_server=self.cfg.mt5_server,
         )
         self.use_metaapi = False  # Reset state
+        self.use_tickerall = False
 
         # 1. Attempt Native MT5 SDK (Primary Path - Windows only)
         if MT5_AVAILABLE:
@@ -203,7 +205,28 @@ class MT5Connector:
                 reason="SDK not imported or platform incompatible",
             )
 
-        # 2. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
+        # 2. Attempt TickerAll hosted API (opt-in cloud path, preferred over
+        #    MetaAPI when configured). Runs on any OS with no local terminal.
+        tickerall_key = (
+            self.cfg.tickerall_api_key.get_secret_value() if self.cfg.tickerall_api_key else ""
+        )
+        if tickerall_key:
+            logger.info("tickerall_initialization_attempt")
+            try:
+                self.tickerall = TickerAllBackend(self.cfg)
+                self.tickerall.initialize()
+                self.use_tickerall = True
+                self._is_initialized = True
+                logger.info("tickerall_initialization_success")
+                return True
+            except Exception as e:
+                logger.error("tickerall_initialization_failed", error=str(e))
+                raise MT5ConnectionError(
+                    f"TickerAll initialization failed: {e}",
+                    details={"error_type": type(e).__name__},
+                ) from e
+
+        # 3. Attempt MetaAPI Cloud (Fallback Path - Linux/Mac/Cloud)
         metaapi_token = self.cfg.metaapi_token.get_secret_value() if self.cfg.metaapi_token else ""
         if METAAPI_AVAILABLE and metaapi_token and self.cfg.metaapi_account_id:
             logger.info("metaapi_fallback_initialization_attempt")
@@ -256,7 +279,9 @@ class MT5Connector:
     def shutdown(self) -> None:
         """Gracefully close all connections."""
         if self._is_initialized:
-            if not self.use_metaapi and MT5_AVAILABLE:
+            if self.use_tickerall and self.tickerall:
+                self.tickerall.shutdown()
+            elif not self.use_metaapi and MT5_AVAILABLE:
                 mt5.shutdown()
             elif self.use_metaapi and self.metaapi_connection:
                 asyncio.run(self.metaapi_connection.close())
@@ -312,6 +337,9 @@ class MT5Connector:
             logger.info("mt5_connector_auto_initialization")
             self.initialize()
 
+        if self.use_tickerall:
+            return self.tickerall.get_rates(symbol, timeframe, n_bars)
+
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
         try:
@@ -338,7 +366,6 @@ class MT5Connector:
                 df["time"] = pd.to_datetime(df["time"], unit="s")
                 return df
             else:
-
                 candles = self._run_async(
                     self.metaapi_connection.get_historical_candles(symbol, timeframe, None, n_bars)
                 )
@@ -355,9 +382,7 @@ class MT5Connector:
             raise MT5DataError(f"Unexpected data retrieval error: {e}") from e
 
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
-    def get_ticks_range(
-        self, symbol: str, date_from: datetime, date_to: datetime
-    ) -> pd.DataFrame:
+    def get_ticks_range(self, symbol: str, date_from: datetime, date_to: datetime) -> pd.DataFrame:
         """
         Fetch historical tick data for a specific date range.
 
@@ -376,6 +401,9 @@ class MT5Connector:
     ) -> pd.DataFrame:
         if not self._is_initialized:
             self.initialize()
+
+        if self.use_tickerall:
+            return self.tickerall.get_ticks_range(symbol, date_from, date_to)
 
         try:
             if not self.use_metaapi:
@@ -427,6 +455,9 @@ class MT5Connector:
     ) -> pd.DataFrame:
         if not self._is_initialized:
             self.initialize()
+
+        if self.use_tickerall:
+            return self.tickerall.get_rates_range(symbol, timeframe, date_from, date_to)
 
         tf = TIMEFRAME_MAP.get(timeframe, 5)
 
@@ -481,6 +512,9 @@ class MT5Connector:
     def _get_tick_logic(self, symbol: str) -> Dict[str, float]:
         if not self._is_initialized:
             self.initialize()
+
+        if self.use_tickerall:
+            return self.tickerall.get_tick(symbol)
 
         try:
             if not self.use_metaapi:
@@ -542,6 +576,9 @@ class MT5Connector:
             lots=signal.lot_size,
             algo=signal.algorithm,
         )
+
+        if self.use_tickerall:
+            return self.tickerall.place_order(signal)
 
         order_type = ORDER_TYPE_BUY if signal.direction > 0 else ORDER_TYPE_SELL
 
@@ -655,6 +692,9 @@ class MT5Connector:
         if not self._is_initialized:
             self.initialize()
 
+        if self.use_tickerall:
+            return self.tickerall.get_account_info()
+
         if not self.use_metaapi:
             acc = mt5.account_info()
             if acc is None:
@@ -679,6 +719,9 @@ class MT5Connector:
         """Internal positions retrieval logic."""
         if not self._is_initialized:
             self.initialize()
+
+        if self.use_tickerall:
+            return self.tickerall.get_positions(symbol)
 
         if not self.use_metaapi:
             positions = mt5.positions_get(symbol=symbol) if symbol else mt5.positions_get()
@@ -708,6 +751,9 @@ class MT5Connector:
         if not self._is_initialized:
             self.initialize()
 
+        if self.use_tickerall:
+            return self.tickerall.get_terminal_status()
+
         if not self.use_metaapi:
             info = mt5.terminal_info()
             if not info:
@@ -735,13 +781,18 @@ class MT5Connector:
         if not self._is_initialized:
             self.initialize()
 
+        if self.use_tickerall:
+            return self.tickerall.get_symbol_properties(symbol)
+
         if not self.use_metaapi:
             info = mt5.symbol_info(symbol)
             if not info:
                 err_code, err_desc = mt5.last_error()
                 if err_code in [-1, 10001, 10002, 10003, 10004]:
                     self._is_initialized = False
-                raise MT5DataError(f"Failed to get symbol info for {symbol}: {err_desc} (code: {err_code})")
+                raise MT5DataError(
+                    f"Failed to get symbol info for {symbol}: {err_desc} (code: {err_code})"
+                )
             return {
                 "name": info.name,
                 "tradable": info.trade_mode != mt5.SYMBOL_TRADE_MODE_DISABLED,
@@ -764,7 +815,9 @@ class MT5Connector:
                 }
             except Exception as e:
                 self._is_initialized = False
-                raise MT5DataError(f"MetaAPI get_symbol_specification failed for {symbol}: {e}") from e
+                raise MT5DataError(
+                    f"MetaAPI get_symbol_specification failed for {symbol}: {e}"
+                ) from e
 
     @with_retry((MT5DataError, MT5ConnectionError), max_retries=3)
     def find_symbols(self, pattern: str) -> List[str]:
@@ -776,13 +829,18 @@ class MT5Connector:
         if not self._is_initialized:
             self.initialize()
 
+        if self.use_tickerall:
+            return self.tickerall.find_symbols(pattern)
+
         if not self.use_metaapi:
             symbols = mt5.symbols_get(pattern)
             if symbols is None:
                 err_code, err_desc = mt5.last_error()
                 if err_code in [-1, 10001, 10002, 10003, 10004]:
                     self._is_initialized = False
-                raise MT5DataError(f"Failed to find symbols with pattern {pattern}: {err_desc} (code: {err_code})")
+                raise MT5DataError(
+                    f"Failed to find symbols with pattern {pattern}: {err_desc} (code: {err_code})"
+                )
             return [s.name for s in symbols]
         else:
             # For MetaAPI, we'd need to fetch all and filter, which is slow.
