@@ -3,8 +3,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.core.config import TradingConfig
+from src.core.exceptions import MT5ExecutionError
 from src.core.schemas import TradeSignal
 from src.trading.mt5_connector import MT5Connector
+from src.trading.safety_supervisor import SafetySupervisor
 
 
 @pytest.fixture
@@ -16,6 +18,24 @@ def test_connector_init(mock_config):
     connector = MT5Connector(mock_config)
     assert connector.cfg == mock_config
     assert not connector._is_initialized
+
+
+def test_place_order_blocked_by_safety_supervisor(mock_config):
+    supervisor = SafetySupervisor(halted=True, halt_reasons=("orphan_position",))
+    connector = MT5Connector(mock_config, safety_supervisor=supervisor)
+    signal = TradeSignal(
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2300.0,
+        stop_loss=2290.0,
+        take_profit=2320.0,
+        lot_size=0.1,
+        algorithm="ppo",
+        confidence=0.8,
+    )
+
+    with pytest.raises(MT5ExecutionError, match="safety supervisor"):
+        connector.place_order(signal)
 
 
 @patch("src.trading.mt5_connector.mt5")

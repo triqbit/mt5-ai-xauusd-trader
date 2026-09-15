@@ -48,6 +48,7 @@ from src.core.exceptions import (
 from src.core.resilience import CircuitBreaker
 from src.core.retry import with_retry
 from src.core.schemas import TradeSignal
+from src.trading.safety_supervisor import SafetySupervisor
 
 # Apply nest_asyncio to allow nested loops (MetaAPI SDK uses asyncio)
 nest_asyncio.apply()
@@ -93,7 +94,12 @@ class MT5Connector:
     Supports both native Windows SDK and MetaAPI cloud fallback for cross-platform support.
     """
 
-    def __init__(self, config: TradingConfig, monitor: Optional["Monitor"] = None) -> None:
+    def __init__(
+        self,
+        config: TradingConfig,
+        monitor: Optional["Monitor"] = None,
+        safety_supervisor: Optional[SafetySupervisor] = None,
+    ) -> None:
         """
         Initialize the connector with configuration.
 
@@ -103,6 +109,7 @@ class MT5Connector:
         """
         self.cfg = config
         self.monitor = monitor
+        self.safety_supervisor = safety_supervisor
         self.use_metaapi: bool = False
         self.metaapi: Any | None = None
         self.metaapi_account: Any | None = None
@@ -527,6 +534,12 @@ class MT5Connector:
 
     def _place_order_logic(self, signal: TradeSignal) -> Optional[int]:
         """Internal order placement logic wrapped by circuit breaker."""
+        if self.safety_supervisor and not self.safety_supervisor.trading_allowed:
+            raise MT5ExecutionError(
+                "Order blocked by live trading safety supervisor",
+                details={"reasons": self.safety_supervisor.halt_reasons},
+                is_retriable=False,
+            )
         if not self._is_initialized:
             self.initialize()
 
