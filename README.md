@@ -2,7 +2,7 @@
 
 [![CI Pipeline](https://github.com/triqbit/mt5-ai-xauusd-trader/actions/workflows/ci.yml/badge.svg)](https://github.com/triqbit/mt5-ai-xauusd-trader/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/release/python-3110/)
+[![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/release/python-3110/)
 [![Docker Ready](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 
 **Institutional-Grade Algorithmic Trading System for MetaTrader 5**
@@ -96,7 +96,9 @@ mt5-ai-xauusd-trader/
 git clone https://github.com/triqbit/mt5-ai-xauusd-trader.git
 cd mt5-ai-xauusd-trader
 
-# Install dependencies
+# Install dependencies (Python 3.11 is required)
+python3.11 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 
 # [CRITICAL] Verify environment and dependencies

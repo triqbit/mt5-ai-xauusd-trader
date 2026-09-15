@@ -5,7 +5,7 @@
 # ============================================================
 
 # --- Stage 1: builder ------------------------------------------
-FROM python:3.12-slim AS builder
+FROM python:3.11-slim AS builder
 
 ARG TARGETARCH
 WORKDIR /app
@@ -27,17 +27,6 @@ RUN wget -q https://github.com/ta-lib/ta-lib/releases/download/v0.6.4/ta-lib-0.6
 # Prepare requirements
 COPY requirements-docker.txt .
 
-# Architecture-specific adjustments for PyTorch
-RUN if [ "$TARGETARCH" = "arm64" ]; then \
-        # ARM64 (Apple Silicon / AWS Graviton): PyPI provides valid CPU wheels
-        sed -i '/--extra-index-url/d' requirements-docker.txt && \
-        sed -i 's/+cpu//g' requirements-docker.txt; \
-    else \
-        # AMD64: Explicitly use the CPU-optimized wheels from PyTorch's dedicated index
-        sed -i 's/torch==2.3.1/torch==2.3.1+cpu/g' requirements-docker.txt && \
-        sed -i 's/torchvision==0.18.1/torchvision==0.18.1+cpu/g' requirements-docker.txt; \
-    fi
-
 # Initialize virtual environment for isolation
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
@@ -48,7 +37,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --no-cache-dir -r requirements-docker.txt
 
 # --- Stage 2: runtime ------------------------------------------
-FROM python:3.12-slim AS runtime
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
