@@ -22,7 +22,6 @@ aiohttp==3.14.3
 httpx==0.28.1
 
 # -- MetaTrader 5 (Cloud Fallback) ---------------------------
-metaapi-cloud-sdk==29.1.1
 
 # -- Database ------------------------------------------------
 psycopg2-binary==2.9.13
@@ -48,7 +47,6 @@ pydantic-settings==2.15.0
 tomli==2.4.1
 
 # -- Utilities -----------------------------------------------
-python-socketio==4.6.1
 python-dateutil==2.9.0.post0
 nest-asyncio==1.6.0
 pytz==2026.3.post1
