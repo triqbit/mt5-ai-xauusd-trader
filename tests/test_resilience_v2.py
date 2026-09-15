@@ -9,6 +9,7 @@ from src.trading.mt5_connector import MT5Connector
 
 # --- Enhanced Retry Tests ---
 
+
 def test_retry_respects_is_retriable_false():
     class PermanentError(TradingError):
         def __init__(self):
@@ -26,6 +27,7 @@ def test_retry_respects_is_retriable_false():
     # Should only call once because is_retriable=False
     assert mock_func.call_count == 1
 
+
 def test_retry_continues_if_is_retriable_true():
     class TransientError(TradingError):
         def __init__(self):
@@ -40,7 +42,9 @@ def test_retry_continues_if_is_retriable_true():
     assert decorated_func() == "success"
     assert mock_func.call_count == 2
 
+
 # --- MT5Connector Error Categorization Tests ---
+
 
 @patch("src.trading.mt5_connector.mt5")
 def test_get_rates_permanent_failure(mock_mt5, mk_config):
@@ -58,6 +62,7 @@ def test_get_rates_permanent_failure(mock_mt5, mk_config):
     # with_retry should catch it and re-raise immediately
     assert mock_mt5.copy_rates_from_pos.call_count == 1
 
+
 @patch("src.trading.mt5_connector.mt5")
 def test_place_order_permanent_rejection(mock_mt5, mk_config):
     connector = MT5Connector(mk_config)
@@ -65,9 +70,14 @@ def test_place_order_permanent_rejection(mock_mt5, mk_config):
     connector.use_metaapi = False
 
     signal = TradeSignal(
-        symbol="XAUUSD", direction=1, entry_price=2300.0,
-        stop_loss=2290.0, take_profit=2320.0, lot_size=0.1,
-        algorithm="ppo", confidence=0.8
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2300.0,
+        stop_loss=2290.0,
+        take_profit=2320.0,
+        lot_size=0.1,
+        algorithm="ppo",
+        confidence=0.8,
     )
 
     # Mock tick info
@@ -85,6 +95,7 @@ def test_place_order_permanent_rejection(mock_mt5, mk_config):
     assert excinfo.value.is_retriable is False
     assert mock_mt5.order_send.call_count == 1
 
+
 @patch("src.trading.mt5_connector.mt5")
 def test_place_order_retriable_rejection(mock_mt5, mk_config):
     connector = MT5Connector(mk_config)
@@ -92,16 +103,21 @@ def test_place_order_retriable_rejection(mock_mt5, mk_config):
     connector.use_metaapi = False
 
     signal = TradeSignal(
-        symbol="XAUUSD", direction=1, entry_price=2300.0,
-        stop_loss=2290.0, take_profit=2320.0, lot_size=0.1,
-        algorithm="ppo", confidence=0.8
+        symbol="XAUUSD",
+        direction=1,
+        entry_price=2300.0,
+        stop_loss=2290.0,
+        take_profit=2320.0,
+        lot_size=0.1,
+        algorithm="ppo",
+        confidence=0.8,
     )
 
     mock_mt5.symbol_info_tick.return_value = MagicMock(ask=2300.0, bid=2299.0)
 
     # TRADE_RETCODE_REQUOTE (10004) is NOT in NON_RETRIABLE_RETCODES
     mock_result_fail = MagicMock(retcode=10004, comment="Requote")
-    mock_result_success = MagicMock(retcode=10009, order=123) # TRADE_RETCODE_DONE
+    mock_result_success = MagicMock(retcode=10009, order=123)  # TRADE_RETCODE_DONE
 
     mock_mt5.order_send.side_effect = [mock_result_fail, mock_result_success]
     mock_mt5.TRADE_RETCODE_DONE = 10009
@@ -110,6 +126,7 @@ def test_place_order_retriable_rejection(mock_mt5, mk_config):
 
     assert ticket == 123
     assert mock_mt5.order_send.call_count == 2
+
 
 @pytest.fixture
 def mk_config():

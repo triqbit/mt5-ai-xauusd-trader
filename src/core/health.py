@@ -285,14 +285,18 @@ class HealthChecker:
 
             if not account_trade_allowed:
                 messages.append("Trading is DISABLED for this account by broker")
-                remedies.append("Contact broker or check if account is read-only or has limited permissions")
+                remedies.append(
+                    "Contact broker or check if account is read-only or has limited permissions"
+                )
                 overall_status = HealthStatus.FAILED
 
             if not symbol_props:
                 similar = self.connector.find_symbols(symbol[:3]) if len(symbol) >= 3 else []
                 suggestion = f" (Did you mean: {', '.join(similar[:3])}?)" if similar else ""
                 messages.append(f"Symbol '{symbol}' not found on server{suggestion}")
-                remedies.append(f"Check SYMBOL in .env is exactly as it appears in MT5 Market Watch{suggestion}")
+                remedies.append(
+                    f"Check SYMBOL in .env is exactly as it appears in MT5 Market Watch{suggestion}"
+                )
                 overall_status = HealthStatus.FAILED
             elif not symbol_props.get("tradable", True):
                 messages.append(f"Symbol '{symbol}' is not tradable (Market closed)")
@@ -384,7 +388,9 @@ class HealthChecker:
             elif len(present) < len(essential):
                 status = HealthStatus.DEGRADED
                 missing = essential - present
-                msg = f"Ensemble DEGRADED: {', '.join(present)} active | Missing {', '.join(missing)}"
+                msg = (
+                    f"Ensemble DEGRADED: {', '.join(present)} active | Missing {', '.join(missing)}"
+                )
                 remedy = f"Load missing components: {', '.join(missing)}"
             else:
                 msg = f"Ensemble HEALTHY: All components ({', '.join(present)}) active"

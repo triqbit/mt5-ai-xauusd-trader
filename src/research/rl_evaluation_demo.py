@@ -26,6 +26,7 @@ from src.research.rl_evaluation import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 def generate_synthetic_data(n_steps: int = 500) -> np.ndarray:
     """Generate synthetic XAUUSD-like data with trend and volatility."""
     np.random.seed(42)
@@ -43,13 +44,14 @@ def generate_synthetic_data(n_steps: int = 500) -> np.ndarray:
 
     # Create OHLCV structure
     data = np.zeros((n_steps, 5))
-    data[:, 3] = prices # Close
-    data[:, 0] = prices - np.random.uniform(0, 1, n_steps) # Open
-    data[:, 1] = prices + np.random.uniform(0, 2, n_steps) # High
-    data[:, 2] = prices - np.random.uniform(0, 2, n_steps) # Low
-    data[:, 4] = np.random.randint(100, 1000, n_steps) # Volume
+    data[:, 3] = prices  # Close
+    data[:, 0] = prices - np.random.uniform(0, 1, n_steps)  # Open
+    data[:, 1] = prices + np.random.uniform(0, 2, n_steps)  # High
+    data[:, 2] = prices - np.random.uniform(0, 2, n_steps)  # Low
+    data[:, 4] = np.random.randint(100, 1000, n_steps)  # Volume
 
     return data.astype(np.float32)
+
 
 def run_demo():
     """Execute the RL evaluation demo."""
@@ -92,7 +94,7 @@ def run_demo():
             f"gap of {comparison.performance_gap_pct:.2f}% over the baseline. "
             "Further training and regime-specific optimization are recommended for PPO agents."
         ),
-        overall_status=SectionStatus.PROVISIONAL
+        overall_status=SectionStatus.PROVISIONAL,
     )
 
     # Add RL Section
@@ -123,6 +125,7 @@ def run_demo():
     reporter.save_html(report, html_path)
 
     logger.info(f"Demo complete. Reports saved to {output_dir}/")
+
 
 if __name__ == "__main__":
     run_demo()

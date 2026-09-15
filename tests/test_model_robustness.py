@@ -11,7 +11,8 @@ def test_ppo_agent_nan_handling():
     import pandas as pd
 
     from src.trading.trading_env import TradingEnv
-    df = pd.DataFrame(np.random.randn(50, 4)) # 4 features
+
+    df = pd.DataFrame(np.random.randn(50, 4))  # 4 features
     env = TradingEnv(df=df)
     agent = PPOAgent(env=env)
 
@@ -20,12 +21,14 @@ def test_ppo_agent_nan_handling():
     assert signal.direction == SignalDirection.HOLD
     assert any("NaN or Inf" in str(v) for v in signal.metadata.values())
 
+
 def test_lstm_model_nan_handling():
     agent = LSTMModel(input_dim=5)
     features = np.array([[1.0, 2.0, 3.0, 4.0, np.inf]])
     signal = agent.predict(features)
     assert signal.direction == SignalDirection.HOLD
     assert any("NaN or Inf" in str(v) for v in signal.metadata.values())
+
 
 def test_dreamer_agent_nan_handling():
     agent = DreamerAgent()

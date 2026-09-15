@@ -1,6 +1,7 @@
 """
 Integration tests for PortfolioScenarioBuilder and CapitalAllocator.
 """
+
 import pytest
 
 from src.trading.capital_allocator import CapitalAllocator, RejectionCode, StrategyConfig
@@ -11,6 +12,7 @@ from src.utils.synthetic_data import PortfolioScenarioBuilder
 def builder():
     return PortfolioScenarioBuilder(seed=42)
 
+
 @pytest.fixture
 def allocator():
     return CapitalAllocator(
@@ -19,8 +21,9 @@ def allocator():
         max_family_risk=0.4,
         max_total_heat=0.7,
         performance_step=0.1,
-        soft_limit_buffer=0.0  # Disable soft buffer for deterministic hard limit testing
+        soft_limit_buffer=0.0,  # Disable soft buffer for deterministic hard limit testing
     )
+
 
 def test_concentration_risk_cascade(builder, allocator):
     configs, requests = builder.concentration_risk_cascade()
@@ -47,16 +50,19 @@ def test_concentration_risk_cascade(builder, allocator):
     assert res4.is_allowed is False
     assert res4.rejection_code == RejectionCode.FAMILY_CONCENTRATION_LIMIT
 
+
 def test_performance_rebalancing_sequence(builder, allocator):
     sequence = builder.performance_rebalancing_sequence()
 
-    allocator.add_strategy(StrategyConfig(
-        strategy_id="strat_a",
-        symbol="XAUUSD",
-        model_family="RL",
-        capital_cap=100000,
-        max_consecutive_losses=3,
-    ))
+    allocator.add_strategy(
+        StrategyConfig(
+            strategy_id="strat_a",
+            symbol="XAUUSD",
+            model_family="RL",
+            capital_cap=100000,
+            max_consecutive_losses=3,
+        )
+    )
 
     results = []
     for step in sequence:
@@ -80,6 +86,7 @@ def test_performance_rebalancing_sequence(builder, allocator):
     assert allocator.strategies["strat_a"].consecutive_losses == 3
     assert allocator.strategies["strat_a"].performance_multiplier == 0.1
 
+
 def test_high_heat_portfolio(builder, allocator):
     configs, requests = builder.high_heat_portfolio()
     for cfg in configs:
@@ -95,6 +102,7 @@ def test_high_heat_portfolio(builder, allocator):
     final_res = allocator.request_allocation(requests[4].strategy_id, requests[4].risk_pct)
     assert final_res.is_allowed is False
     assert final_res.rejection_code == RejectionCode.TOTAL_HEAT_LIMIT
+
 
 def test_diversified_unbalanced_setup(builder, allocator):
     configs = builder.diversified_unbalanced_setup()
