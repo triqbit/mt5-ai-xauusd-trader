@@ -17,11 +17,11 @@ from src.core.constants import EventCategory, EventImpact, SignalDirection
 from src.core.schemas import TradeSignal
 from src.data.event_models import MacroEvent, RiskStatus
 from src.core.schemas import ModelSignal
+from src.core.trade_logger import TradeLogger
 from src.models.regime_detector import MarketRegime, RegimeInfo
 from src.trading.capital_allocator import AllocationRequest, StrategyConfig
 
 if TYPE_CHECKING:
-    from src.core.trade_logger import TradeLogger
     from src.models.dynamic_ensemble import DynamicEnsemble
 
 
