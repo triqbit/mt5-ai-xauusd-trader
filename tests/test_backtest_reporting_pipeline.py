@@ -46,6 +46,7 @@ class SimpleMockModel:
         return type("ModelSignal", (), {"direction": self.direction, "confidence": 0.9})
 
 
+
 def test_backtest_to_reporting_flow(data_generator, feature_engineer, reporter, tmp_path):
     # 1. Generate Data
     n_steps = 1000

@@ -22,6 +22,7 @@ class SimpleMockModel:
         return type("ModelSignal", (), {"direction": self.direction, "confidence": 0.9})
 
 
+
 @pytest.fixture
 def test_data():
     """1000 bars of synthetic trending data."""

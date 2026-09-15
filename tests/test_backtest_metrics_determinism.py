@@ -22,6 +22,7 @@ class ConstantModel:
         return type("ModelSignal", (), {"direction": self.direction, "confidence": self.confidence})
 
 
+
 @pytest.fixture
 def backtest_builder():
     return BacktestScenarioBuilder(seed=42)
