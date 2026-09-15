@@ -5,6 +5,10 @@ echo "=== MT5 AI/ML Trading Bot Bootstrapper ==="
 
 # 1. Check Python
 python3 --version || { echo "Python 3 not found"; exit 1; }
+if ! python3 -c 'import sys; raise SystemExit(not (sys.version_info[:2] == (3, 11)))'; then
+    echo "Python 3.11 is required. Found: $(python3 --version 2>&1)"
+    exit 1
+fi
 
 # 2. Setup virtual environment if not present
 if [ ! -d "venv" ]; then
@@ -66,11 +70,11 @@ if [ -f "$REQ_FILE" ]; then
         if ! $PIP_INSTALL_CMD -r requirements-ta-lib-fallback.txt; then
             echo ""
             echo "----------------------------------------------------------"
-            echo "CRITICAL WARNING: Production dependency installation FAILED."
-            echo "This is likely due to invalid versions in $REQ_FILE."
-            echo "The system will be in a DEGRADED state."
-            echo "Run 'make doctor' to diagnose specific missing packages."
+            echo "CRITICAL: Production dependency installation FAILED."
+            echo "Fix the environment and rerun bootstrap."
             echo "----------------------------------------------------------"
+            rm -f requirements-ta-lib-fallback.txt
+            exit 1
         fi
         rm -f requirements-ta-lib-fallback.txt
 

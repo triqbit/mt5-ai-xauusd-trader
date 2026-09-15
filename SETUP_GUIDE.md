@@ -7,7 +7,7 @@ This guide provides step-by-step instructions for setting up the MT5 AI/ML Tradi
 - Mac with M1/M2 chip or Intel processor
 - Terminal (Command Line)
 - Git installed (`brew install git`)
-- Python 3.9+ installed
+- Python 3.11 installed
 - MetaTrader 5 account (demo for testing)
 
 ## STEP 1: Clone Your Repository
@@ -37,7 +37,7 @@ mkdir -p config training/{drl,lstm,ensemble,scripts} testing/{backtest,walk_forw
 
 ```bash
 # Create virtual environment
-python3 -m venv venv
+python3.11 -m venv venv
 
 # Activate it (for Mac)
 source venv/bin/activate
