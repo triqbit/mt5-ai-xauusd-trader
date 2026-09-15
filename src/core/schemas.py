@@ -24,6 +24,19 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from src.core.constants import SYMBOL_PATTERN, SignalDirection
 
 
+class ModelSignal(BaseModel):
+    """
+    Standardized model output schema.
+    Replaces legacy NamedTuple to ensure type safety and validation.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    direction: SignalDirection = Field(..., description="Predicted direction")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Model confidence")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional model context")
+
+
 class TradeSignal(BaseModel):
     """
     Enterprise-grade validated trading signal schema.
@@ -41,7 +54,7 @@ class TradeSignal(BaseModel):
         description="The financial instrument symbol (e.g., XAUUSD). Must be 3-20 uppercase alphanumeric characters.",
     )
     direction: SignalDirection = Field(
-        ..., description="Signal direction: 1 (BUY), -1 (SELL), 0 (HOLD)"
+        ..., description="ModelSignal direction: 1 (BUY), -1 (SELL), 0 (HOLD)"
     )
     entry_price: float = Field(
         ..., gt=0, description="The target entry price for the trade (must be positive)"
@@ -121,6 +134,26 @@ class TradeSignal(BaseModel):
         return self
 
 
+class RiskDecision(BaseModel):
+    """
+    Structured result of the risk engine cascade.
+    Enforces consistent failure attribution for risk rejections.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    is_approved: bool = Field(..., description="True if passed all risk filters")
+    reason: str = Field(default="", description="Reason for rejection, if any")
+    adjusted_lot_size: float = Field(default=0.0, ge=0.0, description="Risk-adjusted position size")
+
+    @model_validator(mode="after")
+    def validate_risk_rejection(self) -> RiskDecision:
+        """Ensure consistency between is_approved and reason."""
+        if not self.is_approved and not self.reason:
+            raise ValueError("A rejected risk decision must provide a 'reason'.")
+        return self
+
+
 class ExecutionDecision(BaseModel):
     """
     Structured result of the execution filter cascade.
@@ -144,7 +177,7 @@ class ExecutionDecision(BaseModel):
     )
 
     @model_validator(mode="after")
-    def validate_rejection_reason(self) -> "ExecutionDecision":
+    def validate_rejection_reason(self) -> ExecutionDecision:
         """
         Ensure consistency between is_approved and blocked_by.
         If not approved, blocked_by must be provided.

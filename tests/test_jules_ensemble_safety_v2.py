@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from src.core.config import TradingConfig
 from src.core.constants import SignalDirection
-from src.models.base_model import Signal
+from src.core.schemas import ModelSignal
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import MarketRegime, RegimeInfo
 
@@ -28,8 +28,8 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
         })
 
         signals = {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.9),
-            "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.35), # Weak!
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.9),
+            "dreamer": ModelSignal(direction=SignalDirection.BUY, confidence=0.35), # Weak!
         }
 
         result = self.ensemble.aggregate_signals(signals)
@@ -48,7 +48,7 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
         })
 
         signals = {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.70),
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.70),
         }
 
         # 1. Normal regime (threshold 0.60)
@@ -73,7 +73,7 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
         })
 
         signals = {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.65),
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.65),
         }
 
         # Transition score 0.8 (> 0.7 trigger)
@@ -93,7 +93,7 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
         })
 
         signals = {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.85),
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.85),
         }
 
         # News Shock (0.80) + Transition (0.10) = 0.90
@@ -108,8 +108,8 @@ class TestJulesEnsembleSafetyV2(unittest.TestCase):
     def test_dissent_check_preserved(self):
         """Ensure core BUY/SELL dissent check still works."""
         signals = {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.9),
-            "dreamer": Signal(direction=SignalDirection.SELL, confidence=0.9),
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.9),
+            "dreamer": ModelSignal(direction=SignalDirection.SELL, confidence=0.9),
         }
 
         result = self.ensemble.aggregate_signals(signals)

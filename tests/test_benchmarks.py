@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 from src.core.constants import SignalDirection
-from src.models.base_model import Signal
+from src.core.schemas import ModelSignal
 from src.research.benchmarks import (
     ADXStrategy,
     BenchmarkEvaluator,
@@ -237,7 +237,7 @@ def test_evaluator_reversals(sample_data):
 
 def test_ppo_adapter(sample_data):
     mock_agent = MagicMock()
-    mock_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.9)
+    mock_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.9)
 
     adapter = PPOAdapter(mock_agent)
     signals = adapter.predict(sample_data)
@@ -250,7 +250,7 @@ def test_ppo_adapter(sample_data):
 @pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
 def test_ensemble_adapter(sample_data):
     mock_model = MagicMock()
-    mock_model.predict.return_value = Signal(direction=SignalDirection.SELL, confidence=0.8)
+    mock_model.predict.return_value = ModelSignal(direction=SignalDirection.SELL, confidence=0.8)
 
     window_size = 10
     adapter = EnsembleAdapter(mock_model, window_size=window_size)
@@ -303,7 +303,7 @@ def test_lstm_adapter(sample_data):
 
 def test_dreamer_adapter(sample_data):
     mock_agent = MagicMock()
-    mock_agent.predict.return_value = Signal(direction=SignalDirection.SELL, confidence=0.7)
+    mock_agent.predict.return_value = ModelSignal(direction=SignalDirection.SELL, confidence=0.7)
 
     adapter = DreamerAdapter(mock_agent)
     signals = adapter.predict(sample_data)
@@ -411,7 +411,7 @@ def test_regime_aware_adapter(sample_data):
     sample_data["volatility_index"] = 1.2
 
     mock_agent = MagicMock()
-    mock_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.9)
+    mock_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.9)
 
     adapter = PPOAdapter(mock_agent)
     adapter.predict(sample_data)

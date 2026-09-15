@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 from src.core.config import TradingConfig
 from src.core.constants import SignalDirection
-from src.models.base_model import Signal
+from src.core.schemas import ModelSignal
 from src.models.ensemble import EnsembleModel
 from src.models.regime_detector import MarketRegime, RegimeInfo
 
@@ -20,9 +20,9 @@ class TestRegimeAlignmentSafety(unittest.TestCase):
 
         # Default high-confidence signals
         self.signals = {
-            "ppo": Signal(direction=SignalDirection.BUY, confidence=0.9),
-            "dreamer": Signal(direction=SignalDirection.BUY, confidence=0.9),
-            "lstm": Signal(direction=SignalDirection.BUY, confidence=0.9),
+            "ppo": ModelSignal(direction=SignalDirection.BUY, confidence=0.9),
+            "dreamer": ModelSignal(direction=SignalDirection.BUY, confidence=0.9),
+            "lstm": ModelSignal(direction=SignalDirection.BUY, confidence=0.9),
         }
 
         # Mock DynamicEnsemble metrics to avoid drift penalty

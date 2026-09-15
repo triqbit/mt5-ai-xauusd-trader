@@ -88,7 +88,7 @@ DATA_FRESHNESS_GAUGE = Gauge(
     "trading_data_freshness_seconds", "Age of latest data point in seconds"
 )
 
-# 6. Signal Flow & Decision Funnel Metrics
+# 6. ModelSignal Flow & Decision Funnel Metrics
 SIGNAL_FUNNEL_COUNTER = Counter(
     "trading_signal_funnel_total",
     "Trace of signal progression through the decision funnel",

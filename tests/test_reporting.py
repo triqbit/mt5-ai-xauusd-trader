@@ -391,22 +391,22 @@ def test_trade_pattern_motifs():
     html = reporter.generate_html(report)
 
     # Markdown checks
-    assert "### Signal Motifs (Performance Clusters)" in md
+    assert "### ModelSignal Motifs (Performance Clusters)" in md
     assert "PPO" in md
     assert "20.0%" in md
     assert "-1.5" in md
     assert "-0.4" in md
-    assert "### Signal Combinations (Toxic vs Golden)" in md
+    assert "### ModelSignal Combinations (Toxic vs Golden)" in md
     assert "Algo1:1, Algo2:-1" in md
     assert "TOXIC" in md
     assert "-2.0" in md
 
     # HTML checks
-    assert "Signal Motifs (Performance Clusters)" in html
+    assert "ModelSignal Motifs (Performance Clusters)" in html
     assert "PPO" in html
     assert "20.0%" in html
     assert "-1.5" in html
-    assert "Signal Combinations (Toxic vs Golden)" in html
+    assert "ModelSignal Combinations (Toxic vs Golden)" in html
     assert "Algo1:1, Algo2:-1" in html
     assert "TOXIC" in html
 

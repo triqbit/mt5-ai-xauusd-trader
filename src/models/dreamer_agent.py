@@ -13,7 +13,8 @@ from typing import Any
 import numpy as np
 
 from src.core.constants import SignalDirection
-from src.models.base_model import BaseModel, Signal
+from src.core.schemas import ModelSignal
+from src.models.base_model import BaseModel
 
 
 class DreamerAgent(BaseModel):
@@ -55,7 +56,7 @@ class DreamerAgent(BaseModel):
         self.state: Any | None = None
         self.logger.info("DreamerAgent initialized in placeholder mode.")
 
-    def predict(self, features: np.ndarray, **kwargs: Any) -> Signal:
+    def predict(self, features: np.ndarray, **kwargs: Any) -> ModelSignal:
         """
         Generates a trading signal using the Dreamer policy (placeholder).
 
@@ -67,21 +68,21 @@ class DreamerAgent(BaseModel):
             **kwargs: Additional context.
 
         Returns:
-            A Signal object (currently returns HOLD as placeholder).
+            A ModelSignal object (currently returns HOLD as placeholder).
         """
         self.logger.debug("DreamerAgent.predict called (placeholder).")
 
         # Production-grade robustness: Check for NaN or Inf in input features
         if not np.isfinite(features).all():
             self.logger.error("Input features contain NaN or Inf values.")
-            return Signal(
+            return ModelSignal(
                 direction=SignalDirection.HOLD,
                 confidence=0.0,
                 metadata={"error": "Invalid features: NaN or Inf detected"},
             )
 
         # Placeholder logic: return neutral signal
-        return Signal(
+        return ModelSignal(
             direction=SignalDirection.HOLD,
             confidence=0.0,
             metadata={

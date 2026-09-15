@@ -396,7 +396,7 @@ def test_detect_pre_drawdown_motifs(miner):
         ]
     )
 
-    # Signal 1 hour before cluster
+    # ModelSignal 1 hour before cluster
     signals = pd.DataFrame(
         [
             {

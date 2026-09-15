@@ -15,7 +15,7 @@ from src.trading.backtester import BacktestEngine
 
 class MockModel:
     def predict(self, obs):
-        return type("Signal", (), {"direction": 1, "confidence": 0.8})
+        return type("ModelSignal", (), {"direction": 1, "confidence": 0.8})
 
 
 @pytest.fixture
@@ -107,7 +107,7 @@ def test_walk_forward_normalization_no_lookahead(sample_data):
     class CapturingModel:
         def predict(self, obs, **kwargs):
             captured_obs.append(obs.copy())
-            return type("Signal", (), {"direction": 1, "confidence": 0.8})
+            return type("ModelSignal", (), {"direction": 1, "confidence": 0.8})
 
     engine = BacktestEngine(symbol="XAUUSD", execution_filter=mock_ef)
     model = CapturingModel()

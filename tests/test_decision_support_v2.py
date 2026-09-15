@@ -45,7 +45,7 @@ def base_explanation():
         feature_contributions=[],
         risk_assessment=RiskAssessment(passed=True, risk_reward_ratio=2.5, summary="Good R:R"),
         regime_context=RegimeContext(regime_name="Trending", confidence=0.9, is_favorable=True),
-        human_readable_summary="Signal shows momentum alignment.",
+        human_readable_summary="ModelSignal shows momentum alignment.",
         machine_attribution={}
     )
     return explanation

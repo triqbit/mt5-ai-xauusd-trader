@@ -490,14 +490,14 @@ class RLEvaluator:
 
     def _get_prediction(self, agent: Any, obs: np.ndarray) -> int:
         """
-        Translate agent prediction (int or Signal) into environment action.
-        Robustly handles SB3 tuples, numpy scalars/arrays, and Signal objects.
+        Translate agent prediction (int or ModelSignal) into environment action.
+        Robustly handles SB3 tuples, numpy scalars/arrays, and ModelSignal objects.
         Maps SignalDirection.SELL (-1) to ModelAction.SELL (2).
         """
         try:
             prediction = agent.predict(obs)
 
-            # Handle Signal objects FIRST (they are tuples, but we want the object)
+            # Handle ModelSignal objects FIRST (they are tuples, but we want the object)
             if hasattr(prediction, "direction"):
                 direction = prediction.direction
                 if direction == SignalDirection.BUY:

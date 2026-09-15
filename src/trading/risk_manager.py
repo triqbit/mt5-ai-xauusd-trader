@@ -24,7 +24,7 @@ from typing import Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import TradeSignal
+from src.core.schemas import RiskDecision, TradeSignal
 from src.core.trade_logger import TradeLogger
 from src.trading.risk_engine import RiskDecision, RiskEngine
 
@@ -82,10 +82,10 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> bool:
+    ) -> RiskDecision:
         """
         Run the full 8-layer risk filter cascade.
-        Returns True only if ALL layers pass.
+        Returns RiskDecision indicating approval status and reason.
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():
@@ -108,7 +108,7 @@ class RiskManager:
         passed = rejection_reason == ""
         if not passed:
             logger.warning(
-                "Signal REJECTED | %s %s | Reason: %s",
+                "ModelSignal REJECTED | %s %s | Reason: %s",
                 signal.symbol,
                 signal.direction,
                 rejection_reason,
@@ -120,7 +120,10 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-        return passed
+            return RiskDecision(is_approved=False, reason=rejection_reason)
+
+        # Default sizing for RiskManager (Legacy behavior kept compatible)
+        return RiskDecision(is_approved=True, reason="Approved", adjusted_lot_size=signal.lot_size)
 
     def size_position(
         self,

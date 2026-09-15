@@ -86,10 +86,10 @@ class DecisionStatus(str, Enum):
     Augmented status levels for trade execution and operator feedback.
 
     EXECUTE: High-confidence signal passing all filters and risk gates. Ready for immediate execution.
-    REVIEW: Signal is valid but meets criteria for manual operator oversight before execution.
+    REVIEW: ModelSignal is valid but meets criteria for manual operator oversight before execution.
     CAUTION: Valid signal but with elevated risk (e.g., high volatility) or lower confidence.
              May require manual oversight or reduced position sizing.
-    BLOCKED: Signal rejected by risk management, execution filters, or macro intelligence.
+    BLOCKED: ModelSignal rejected by risk management, execution filters, or macro intelligence.
              Strictly prohibited from execution.
     """
 

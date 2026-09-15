@@ -102,7 +102,7 @@ def test_full_trading_flow_integration(mock_cfg, trade_logger, mock_monitor, moc
         obs = mock_ohlcv[-1]
         model.predict(obs)
 
-        # 3. Log Signal
+        # 3. Log ModelSignal
         signal_id = trade_logger.log_signal(
             {
                 "symbol": "XAUUSD",
@@ -280,10 +280,10 @@ def test_intelligence_ensemble_adaptation():
     obs = np.random.rand(140)
     # Mock models to ensure they participate
     from src.core.constants import SignalDirection
-    from src.models.base_model import Signal
+    from src.core.schemas import ModelSignal
 
     model.ppo_agent = MagicMock()
-    model.ppo_agent.predict.return_value = Signal(direction=SignalDirection.BUY, confidence=0.8)
+    model.ppo_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.8)
 
     signal = model.predict(obs)
     assert "ppo" in signal.metadata["per_algo_votes"]
