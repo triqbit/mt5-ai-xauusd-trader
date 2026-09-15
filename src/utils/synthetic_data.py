@@ -1621,31 +1621,60 @@ class ReconciliationScenarioBuilder:
     Used for testing risk state restoration after system restarts.
     """
 
-    def __init__(self, trade_logger: TradeLogger):
-        self.logger = trade_logger
+    def __init__(self, trade_logger: TradeLogger | int | None = None, seed: int = 42):
+        self.logger = trade_logger if isinstance(trade_logger, TradeLogger) else None
+        if isinstance(trade_logger, int):
+            seed = trade_logger
+        self.rng = np.random.default_rng(seed)
 
-    def populate_near_daily_loss(self, symbol: str = "XAUUSD") -> dict[str, Any]:
+    def _resolve_logger(self, logger: TradeLogger | None) -> TradeLogger:
+        active_logger = logger or self.logger
+        if active_logger is None:
+            raise ValueError("A TradeLogger is required for reconciliation scenarios")
+        return active_logger
+
+    def populate_near_daily_loss(
+        self,
+        logger: TradeLogger | str | None = None,
+        balance: float = 10000.0,
+        target_loss_pct: float = 0.045,
+        symbol: str = "XAUUSD",
+    ) -> dict[str, Any]:
         """
         Populates trades that put the system near the daily loss limit.
         """
-        # Create 3 trades with $150 loss each = $450 total loss
+        if isinstance(logger, str):
+            symbol = logger
+            logger = None
+        active_logger = self._resolve_logger(logger)
+        loss_per_trade = balance * target_loss_pct / 3
         for i in range(3):
             ticket = 5000 + i
-            self.logger.log_trade(ticket, symbol, 1, 2300.0, 0.1, status="OPEN")
-            self.logger.update_trade(ticket, 2285.0, -150.0)
+            active_logger.log_trade(ticket, symbol, 1, 2300.0, 0.1, status="OPEN")
+            active_logger.update_trade(ticket, 2285.0, -loss_per_trade)
 
         return {"realised_pnl": -450.0, "trade_count": 3, "consecutive_losses": 3}
 
     def populate_active_losing_streak(
-        self, n_losses: int = 4, symbol: str = "XAUUSD"
+        self,
+        logger: TradeLogger | str | None = None,
+        n_losses: int = 4,
+        symbol: str = "XAUUSD",
+        count: int | None = None,
     ) -> dict[str, Any]:
         """
         Populates a sequence of losses to test consecutive loss guarding.
         """
+        if isinstance(logger, str):
+            symbol = logger
+            logger = None
+        active_logger = self._resolve_logger(logger)
+        if count is not None:
+            n_losses = count
         for i in range(n_losses):
             ticket = 6000 + i
-            self.logger.log_trade(ticket, symbol, 1, 2300.0, 0.1, status="OPEN")
-            self.logger.update_trade(ticket, 2295.0, -50.0)
+            active_logger.log_trade(ticket, symbol, 1, 2300.0, 0.1, status="OPEN")
+            active_logger.update_trade(ticket, 2295.0, -50.0)
 
         return {
             "realised_pnl": -50.0 * n_losses,
