@@ -70,6 +70,12 @@ The MT5 AI/ML Trading Bot is built for institutional-grade reliability. We prior
 - **DevOps:** [Docker](https://www.docker.com/), GitHub Actions, [Ruff](https://github.com/astral-sh/ruff)
 - **Settings:** [Pydantic Settings V2](https://docs.pydantic.dev/latest/usage/pydantic_settings/)
 
+### Supported Runtime
+
+- Python **3.11** is required for the pinned PyTorch, scientific, and trading dependencies.
+- Python 3.14 is not supported by the current dependency set.
+- The repository includes a `.python-version` file for version managers that support it.
+
 ---
 
 ## 📦 Project Structure
@@ -99,7 +105,8 @@ cd mt5-ai-xauusd-trader
 # Install dependencies (Python 3.11 is required)
 python3.11 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
 
 # [CRITICAL] Verify environment and dependencies
 python main.py --doctor
@@ -110,6 +117,16 @@ python main.py --setup
 # Perform a pre-flight health check (verifies .env and connectivity)
 python main.py --check
 ```
+
+For Linux or macOS, the bootstrap script performs the same setup and creates a local `.env` from the template:
+
+```bash
+python3.11 -m venv venv
+source venv/bin/activate
+bash scripts/bootstrap.sh
+```
+
+If `python3` points to another version, invoke the script from an activated Python 3.11 environment. The bootstrapper stops rather than creating a partially installed environment.
 
 ### 2. Quick Evaluation (No-Config Demo)
 You can evaluate the system's analytical and RL capabilities immediately using synthetic data, without requiring MT5 credentials or pre-trained models:
@@ -134,6 +151,13 @@ MT5_LOGIN=your_account
 MT5_PASSWORD=your_password
 MT5_SERVER=your_broker_server
 MODE=demo
+```
+
+For Docker Compose, create the environment file before starting the service:
+
+```bash
+cp .env.example .env
+docker compose up --build
 ```
 
 ### 4. Execution
