@@ -29,10 +29,10 @@ class AuditedRiskManager(RiskManager):
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> RiskDecision:
+    ) -> bool:
         """
         Run the full 8-layer risk filter cascade.
-        Returns RiskDecision indicating approval status and reason.
+        Returns whether the signal passed the approval gate.
         Logs the full decision chain to the audit log.
         """
         decision_chain = {
@@ -97,6 +97,6 @@ class AuditedRiskManager(RiskManager):
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-            return RiskDecision(is_approved=False, reason=f"Failed: {reason_str}")
+            return False
 
-        return RiskDecision(is_approved=True, reason="Approved", adjusted_lot_size=signal.lot_size)
+        return True
