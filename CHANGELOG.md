@@ -1544,6 +1544,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **config**: Properly fix mt5_login syntax error from previous commit
 - **config**: Add default=0 to mt5_login for test compatibility
 
+### Security
+- Remove vulnerable socketio dependency chain
+
 ## [1.1.0-rc7] - 2026-05-09
 
 ### Added
