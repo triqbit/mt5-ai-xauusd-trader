@@ -137,7 +137,7 @@ CORE_DEPENDENCIES = {
     "redis": ("redis", "5.2.0"),
     "alembic": ("alembic", "1.14.0"),
     "prometheus-client": ("prometheus_client", "0.25.0"),
-    "python-socketio": ("socketio", "4.6.1"),
+    "python-socketio": ("socketio", "5.16.4"),
     "pytz": ("pytz", "2026.2"),
     "psycopg2-binary": ("psycopg2", "2.9.12"),
     "python-telegram-bot": ("telegram", "22.8"),

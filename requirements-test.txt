@@ -23,6 +23,7 @@ pydantic-settings==2.15.0
 # -- MetaTrader 5 (Cloud Fallback) ---------------------------------
 
 # -- Testing -------------------------------------------------------
+python-socketio==5.16.4
 optuna==5.0.0
 pytest==9.1.1
 pytest-asyncio==1.4.0
