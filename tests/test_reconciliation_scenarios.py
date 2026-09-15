@@ -52,7 +52,7 @@ def test_populate_active_losing_streak(temp_logger, recon_builder):
     assert report["total_trades"] == 2
     assert report["win_rate"] == 0.0
 
-        with temp_logger.Session() as session:
+    with temp_logger.Session() as session:
         trades = session.query(Trade).all()
         assert len(trades) == 2
         assert all(t.pnl < 0 for t in trades)
