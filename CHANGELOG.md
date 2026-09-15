@@ -1484,6 +1484,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update daily PR triage report and merge readiness checklist (#1942)
 - Clarify supported setup workflow
 - Add live trading safety supervisor
+- **deps**: Patch python-socketio advisory
+- Chore(deps)(deps): bump torch from 2.6.0 to 2.14.0+cpu (#1905)
 
 ### Fixed
 - **Dependency Harmonization:** Aligned `python-socketio` version to 5.14.0 across `requirements.txt` and `pyproject.toml` to resolve synchronization mismatches.
