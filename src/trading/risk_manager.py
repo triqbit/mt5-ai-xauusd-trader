@@ -82,10 +82,10 @@ class RiskManager:
         signal: TradeSignal,
         signal_id: Optional[int] = None,
         model_health: Optional[dict] = None,
-    ) -> RiskDecision:
+    ) -> bool:
         """
         Run the full 8-layer risk filter cascade.
-        Returns RiskDecision indicating approval status and reason.
+        Returns whether the signal passed the compatibility approval gate.
         """
         rejection_reason = ""
         if not self._check_circuit_breaker():
@@ -120,10 +120,10 @@ class RiskManager:
                     symbol=signal.symbol,
                     signal_id=signal_id,
                 )
-            return RiskDecision(is_approved=False, reason=rejection_reason)
+            return False
 
         # Default sizing for RiskManager (Legacy behavior kept compatible)
-        return RiskDecision(is_approved=True, reason="Approved", adjusted_lot_size=signal.lot_size)
+        return True
 
     def size_position(
         self,
