@@ -1,0 +1,19 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.13, pytest-9.0.3, pluggy-1.6.0 -- /home/jules/.pyenv/versions/3.12.13/bin/python3
+cachedir: .pytest_cache
+rootdir: /app
+configfile: pyproject.toml
+plugins: mock-3.15.1, anyio-4.13.0
+collecting ... collected 9 items
+
+tests/test_risk_reconciliation.py::test_reconciliation_near_daily_loss PASSED [ 11%]
+tests/test_risk_reconciliation.py::test_reconciliation_losing_streak PASSED [ 22%]
+tests/test_risk_reconciliation.py::test_reconciliation_mixed_streak PASSED [ 33%]
+tests/test_trade_logger.py::test_log_signal PASSED                       [ 44%]
+tests/test_trade_logger.py::test_log_trade PASSED                        [ 55%]
+tests/test_trade_logger.py::test_performance_report PASSED               [ 66%]
+tests/test_trade_logger.py::test_log_risk_event PASSED                   [ 77%]
+tests/test_trade_logger.py::test_audit_columns PASSED                    [ 88%]
+tests/test_trade_logger.py::test_constraints PASSED                      [100%]
+
+============================== 9 passed in 9.07s ===============================

@@ -9,7 +9,7 @@ License: MIT
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 import numpy as np
@@ -343,6 +343,53 @@ class TradeLogger:
             else:
                 logger.warning("Trade with ticket %d not found for update.", ticket)
                 return None
+
+    def get_reconciliation_data(self, target_date: date | None = None) -> dict[str, Any]:
+        """
+        Retrieve intraday stats for state reconciliation.
+        """
+        if target_date is None:
+            target_date = datetime.now(UTC).date()
+
+        with self.Session() as session:
+            # Get all closed trades for the target date
+            trades = (
+                session.execute(
+                    select(Trade)
+                    .where(
+                        Trade.status == "CLOSED",
+                        Trade.is_deleted.is_(False),
+                        func.date(Trade.created_at) == target_date,
+                    )
+                    .order_by(Trade.created_at.asc())
+                )
+                .scalars()
+                .all()
+            )
+
+            if not trades:
+                return {
+                    "realised_pnl": 0.0,
+                    "trade_count": 0,
+                    "consecutive_losses": 0,
+                }
+
+            realised_pnl = sum(t.pnl for t in trades)
+            trade_count = len(trades)
+
+            # Calculate current streak
+            consecutive_losses = 0
+            for t in reversed(trades):
+                if t.pnl < 0:
+                    consecutive_losses += 1
+                else:
+                    break
+
+            return {
+                "realised_pnl": realised_pnl,
+                "trade_count": trade_count,
+                "consecutive_losses": consecutive_losses,
+            }
 
     def get_trade_by_ticket(self, ticket: int) -> Trade | None:
         """Retrieve trade details by ticket ID."""

@@ -23,6 +23,7 @@ class SimpleMockModel:
 
 
 
+
 @pytest.fixture
 def test_data():
     """1000 bars of synthetic trending data."""

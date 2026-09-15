@@ -23,6 +23,7 @@ class ConstantModel:
 
 
 
+
 @pytest.fixture
 def backtest_builder():
     return BacktestScenarioBuilder(seed=42)
