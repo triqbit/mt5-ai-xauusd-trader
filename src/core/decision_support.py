@@ -61,6 +61,7 @@ class PerformanceContext(BaseModel):
     sharpe_ratio: float = Field(
         0.0,
         ge=-10.0,
+        le=10.0,
         description="Risk-adjusted return (Sharpe Ratio). Target > 2.0 per standards.",
     )
     profit_factor: float = Field(

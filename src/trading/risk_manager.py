@@ -26,6 +26,7 @@ from src.core.config import TradingConfig
 from src.core.monitor import Monitor
 from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
+from src.trading.risk_engine import RiskDecision, RiskEngine
 
 logger = logging.getLogger(__name__)
 
@@ -124,15 +125,22 @@ class RiskManager:
     def size_position(
         self,
         symbol: str,
-        win_rate: float,
-        avg_win: float,
-        avg_loss: float,
+        win_rate: float | object,
+        avg_win: Optional[float] = None,
+        avg_loss: Optional[float] = None,
         pip_value: float = 1.0,
     ) -> float:
         """
         Fractional Kelly Criterion position sizing.
         Returns lot size capped at max risk per trade.
         """
+        if avg_win is None and avg_loss is None:
+            engine = RiskEngine(self.cfg, self.balance, monitor=self.monitor)
+            engine.peak_equity = self.peak_equity
+            engine.daily = self.daily
+            return engine.calculate_position_size(symbol, win_rate)  # type: ignore[arg-type]
+        if avg_loss is None or avg_win is None:
+            raise TypeError("avg_win and avg_loss must be provided together")
         if avg_loss == 0:
             return 0.01  # minimum lot
         kelly_fraction = (win_rate * avg_win - (1 - win_rate) * avg_loss) / avg_win
@@ -147,6 +155,19 @@ class RiskManager:
             lot_size,
         )
         return lot_size
+
+    def validate_signal(
+        self,
+        signal: TradeSignal,
+        market_data: object,
+        open_positions: list[dict[str, object]],
+        model_health: Optional[dict[str, float]] = None,
+    ) -> RiskDecision:
+        """Compatibility API backed by the canonical institutional risk engine."""
+        engine = RiskEngine(self.cfg, self.balance, trade_logger=self.trade_logger, monitor=self.monitor)
+        engine.peak_equity = self.peak_equity
+        engine.daily = self.daily
+        return engine.validate_signal(signal, market_data, open_positions, model_health)  # type: ignore[arg-type]
 
     def update_equity(self, current_equity: float) -> None:
         """Call after every closed trade or on heartbeat."""

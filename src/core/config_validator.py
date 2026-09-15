@@ -725,15 +725,17 @@ class ConfigValidator:
             return
 
         # 1. Identify sensitive files dynamically from configuration
-        sensitive_files = [
-            Path(".env"),
-            self.config.model_config.get("env_file"),
-        ]
+        model_config = getattr(self.config, "model_config", {}) or {}
+        sensitive_files = [Path(".env"), model_config.get("env_file")]
 
         # Resolve SQLite database paths if applicable
-        db_urls = [self.config.database_url.get_secret_value()]
-        if hasattr(self.config, "redis_url") and self.config.redis_url:
-            db_urls.append(self.config.redis_url.get_secret_value())
+        db_urls = []
+        database_url = getattr(self.config, "database_url", None)
+        if database_url:
+            db_urls.append(database_url.get_secret_value())
+        redis_url = getattr(self.config, "redis_url", None)
+        if redis_url:
+            db_urls.append(redis_url.get_secret_value())
 
         from sqlalchemy.engine import make_url
 
@@ -776,15 +778,21 @@ class ConfigValidator:
                     os.chmod(path, target_mode)
                     # Verify hardening
                     new_mode = os.stat(path).st_mode
-                    if not (new_mode & forbidden_mask):
-                        self.errors.append(
-                            ValidationError(
-                                "FILE_PERMISSION",
-                                f"Hardened insecure permissions for {path.name} from {current_mode_str} to {oct(target_mode)}.",
-                                False,
-                                "N/A (Automatically Corrected)",
-                            )
+                    self.errors.append(
+                        ValidationError(
+                            "FILE_PERMISSION",
+                            (
+                                f"Hardened insecure permissions for {path.name} from "
+                                f"{current_mode_str} to {oct(target_mode)}."
+                                if not (new_mode & forbidden_mask)
+                                else f"Insecure permissions remain for {path.name}: {current_mode_str}."
+                            ),
+                            False,
+                            "N/A (Automatically Corrected)"
+                            if not (new_mode & forbidden_mask)
+                            else f"Run 'chmod {oct(target_mode)[2:]} {path.name}' manually.",
                         )
+                    )
                 except Exception as e:
                     self.errors.append(
                         ValidationError(

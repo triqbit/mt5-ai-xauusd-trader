@@ -916,14 +916,8 @@ def run_setup_wizard() -> int:
             f"METAAPI_ACCOUNT_ID={meta_id}\n",
         ]
 
-    # Enterprise Security: Use os.open with 0o600 to prevent world-readable race condition
-    if os.name != "nt":
-        fd = os.open(env_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w") as f:
-            f.writelines(lines)
-    else:
-        with open(env_path, "w") as f:
-            f.writelines(lines)
+    with open(env_path, "w") as f:
+        f.writelines(lines)
 
     # Secure permissions (double-check)
     import contextlib
