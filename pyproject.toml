@@ -70,7 +70,7 @@ test = [
     "types-requests==2.33.0.20260906",
     "types-python-dateutil==2.9.0.20260807",
     "types-setuptools==84.0.0.20260812",
-    "types-PyYAML==6.0.12.20260815",
+    "types-PyYAML==6.0.12.20260906",
 ]
 
 [tool.setuptools.packages.find]
