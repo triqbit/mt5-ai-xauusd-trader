@@ -13,6 +13,7 @@ from src.trading.capital_allocator import (
 )
 from src.trading.mt5_connector import MT5Connector
 from src.trading.risk_engine import RiskDecision, RiskEngine
+from src.trading.safety_supervisor import ReconciliationResult, SafetySupervisor
 
 __all__ = [
     "AllocationRequest",
@@ -24,6 +25,8 @@ __all__ = [
     "RejectionCode",
     "RiskDecision",
     "RiskEngine",
+    "ReconciliationResult",
+    "SafetySupervisor",
     "StrategyConfig",
     "TradeSignal",
 ]
