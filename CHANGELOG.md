@@ -1478,6 +1478,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add integration strategy for MT5 AI/ML trading bot
 - Add comprehensive development plan for MT5 AI/ML trading bot
 - Initial commit
+- Update daily merge-readiness checklist for 2026-09-15 (#1944)
+- Update daily process integrity log for 2026-09-15 (#1943) (#1943)
+- Update daily PR triage report and merge readiness checklist (#1942)
 
 ### Fixed
 - **Dependency Harmonization:** Aligned `python-socketio` version to 5.14.0 across `requirements.txt` and `pyproject.toml` to resolve synchronization mismatches.
@@ -1543,6 +1546,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move inline imports (os, numpy) to module top — resolves E402/PLC0415
 - **config**: Properly fix mt5_login syntax error from previous commit
 - **config**: Add default=0 to mt5_login for test compatibility
+- Align runtime and dependency pins
 
 ### Security
 - Remove vulnerable socketio dependency chain
