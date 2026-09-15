@@ -189,6 +189,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **trading**: Add dual-path MT5Connector with SDK + MetaAPI fallback
 - **trading**: Add enterprise RiskManager with Kelly sizing, circuit breakers & 6-layer filters
 - **core**: Add enterprise TradingConfig with Pydantic-v2 settings management
+- Add live trading safety supervisor
 
 ### Changed
 - Optimized `FeatureEngineer` technical analysis pipeline, achieving ~17% reduction in latency.
@@ -1481,6 +1482,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update daily merge-readiness checklist for 2026-09-15 (#1944)
 - Update daily process integrity log for 2026-09-15 (#1943) (#1943)
 - Update daily PR triage report and merge readiness checklist (#1942)
+- Clarify supported setup workflow
+- Add live trading safety supervisor
 
 ### Fixed
 - **Dependency Harmonization:** Aligned `python-socketio` version to 5.14.0 across `requirements.txt` and `pyproject.toml` to resolve synchronization mismatches.
