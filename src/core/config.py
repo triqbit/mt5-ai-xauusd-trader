@@ -29,6 +29,7 @@ class TradingConfig(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        loc_by_alias=False,
     )
 
     # ── MT5 Connection ──────────────────────────────────────────────────────────

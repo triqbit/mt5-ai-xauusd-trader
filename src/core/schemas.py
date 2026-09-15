@@ -36,6 +36,12 @@ class ModelSignal(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Model confidence")
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional model context")
 
+    def __iter__(self):
+        """Preserve tuple-style unpacking for legacy model consumers."""
+        yield self.direction
+        yield self.confidence
+        yield self.metadata
+
 
 class TradeSignal(BaseModel):
     """
