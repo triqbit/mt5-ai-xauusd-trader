@@ -2,11 +2,14 @@
 Tests for centralized Pydantic schema enforcement and decision funnel validation.
 """
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, UTC
 from pydantic import ValidationError
-from src.core.schemas import ModelSignal, TradeSignal, RiskDecision, ExecutionDecision
+
 from src.core.constants import SignalDirection
+from src.core.schemas import ExecutionDecision, ModelSignal, RiskDecision, TradeSignal
+
 
 def test_model_signal_validation():
     """Verify ModelSignal enforces types and ranges."""
@@ -23,6 +26,7 @@ def test_model_signal_validation():
     with pytest.raises(ValidationError):
         ModelSignal(direction=SignalDirection.BUY, confidence=-0.1)
 
+
 def test_risk_decision_consistency():
     """Verify RiskDecision enforces rejection reasons."""
     # Valid approval
@@ -38,6 +42,7 @@ def test_risk_decision_consistency():
     with pytest.raises(ValidationError, match="A rejected risk decision must provide a 'reason'"):
         RiskDecision(is_approved=False)
 
+
 def test_trade_signal_price_sanity():
     """Verify TradeSignal enforces price boundaries and R:R ratio."""
     base_params = {
@@ -45,7 +50,7 @@ def test_trade_signal_price_sanity():
         "lot_size": 0.1,
         "algorithm": "test",
         "confidence": 0.8,
-        "timestamp": datetime.now(UTC)
+        "timestamp": datetime.now(UTC),
     }
 
     # Valid BUY
@@ -54,28 +59,31 @@ def test_trade_signal_price_sanity():
         entry_price=2000.0,
         stop_loss=1990.0,
         take_profit=2020.0,
-        **base_params
+        **base_params,
     )
 
     # Invalid BUY (SL above entry)
-    with pytest.raises(ValidationError, match="BUY Stop Loss .* must be below Entry Price"):
+    with pytest.raises(ValidationError, match=r"BUY Stop Loss .* must be below Entry Price"):
         TradeSignal(
             direction=SignalDirection.BUY,
             entry_price=2000.0,
             stop_loss=2010.0,
             take_profit=2030.0,
-            **base_params
+            **base_params,
         )
 
     # Invalid R:R (below 1.5)
-    with pytest.raises(ValidationError, match="Risk-Reward ratio .* is below the required minimum of 1.5"):
+    with pytest.raises(
+        ValidationError, match=r"Risk-Reward ratio .* is below the required minimum of 1.5"
+    ):
         TradeSignal(
             direction=SignalDirection.BUY,
             entry_price=2000.0,
             stop_loss=1990.0,
             take_profit=2010.0,  # RR = 1.0
-            **base_params
+            **base_params,
         )
+
 
 def test_execution_decision_consistency():
     """Verify ExecutionDecision enforces rejection reasons."""
@@ -87,29 +95,22 @@ def test_execution_decision_consistency():
         take_profit=2020.0,
         lot_size=0.1,
         algorithm="test",
-        confidence=0.8
+        confidence=0.8,
     )
 
     # Valid approval
-    ExecutionDecision(
-        signal=trade_sig,
-        is_approved=True,
-        confidence_score=0.8
-    )
+    ExecutionDecision(signal=trade_sig, is_approved=True, confidence_score=0.8)
 
     # Invalid approval (has blocked_by)
-    with pytest.raises(ValidationError, match="An approved decision cannot have a 'blocked_by' reason"):
+    with pytest.raises(
+        ValidationError, match="An approved decision cannot have a 'blocked_by' reason"
+    ):
         ExecutionDecision(
-            signal=trade_sig,
-            is_approved=True,
-            confidence_score=0.8,
-            blocked_by="SpreadFilter"
+            signal=trade_sig, is_approved=True, confidence_score=0.8, blocked_by="SpreadFilter"
         )
 
     # Invalid rejection (missing blocked_by)
-    with pytest.raises(ValidationError, match="A blocked decision must provide a 'blocked_by' reason"):
-        ExecutionDecision(
-            signal=trade_sig,
-            is_approved=False,
-            confidence_score=0.8
-        )
+    with pytest.raises(
+        ValidationError, match="A blocked decision must provide a 'blocked_by' reason"
+    ):
+        ExecutionDecision(signal=trade_sig, is_approved=False, confidence_score=0.8)

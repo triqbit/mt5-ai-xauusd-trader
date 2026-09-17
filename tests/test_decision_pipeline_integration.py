@@ -85,7 +85,9 @@ def ensemble_model():
         from src.core.constants import SignalDirection
         from src.core.schemas import ModelSignal
 
-        model.ppo_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.8)
+        model.ppo_agent.predict.return_value = ModelSignal(
+            direction=SignalDirection.BUY, confidence=0.8
+        )
         return model
 
 

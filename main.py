@@ -480,7 +480,9 @@ def run_live(
                     risk_decision = None
                     risk_approved = False
                     if direction != 0:
-                        risk_decision = risk.approve(signal, signal_id=signal_id, model_health=health)
+                        risk_decision = risk.approve(
+                            signal, signal_id=signal_id, model_health=health
+                        )
                         risk_approved = risk_decision.is_approved
 
                     if monitor and direction != 0:
@@ -538,7 +540,9 @@ def run_live(
 
                         risk_data = {
                             "passed": risk_approved,
-                            "rejection_reasons": [risk_decision.reason] if risk_decision and not risk_approved else [],
+                            "rejection_reasons": [risk_decision.reason]
+                            if risk_decision and not risk_approved
+                            else [],
                             "risk_reward": abs(signal.take_profit - price)
                             / abs(price - signal.stop_loss)
                             if abs(price - signal.stop_loss) > 0
