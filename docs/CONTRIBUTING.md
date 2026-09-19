@@ -94,7 +94,9 @@ Run the full suite and governance checks locally:
 # Run tests with coverage
 PYTHONPATH=. python3 -m pytest tests/ --cov=src --cov-report=term-missing
 
-# Run governance vitals check
+# Run governance vitals check (zero-dependency via unittest or pytest)
+PYTHONPATH=. python3 -m unittest tests/test_governance_vitals.py
+# Or via pytest:
 PYTHONPATH=. python3 -m pytest tests/test_governance_vitals.py --noconftest
 
 # Run Atlas Governance Auditor
