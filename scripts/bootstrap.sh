@@ -4,16 +4,23 @@ set -e
 echo "=== MT5 AI/ML Trading Bot Bootstrapper ==="
 
 # 1. Check Python
-python3 --version || { echo "Python 3 not found"; exit 1; }
-if ! python3 -c 'import sys; raise SystemExit(not (sys.version_info[:2] == (3, 11)))'; then
-    echo "Python 3.11 is required. Found: $(python3 --version 2>&1)"
+PYTHON_EXEC="python3"
+if command -v python3.11 &>/dev/null; then
+    if python3.11 -c 'import sys; sys.exit(0 if sys.version_info[:2] == (3, 11) else 1)' 2>/dev/null; then
+        PYTHON_EXEC="python3.11"
+    fi
+fi
+
+$PYTHON_EXEC --version || { echo "Python 3 not found"; exit 1; }
+if ! $PYTHON_EXEC -c 'import sys; raise SystemExit(not (sys.version_info[:2] == (3, 11)))' 2>/dev/null; then
+    echo "Python 3.11 is required. Found: $($PYTHON_EXEC --version 2>&1)"
     exit 1
 fi
 
 # 2. Setup virtual environment if not present
 if [ ! -d "venv" ]; then
-    echo "Creating virtual environment..."
-    python3 -m venv venv
+    echo "Creating virtual environment using $PYTHON_EXEC..."
+    $PYTHON_EXEC -m venv venv
 fi
 
 # 3. Create required directories
