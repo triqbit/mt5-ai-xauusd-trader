@@ -116,7 +116,6 @@ CORE_DEPENDENCIES = {
     "pydantic": ("pydantic", "2.10.4"),
     "pydantic-settings": ("pydantic_settings", "2.7.0"),
     "sqlalchemy": ("sqlalchemy", "2.0.36"),
-    "metaapi-cloud-sdk": ("metaapi_cloud_sdk", "29.1.1"),
     "torch": ("torch", "2.5.1"),
     "fastapi": ("fastapi", "0.115.6"),
     "structlog": ("structlog", "24.4.0"),
@@ -142,6 +141,10 @@ CORE_DEPENDENCIES = {
     "psycopg2-binary": ("psycopg2", "2.9.12"),
     "python-telegram-bot": ("telegram", "22.8"),
     "optuna": ("optuna", "4.9.0"),
+}
+
+OPTIONAL_DEPENDENCIES = {
+    "metaapi-cloud-sdk": ("metaapi_cloud_sdk", "29.1.1"),
 }
 
 
@@ -194,6 +197,14 @@ def check_dependencies(dependencies=None):
                 versions.append(f"{display_name} v?")
         except ImportError:
             missing.append(display_name)
+
+    if dependencies is None:
+        for display_name, val in OPTIONAL_DEPENDENCIES.items():
+            module_name = val[0] if isinstance(val, tuple) else val
+            try:
+                __import__(module_name)
+            except ImportError:
+                optional_missing.append(display_name)
 
     if missing:
         remedy = "Run 'make bootstrap' to install missing dependencies."
