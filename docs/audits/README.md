@@ -16,6 +16,16 @@ This directory serves as the central repository for all technical audits, perfor
 
 ---
 
+## 🗺️ System Map & Health Routing
+
+| Navigation Target | Purpose | Status |
+| :--- | :--- | :--- |
+| [**Architecture Quick-Start**](../ARCHITECTURE_QUICK.md) | High-level system topology and production maturity map. | ✅ Verified |
+| [**Project Health Dashboard**](../status/PROJECT_HEALTH.md) | Real-time CI, linter, and PR backlog metrics. | ✅ Active |
+| [**Process Integrity Log**](../status/PROCESS_INTEGRITY_LOG.md) | Audit trail of daily process invariant checks. | ✅ Active |
+
+---
+
 ## 🏛️ Governance Context
 
 These audits are maintained by the Technical Credibility & Evidence Surface Engine (Jules06) to ensure the system remains enterprise-legible and trustworthy.
