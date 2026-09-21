@@ -4,25 +4,28 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 
 ## 2026-09-21 18:00 GMT+4
 
-**Summary:** Process invariants are fully holding on `main`. No process drift or risky behavior detected. Three safe-surface pull requests updating documentation, process integrity logs, daily PR triage dashboard, and merge-readiness checklist have been integrated since the last process integrity report.
+**Summary:** Process invariants are holding on `main` (🟡 AMBER). Global CI Fast Validation is failing due to 14 Ruff linting errors across `src/models/`, `src/trading/`, `src/utils/`, and `tests/` introduced by recent merges. Triage diagnostic tests pass cleanly locally. No direct commits to `main` without PRs or unauthorized risk changes detected.
 
 **Suspected Process Issues:**
-- **Stale PR Backlog:** The open PR count is at 559 open PRs. These are stale relative to the active `main` branch but do not affect current system safety on `main`.
+- **CI Fast Validation Failure:** Ruff linting is failing in CI with 14 errors (unsorted `__all__`, unused/redefined imports, unformatted import blocks, missing trailing newlines, and regex pattern warnings) across `src/models/__init__.py`, `src/trading/__init__.py`, `src/trading/audited_risk_manager.py`, `src/trading/risk_manager.py`, `src/trading/safety_supervisor.py`, `src/utils/synthetic_data.py`, `tests/test_adaptive_feedback_loop.py`, `tests/test_decision_schema_enforcement.py`, `tests/test_safety_supervisor.py`, and `tests/test_system_bootstrap_to_execution.py`.
+- **Stale PR Backlog:** The open PR count is at 560 open PRs. These are stale relative to the active `main` branch but do not affect current system safety on `main`.
 
 **PRs/Commits Involved:**
+- `main` branch: Commit `bd29f2b` (PR #1974) - Updates daily PR triage dashboard for 2026-09-21.
 - `main` branch: Commit `829276c` (PR #1960) - Updates daily PR triage dashboard for 2026-09-20.
 - `main` branch: Commit `d0d5b54` (PR #1959) - Updates daily merge-readiness checklist for 2026-09-20.
 - `main` branch: Commit `eee58d1` (PR #1958) - Updates daily process integrity log for 2026-09-20.
 
 **Check Invariants:**
-- [x] Changes go through PRs (Verified: All integrated commits PR #1958, #1959, and #1960 went through proper pull request merges).
-- [x] CI must pass before merge (Verified: Local triage diagnostic unit tests pass cleanly).
-- [x] Risky domains are not being changed casually (Verified: Only documentation files under `docs/status/` were modified. No trading, risk, security, or execution logic files were touched).
+- [x] Changes go through PRs (Verified: All integrated commits PR #1974, #1960, #1959, and #1958 went through proper pull request merges).
+- [ ] CI must pass before merge (Attention: Global CI Fast Validation currently failing on Ruff lint checks).
+- [x] Risky domains are not being changed casually (Verified: Only documentation files under `docs/status/` were modified by Jules06. No trading, risk, security, or execution logic files were touched).
 
 **Recommended Follow-ups:**
-- **Backlog Pruning:** Jules05 should perform a bulk prune/closure of the 559 stale PRs to reduce noise.
+- **Ruff Lint Resolution:** Jules02 or human operator should run `ruff check --fix .` across the repository to resolve the 14 linting errors and restore green CI status.
+- **Backlog Pruning:** Jules05 should perform a bulk prune/closure of the 560 stale PRs to reduce noise.
 
-**Status:** 🟢 GREEN (Invariants holding, git linear history verified as fully preserved).
+**Status:** 🟡 AMBER (Invariants holding, but CI Fast Validation failing on Ruff linting errors).
 
 ## 2026-09-20 18:00 GMT+4
 
