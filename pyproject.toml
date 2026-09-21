@@ -21,7 +21,7 @@ dependencies = [
     "numpy==2.4.6",
     "scipy==1.15.3",
     "scikit-learn==1.9.1",
-    "pandas==2.3.2",
+    "pandas==3.0.6",
     "TA-Lib==0.8.0",
     "requests==2.34.2",
     "aiohttp==3.14.3",
