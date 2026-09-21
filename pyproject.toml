@@ -36,7 +36,7 @@ dependencies = [
     "tqdm==4.70.0",
     "jinja2==3.1.6",
     "fastapi==0.141.1",
-    "uvicorn[standard]==0.52.4",
+    "uvicorn[standard]==0.53.0",
     "python-dotenv==1.2.3",
     "pydantic==2.13.5",
     "pydantic-settings==2.15.0",
