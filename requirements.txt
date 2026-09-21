@@ -27,7 +27,7 @@ MetaTrader5==5.0.6180; sys_platform == 'win32'
 
 # ── Database ────────────────────────────────────────────────
 psycopg2-binary==2.9.13
-sqlalchemy==2.0.52
+sqlalchemy==2.0.54
 alembic==1.19.2
 redis==8.1.0
 
