@@ -121,12 +121,15 @@ class RiskEngine:
 
         # Layer 5: Symbol Allocation (Simplified for XAUUSD focus)
         if signal.symbol != self.cfg.symbol:
-            return RiskDecision(is_approved=False, reason=f"Symbol {signal.symbol} not in approved list")
+            return RiskDecision(
+                is_approved=False, reason=f"Symbol {signal.symbol} not in approved list"
+            )
 
         # Layer 6: Prediction Limits
         if signal.confidence < self.cfg.min_confidence:
             return RiskDecision(
-                is_approved=False, reason=f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}"
+                is_approved=False,
+                reason=f"Confidence {signal.confidence:.2f} below {self.cfg.min_confidence}",
             )
 
         # Layer 7: Risk-Reward Validation (Min 1.5 R:R)
@@ -141,7 +144,9 @@ class RiskEngine:
         adjusted_lots = self.calculate_position_size(signal.symbol, market_data)
 
         if adjusted_lots < self.cfg.min_lot_size:
-            return RiskDecision(is_approved=False, reason=f"Calculated lot size {adjusted_lots} below minimum")
+            return RiskDecision(
+                is_approved=False, reason=f"Calculated lot size {adjusted_lots} below minimum"
+            )
 
         return RiskDecision(is_approved=True, reason="Approved", adjusted_lot_size=adjusted_lots)
 

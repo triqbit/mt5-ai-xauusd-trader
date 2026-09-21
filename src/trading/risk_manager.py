@@ -24,7 +24,7 @@ from typing import Any, Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import RiskDecision, TradeSignal
+from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
 from src.trading.risk_engine import RiskDecision, RiskEngine
 
@@ -167,7 +167,9 @@ class RiskManager:
         model_health: Optional[dict[str, float]] = None,
     ) -> RiskDecision:
         """Compatibility API backed by the canonical institutional risk engine."""
-        engine = RiskEngine(self.cfg, self.balance, trade_logger=self.trade_logger, monitor=self.monitor)
+        engine = RiskEngine(
+            self.cfg, self.balance, trade_logger=self.trade_logger, monitor=self.monitor
+        )
         engine.peak_equity = self.peak_equity
         engine.daily = self.daily
         return engine.validate_signal(signal, market_data, open_positions, model_health)  # type: ignore[arg-type]

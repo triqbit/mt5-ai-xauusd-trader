@@ -283,7 +283,9 @@ def test_intelligence_ensemble_adaptation():
     from src.core.schemas import ModelSignal
 
     model.ppo_agent = MagicMock()
-    model.ppo_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.8)
+    model.ppo_agent.predict.return_value = ModelSignal(
+        direction=SignalDirection.BUY, confidence=0.8
+    )
 
     signal = model.predict(obs)
     assert "ppo" in signal.metadata["per_algo_votes"]
