@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-09-21 14:07:10 UTC
+**Date:** 2026-09-22 13:24:08 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,7 +10,7 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `5b4ff4f4b4043eb2fac9391a9c919ed947d33290` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `a2e92ae290f27cc4d8fbd41be8c1ba7ba298c43d` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (560)
 3. **Re-validate Stale:** Review Safe Surface PR #1972 (chore(deps): bump ruff from 0.16.7 to 0.16.8)
 
@@ -19,7 +19,7 @@
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
 | [1972](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1972) | chore(deps): bump ruff from 0.16.7 to 0.16.8 | dependabot[bot] | `dependabot/pip/ruff-0.16.8` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1938](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1938) | chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 | dependabot[bot] | `dependabot/pip/types-pyyaml-6.0.12.20260906` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1938](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1938) | chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 | dependabot[bot] | `dependabot/pip/types-pyyaml-6.0.12.20260906` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1740](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1740) | docs: update daily merge-readiness checklist and PR triage [2026-07-31] | triqbit | `main-16126816414089982301` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1712](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1712) | Add optional TickerAll hosted MT5 API path to MT5Connector | miguelangelo78 | `tickerall-provider` | none | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1697](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1697) | docs: update process integrity log [2026-07-21] | triqbit | `process-integrity-log-2026-07-21-qufuwan-17949035639015288261` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
@@ -590,7 +590,7 @@
 ## ✨ Good Candidates for Review Today
 
 - **PR #1972**: chore(deps): bump ruff from 0.16.7 to 0.16.8 (dependabot[bot]) [CI: pending] - *Safe Surface*
-- **PR #1938**: chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1938**: chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #1697**: docs: update process integrity log [2026-07-21] (triqbit) [CI: pending] - *Safe Surface*
 - **PR #1661**: DX: update process integrity log and project health [2026-07-14] (triqbit) [CI: pending] - *Safe Surface*
 
