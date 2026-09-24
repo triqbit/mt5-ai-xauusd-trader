@@ -18,9 +18,8 @@ from sqlalchemy import select
 from src.core.audit_log import AuditEntry, AuditLogger
 from src.core.config import get_config
 from src.core.constants import SignalDirection
-from src.core.schemas import TradeSignal
+from src.core.schemas import ModelSignal, TradeSignal
 from src.core.trade_logger import TradeLogger
-from src.core.schemas import ModelSignal
 from src.models.ensemble import EnsembleModel
 from src.trading.execution_filter import ExecutionFilter
 
@@ -65,9 +64,15 @@ def ensemble(system_env):
     model.lstm_model = MagicMock()
 
     # Set default behaviors
-    model.ppo_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.9)
-    model.dreamer_agent.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.9)
-    model.lstm_model.predict.return_value = ModelSignal(direction=SignalDirection.BUY, confidence=0.9)
+    model.ppo_agent.predict.return_value = ModelSignal(
+        direction=SignalDirection.BUY, confidence=0.9
+    )
+    model.dreamer_agent.predict.return_value = ModelSignal(
+        direction=SignalDirection.BUY, confidence=0.9
+    )
+    model.lstm_model.predict.return_value = ModelSignal(
+        direction=SignalDirection.BUY, confidence=0.9
+    )
 
     return model
 
