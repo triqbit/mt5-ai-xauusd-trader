@@ -12,8 +12,8 @@ if command -v python3.11 &>/dev/null; then
 fi
 
 $PYTHON_EXEC --version || { echo "Python 3 not found"; exit 1; }
-if ! $PYTHON_EXEC -c 'import sys; raise SystemExit(not (sys.version_info[:2] == (3, 11)))' 2>/dev/null; then
-    echo "Python 3.11 is required. Found: $($PYTHON_EXEC --version 2>&1)"
+if ! $PYTHON_EXEC -c 'import sys; raise SystemExit(not (sys.version_info >= (3, 10)))' 2>/dev/null; then
+    echo "Python 3.10 or higher is required. Found: $($PYTHON_EXEC --version 2>&1)"
     exit 1
 fi
 
