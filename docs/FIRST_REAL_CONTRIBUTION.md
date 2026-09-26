@@ -117,41 +117,41 @@ Add your new check function to the `system_checks` list in `main()` of `scripts/
 
 ### 2. Write the Corresponding Unit Test in `tests/test_doctor_diagnostics.py`
 
-Every diagnostic check added to `scripts/doctor.py` **must** have a corresponding unit test to maintain our strict statement coverage threshold.
+Every diagnostic check added to `scripts/doctor.py` **must** have a corresponding unit test in `TestDoctorDiagnostics` inheriting from `unittest.TestCase`.
 
 Open `tests/test_doctor_diagnostics.py` and add:
 
 ```python
-def test_check_workspace_directories_missing():
-    """Verify that workspace check warns when directories are missing."""
-    def mock_exists_side_effect(path):
-        # Pretend "data" and "logs" do not exist
-        if str(path) in ["data", "logs"]:
-            return False
-        return True
+    def test_check_workspace_directories_missing(self):
+        """Verify that workspace check warns when directories are missing."""
+        def mock_exists_side_effect(path):
+            # Pretend "data" and "logs" do not exist
+            if str(path) in ["data", "logs"]:
+                return False
+            return True
 
-    with patch("scripts.doctor.Path.exists", side_effect=mock_exists_side_effect):
-        res = doctor.check_workspace_directories()
-        assert res.status == "WARNING"
-        assert "Missing: data, logs" in res.message
+        with patch("scripts.doctor.Path.exists", side_effect=mock_exists_side_effect):
+            res = doctor.check_workspace_directories()
+            self.assertEqual(res.status, "WARNING")
+            self.assertIn("Missing: data, logs", res.message)
 
-
-def test_check_workspace_directories_ok():
-    """Verify that workspace check passes when directories exist."""
-    with patch("scripts.doctor.Path.exists", return_value=True):
-        res = doctor.check_workspace_directories()
-        assert res.status == "OK"
+    def test_check_workspace_directories_ok(self):
+        """Verify that workspace check passes when directories exist."""
+        with patch("scripts.doctor.Path.exists", return_value=True):
+            res = doctor.check_workspace_directories()
+            self.assertEqual(res.status, "OK")
 ```
 
 ### 3. Run and Verify Your Unit Tests Locally
 
-We enforce clean test outcomes before any code is reviewed. Always run tests using your active python environment or pytest:
+We enforce clean test outcomes before any code is reviewed. All diagnostic and governance tests inherit from `unittest.TestCase` and can be executed with zero external dependencies using Python's built-in `unittest` module:
 
 ```bash
-# Run doctor diagnostic tests via pytest or unittest
-pytest tests/test_doctor_diagnostics.py
-# Or using unittest:
+# Run doctor diagnostic tests with zero external dependencies
 PYTHONPATH=. python3 -m unittest tests/test_doctor_diagnostics.py
+
+# Or via pytest if installed
+pytest tests/test_doctor_diagnostics.py
 
 # Verify the complete system health via system doctor
 make doctor
@@ -169,7 +169,7 @@ Before submitting your PR:
 2.  **Conventional Commits:** Commit your change with an approved semantic type (e.g., `chore: add workspace directory checks to doctor`).
 3.  **Run Governance Suite:** Run the project's governance validator to ensure all files match expectations:
     ```bash
-    pytest tests/test_governance_vitals.py --noconftest
+    PYTHONPATH=. python3 -m unittest tests/test_governance_vitals.py
     ```
 4.  **Resync with Main (Critical):** Always rebase just before pushing to ensure you are on the latest commit on main:
     ```bash

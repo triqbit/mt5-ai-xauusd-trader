@@ -2,11 +2,14 @@
 Tests for centralized Pydantic schema enforcement and decision funnel validation.
 """
 
+from datetime import UTC, datetime
+
 import pytest
-from datetime import datetime, UTC
 from pydantic import ValidationError
-from src.core.schemas import ModelSignal, TradeSignal, RiskDecision, ExecutionDecision
+
 from src.core.constants import SignalDirection
+from src.core.schemas import ExecutionDecision, ModelSignal, RiskDecision, TradeSignal
+
 
 def test_model_signal_validation():
     """Verify ModelSignal enforces types and ranges."""
@@ -58,7 +61,7 @@ def test_trade_signal_price_sanity():
     )
 
     # Invalid BUY (SL above entry)
-    with pytest.raises(ValidationError, match="BUY Stop Loss .* must be below Entry Price"):
+    with pytest.raises(ValidationError, match=r"BUY Stop Loss .* must be below Entry Price"):
         TradeSignal(
             direction=SignalDirection.BUY,
             entry_price=2000.0,
@@ -68,7 +71,7 @@ def test_trade_signal_price_sanity():
         )
 
     # Invalid R:R (below 1.5)
-    with pytest.raises(ValidationError, match="Risk-Reward ratio .* is below the required minimum of 1.5"):
+    with pytest.raises(ValidationError, match=r"Risk-Reward ratio .* is below the required minimum of 1.5"):
         TradeSignal(
             direction=SignalDirection.BUY,
             entry_price=2000.0,

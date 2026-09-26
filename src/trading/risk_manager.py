@@ -24,7 +24,7 @@ from typing import Any, Dict, Optional
 
 from src.core.config import TradingConfig
 from src.core.monitor import Monitor
-from src.core.schemas import RiskDecision, TradeSignal
+from src.core.schemas import TradeSignal
 from src.core.trade_logger import TradeLogger
 from src.trading.risk_engine import RiskDecision, RiskEngine
 
