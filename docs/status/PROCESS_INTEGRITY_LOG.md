@@ -2,6 +2,28 @@
 
 This log tracks the health and safety of the autonomous workflow for the `mt5-ai-xauusd-trader` repository.
 
+## 2026-09-26 18:00 GMT+4
+
+**Summary:** Process invariants are holding on `main`, but a global CI Fast Validation failure (8 Ruff linting errors in `src/models/`, `src/trading/`, and `src/utils/`) has been detected on the Code Quality job.
+
+**Suspected Process Issues:**
+- **Global CI Fast Validation Failure:** CI Code Quality job failed due to 8 Ruff linting errors (RUF022, F401, F811, I001, W292) across `src/models/__init__.py`, `src/trading/__init__.py`, `src/trading/audited_risk_manager.py`, `src/trading/risk_manager.py`, `src/trading/safety_supervisor.py`, and `src/utils/synthetic_data.py`.
+- **Stale PR Backlog:** The open PR count is at 561 open PRs. These are stale relative to the active `main` branch but do not affect current system safety on `main`.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `315fc7f` (PR #1990) - Updates daily PR triage dashboard for 2026-09-26.
+
+**Check Invariants:**
+- [x] Changes go through PRs (Verified: Integrated commit PR #1990 went through proper pull request merge).
+- [ ] CI must pass before merge (**VIOLATED**: Global CI Fast Validation fails on Ruff linting checks across core `src/` modules).
+- [x] Risky domains are not being changed casually (Verified: Only documentation files under `docs/status/` were modified. No trading, risk, security, or execution logic files were touched by Jules06).
+
+**Recommended Follow-ups:**
+- **CI Lint Resolution:** Jules02 or human operator should run `ruff check --fix .` (or manually fix the 8 lint errors in `src/models/`, `src/trading/`, and `src/utils/`) to permanently unblock global CI.
+- **Backlog Pruning:** Jules05 should perform a bulk prune/closure of the 561 stale PRs to reduce noise.
+
+**Status:** 🟡 AMBER (Process invariants holding on process surface, but CI Code Quality failing due to lint errors in core modules).
+
 ## 2026-09-25 18:00 GMT+4
 
 **Summary:** Process invariants are fully holding on `main`. No process drift or risky behavior detected. Safe-surface pull request updating the daily PR triage and merge-readiness checklist has been integrated since the last process integrity report.
