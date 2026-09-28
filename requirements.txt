@@ -53,7 +53,7 @@ pytest==9.1.1
 pytest-asyncio==1.4.0
 pytest-mock==3.15.1
 pytest-cov==7.1.0
-hypothesis==6.168.0
+hypothesis==6.168.1
 
 # ── DevOps / CI ─────────────────────────────────────────────
 optuna==5.0.0
