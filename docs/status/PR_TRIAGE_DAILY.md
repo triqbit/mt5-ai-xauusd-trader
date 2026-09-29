@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-09-29 13:12:35 UTC
+**Date:** 2026-09-29 14:13:49 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,18 +10,18 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `85701c7ee7e03cfc42b9215734579168d0cecb6d` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `947a67c8f739faf0791dd4fb990180644ee96396` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (562)
-3. **Re-validate Stale:** Review Safe Surface PR #1997 (chore(deps): bump pytz from 2026.3.post1 to 2026.4)
+3. **Re-validate Stale:** Review Safe Surface PR #2001 (chore(deps): bump python-socketio from 5.16.4 to 5.17.0)
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
-| [2001](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/2001) | chore(deps): bump python-socketio from 5.16.4 to 5.17.0 | dependabot[bot] | `dependabot/pip/python-socketio-5.17.0` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1999](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1999) | chore(deps): bump hypothesis from 6.168.0 to 6.168.1 | dependabot[bot] | `dependabot/pip/hypothesis-6.168.1` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [2001](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/2001) | chore(deps): bump python-socketio from 5.16.4 to 5.17.0 | dependabot[bot] | `dependabot/pip/python-socketio-5.17.0` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [1999](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1999) | chore(deps): bump hypothesis from 6.168.0 to 6.168.1 | dependabot[bot] | `dependabot/pip/hypothesis-6.168.1` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1997](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1997) | chore(deps): bump pytz from 2026.3.post1 to 2026.4 | dependabot[bot] | `dependabot/pip/pytz-2026.4` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
-| [1938](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1938) | chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 | dependabot[bot] | `dependabot/pip/types-pyyaml-6.0.12.20260906` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1938](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1938) | chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 | dependabot[bot] | `dependabot/pip/types-pyyaml-6.0.12.20260906` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1740](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1740) | docs: update daily merge-readiness checklist and PR triage [2026-07-31] | triqbit | `main-16126816414089982301` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [1712](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1712) | Add optional TickerAll hosted MT5 API path to MT5Connector | miguelangelo78 | `tickerall-provider` | none | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1697](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1697) | docs: update process integrity log [2026-07-21] | triqbit | `process-integrity-log-2026-07-21-qufuwan-17949035639015288261` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
@@ -37,7 +37,7 @@
 | [1404](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1404) | 🔗 Jules05: Integration test results [2026-05-23] | yxynoty | `jules05-integration-results-2026-05-23-1111935695238620886` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1402](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1402) | ✨ Jules05: Product coherence improvements | yxynoty | `jules05-product-coherence-improvements-5365694077499482405` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1395](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1395) | 🤖 Jules05: Auto-merge policy update | yxynoty | `jules05-auto-merge-policy-update-14778474038957274841` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
-| [1376](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1376) | Resolve cross-agent conflict in Risk Management API | yxynoty | `jules05-harmonize-risk-api-9770632301630553907` | escalated-risk | unknown | High Risk | ⚠️ Stale (Pre-Big-Bang) |
+| [1376](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1376) | Resolve cross-agent conflict in Risk Management API | yxynoty | `jules05-harmonize-risk-api-9770632301630553907` | escalated-risk | pending | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1372](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1372) | 🔧 Jules05: Resolve cross-agent conflict in Risk Management and Model interfaces | yxynoty | `Jules05-resolve-cross-agent-conflict-13854965436455603502` | escalated-risk | unknown | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1369](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1369) | 🔐 Jules02: Security hardening — HMAC-SHA256 signature verification for model files | xnessom | `jules02-security-hardening-model-signatures-17851897229134920353` | escalated-risk | unknown | High Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [1367](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/1367) | ⚡ Jules05: Workflow simplification — Comprehensive Log Update | yxynoty | `jules05/workflow-simplification-log-7413812354450014762` | escalated-risk | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
@@ -591,10 +591,10 @@
 
 ## ✨ Good Candidates for Review Today
 
-- **PR #2001**: chore(deps): bump python-socketio from 5.16.4 to 5.17.0 (dependabot[bot]) [CI: pending] - *Medium Risk*
-- **PR #1999**: chore(deps): bump hypothesis from 6.168.0 to 6.168.1 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #2001**: chore(deps): bump python-socketio from 5.16.4 to 5.17.0 (dependabot[bot]) [CI: pending] - *Safe Surface*
+- **PR #1999**: chore(deps): bump hypothesis from 6.168.0 to 6.168.1 (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #1997**: chore(deps): bump pytz from 2026.3.post1 to 2026.4 (dependabot[bot]) [CI: pending] - *Safe Surface*
-- **PR #1938**: chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 (dependabot[bot]) [CI: pending] - *Medium Risk*
+- **PR #1938**: chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906 (dependabot[bot]) [CI: pending] - *Safe Surface*
 
 ---
 *Note: This report is generated by Jules06 (qufuwan). Risk classification is based on file paths and heuristics.*
