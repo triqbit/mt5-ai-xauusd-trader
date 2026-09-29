@@ -2,6 +2,28 @@
 
 This log tracks the health and safety of the autonomous workflow for the `mt5-ai-xauusd-trader` repository.
 
+## 2026-09-29 18:00 GMT+4
+
+**Summary:** Process invariants are holding on `main` (🟡 AMBER). Global CI Fast Validation is failing due to 14 Ruff linting errors across `src/models/`, `src/trading/`, `src/utils/`, and `tests/` following commit `947a67c8` (PR #2005).
+
+**Suspected Process Issues:**
+- **Global CI Failure (Fast Validation):** CI job `Fast Validation` failed on `ruff check src/ main.py scripts/ tests/` with 14 errors (unsorted `__all__` in `src/models/__init__.py` and `src/trading/__init__.py`, unused import in `src/trading/audited_risk_manager.py`, redefinition of `RiskDecision` in `src/trading/risk_manager.py` and `ReconciliationScenarioBuilder` in `src/utils/synthetic_data.py`, unformatted import blocks across `src/trading/safety_supervisor.py`, `src/utils/synthetic_data.py`, `tests/test_adaptive_feedback_loop.py`, `tests/test_decision_schema_enforcement.py`, `tests/test_system_bootstrap_to_execution.py`, unescaped match regexes in `tests/test_decision_schema_enforcement.py`, and missing newline in `src/trading/safety_supervisor.py` and `tests/test_safety_supervisor.py`).
+- **Stale PR Backlog:** The open PR count is at 562 open PRs. These are stale relative to the active `main` branch but do not affect current system safety on `main`.
+
+**PRs/Commits Involved:**
+- `main` branch: Commit `947a67c8` (PR #2005) - Updates daily merge-readiness checklist and PR triage [2026-09-29].
+
+**Check Invariants:**
+- [x] Changes go through PRs (Verified: Integrated commit PR #2005 went through proper pull request merge).
+- [ ] CI must pass before merge (VIOLATED on CI: Global CI Fast Validation fails due to 14 Ruff linting errors; local triage unit tests pass cleanly).
+- [x] Risky domains are not being changed casually (Verified: Only documentation files under `docs/status/` were modified. No trading, risk, security, or execution logic files were touched).
+
+**Recommended Follow-ups:**
+- **Lint Resolution:** Jules02 or human operator should run `ruff check --fix .` and resolve the remaining Ruff linting errors across `src/` and `tests/` to unblock global CI.
+- **Backlog Pruning:** Jules05 should perform a bulk prune/closure of the 562 stale PRs to reduce noise.
+
+**Status:** 🟡 AMBER (Process invariants holding on main, but global CI Fast Validation is failing due to Ruff linting errors).
+
 ## 2026-09-28 18:00 GMT+4
 
 **Summary:** Process invariants are fully holding on `main`. No process drift or risky behavior detected. Safe-surface pull request updating the daily PR triage dashboard has been integrated since the last process integrity report.
