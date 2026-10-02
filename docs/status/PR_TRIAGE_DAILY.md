@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-10-02 13:27:22 UTC
+**Date:** 2026-10-02 14:03:56 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,7 +10,7 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `1bd19372f3448b7503e4d4c6e3f9bebf2e6495b4` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `760050d06e4017b5fbe476809bb9211c1b795b99` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (562)
 3. **Re-validate Stale:** Review Safe Surface PR #2001 (chore(deps): bump python-socketio from 5.16.4 to 5.17.0)
 
