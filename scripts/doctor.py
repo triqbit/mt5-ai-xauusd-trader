@@ -521,6 +521,8 @@ def check_branch_naming():
             "ci/",
             "perf/",
             "style/",
+            "jules-",
+            "jules/",
         ]
         if any(branch.startswith(p) for p in prefixes):
             return DiagnosticCheck("Branch Naming", "OK", f"Valid prefix: {branch}")
