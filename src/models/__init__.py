@@ -39,8 +39,8 @@ __all__ = [
     "LSTMAttentionModel",
     "LSTMModel",
     "MarketRegime",
+    "ModelSignal",
     "PPOAgent",
     "RegimeDetector",
-    "ModelSignal",
     "TimeSeriesTransformer",
 ]

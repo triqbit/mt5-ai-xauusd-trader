@@ -25,12 +25,15 @@ Our repository enforces a strict semantic pull request check using the `amannn/a
 >
 > **Allowed Semantic Prefixes & Casing Rules:**
 > - The PR title subject after the prefix **must start with a lowercase letter** (e.g., `docs: improve developer guide` NOT `docs: Improve developer guide`).
+> - `feat:` for new capabilities or feature enhancements (e.g., `feat: add docker health check retry logic`)
+> - `fix:` for fixing developer experience or system utilities (e.g., `fix: resolve doctor syntax error`)
 > - `docs:` for documentation and onboarding enhancements (e.g., `docs: improve developer onboarding guide`)
-> - `chore:` for developer tool scripts and auxiliary tasks (e.g., `chore: add directory validation check to doctor`)
-> - `test:` for writing or updating unit tests (e.g., `test: add unit tests for doctor checks`)
-> - `fix:` for fixing developer experience utilities (e.g., `fix: resolve doctor syntax error`)
-- `perf:` for performance optimizations (e.g., `perf: optimize vector loops in indicator checks`)
-- `style:` for style, formatting, or lint-only fixes (e.g., `style: run ruff formatter on doctor`)
+> - `chore:` for developer tool scripts and auxiliary maintenance (e.g., `chore: add directory validation check to doctor`)
+> - `test:` for writing or updating unit and integration tests (e.g., `test: add unit tests for doctor checks`)
+> - `refactor:` for code restructuring without behavioral changes (e.g., `refactor: simplify doctor check helper`)
+> - `style:` for style, formatting, or lint-only fixes (e.g., `style: run ruff formatter on doctor`)
+> - `perf:` for performance optimizations (e.g., `perf: optimize vector loops in indicator checks`)
+> - `ci:` for CI/CD workflow configuration updates (e.g., `ci: update workflow action versions`)
 
 ---
 
@@ -167,15 +170,16 @@ Before submitting your PR:
 
 1.  **Branch Prefix:** Ensure your branch has a valid prefix (`feature/`, `bugfix/`, `hotfix/`, `docs/`, `refactor/`, `chore/`, `test/`, `ci/`, `perf/`, `style/`).
 2.  **Conventional Commits:** Commit your change with an approved semantic type (e.g., `chore: add workspace directory checks to doctor`).
-3.  **Run Governance Suite:** Run the project's governance validator to ensure all files match expectations:
+3.  **Contributor Safety Audit:** Run `make doctor` (or `python3 scripts/doctor.py`) to execute automated Contributor Readiness checks (`Contribution Safety`, `Branch Naming`, `Graft Alignment`, `Git Configuration`). The `Contribution Safety` check automatically inspects modified files against Safe Zones (`docs/`, `tests/`, `scripts/`, `Makefile`) to verify you stay within low-risk contribution pathways.
+4.  **Run Governance Suite:** Run the project's governance validator to ensure all files match expectations:
     ```bash
     PYTHONPATH=. python3 -m unittest tests/test_governance_vitals.py
     ```
-4.  **Resync with Main (Critical):** Always rebase just before pushing to ensure you are on the latest commit on main:
+5.  **Resync with Main (Critical):** Always rebase just before pushing to ensure you are on the latest commit on main:
     ```bash
     make resync
     ```
-5.  **Tag for Review:** Open a PR with an approved semantic title (e.g., `docs: improve developer onboarding experience`) and tag **Jules06 (@qufuwan)** for review.
+6.  **Tag for Review:** Open a PR with an approved semantic title (e.g., `docs: improve developer onboarding experience`) and tag **Jules06 (@qufuwan)** for review.
 
 ---
 

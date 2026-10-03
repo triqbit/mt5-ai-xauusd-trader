@@ -89,7 +89,7 @@ Changes to these directories affect the core financial and operational safety of
     - `is:pr is:open label:docs`: Documentation improvements.
     - `is:pr is:open label:test`: Testing and coverage enhancements.
     - `is:pr is:open label:chore`: Maintenance and developer experience tasks.
-3.  **Run `make doctor`:** If any check fails on your system, improving that check or the documentation around it is a great first contribution.
+3.  **Run `make doctor`:** Run `make doctor` (or `python3 scripts/doctor.py`) to verify environment health and execute automated "Contributor Readiness" checks. The `Contribution Safety` check automatically validates that your changed files reside in Safe Zones (`docs/`, `tests/`, `scripts/`, `Makefile`) before opening a PR.
 4.  **Check `docs/status/PR_TRIAGE_DAILY.md`:** Look for PRs categorized as **"Safe Surface"**. This report is updated daily and is the best source for finding approved first-task candidates.
 5.  **Audit `tests/`:** Find a module with low coverage (check `make test` output) and add missing unit tests.
 6.  **Use `make resync`:** Always run this command before submitting to ensure your branch is aligned with the latest commit.
