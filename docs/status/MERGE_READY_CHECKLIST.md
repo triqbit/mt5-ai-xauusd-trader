@@ -1,31 +1,31 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `68eae69ac42ec1c14fb174a1cf8f2524faba4810` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `74d3468ccd917a1cfd05ed8070b9e903e7b328fa` is required for all PRs.**
 
-Generated on: 2026-10-04 14:06:48 UTC
+Generated on: 2026-10-05 13:29:20 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
-## 1. PR #2001: chore(deps): bump python-socketio from 5.16.4 to 5.17.0
-- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump python-socketio from 5.16.4 to 5.17.0' (Candidate for re-validation/review)
+## 1. PR #2035: chore(deps): bump sqlalchemy from 2.1.0 to 2.1.2
+- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump sqlalchemy from 2.1.0 to 2.1.2' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `68eae69ac42ec1c14fb174a1cf8f2524faba4810`, tests, docs
+- **Missing items**: Mandatory rebase against commit `74d3468ccd917a1cfd05ed8070b9e903e7b328fa`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
-## 2. PR #1999: chore(deps): bump hypothesis from 6.168.0 to 6.168.1
-- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump hypothesis from 6.168.0 to 6.168.1' (Candidate for re-validation/review)
+## 2. PR #2029: chore(deps): bump uvicorn from 0.53.0 to 0.54.0
+- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump uvicorn from 0.53.0 to 0.54.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `68eae69ac42ec1c14fb174a1cf8f2524faba4810`, tests, docs
+- **Missing items**: Mandatory rebase against commit `74d3468ccd917a1cfd05ed8070b9e903e7b328fa`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
-## 3. PR #1997: chore(deps): bump pytz from 2026.3.post1 to 2026.4
-- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump pytz from 2026.3.post1 to 2026.4' (Candidate for re-validation/review)
+## 3. PR #1938: chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906
+- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `68eae69ac42ec1c14fb174a1cf8f2524faba4810`
+- **Missing items**: Mandatory rebase against commit `74d3468ccd917a1cfd05ed8070b9e903e7b328fa`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ---
