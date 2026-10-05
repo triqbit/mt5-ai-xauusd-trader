@@ -40,7 +40,7 @@ tqdm==4.70.1
 
 # ── Dashboard / API ─────────────────────────────────────────
 fastapi==0.142.2
-uvicorn[standard]==0.53.0
+uvicorn[standard]==0.54.0
 
 # ── Configuration ───────────────────────────────────────────
 python-dotenv==1.2.4
