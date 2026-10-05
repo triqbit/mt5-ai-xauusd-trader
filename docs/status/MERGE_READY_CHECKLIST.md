@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `74d3468ccd917a1cfd05ed8070b9e903e7b328fa` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `24915ba3355fd91af19a376b12b6df140c2c0e11` is required for all PRs.**
 
-Generated on: 2026-10-05 13:29:20 UTC
+Generated on: 2026-10-05 14:07:15 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump sqlalchemy from 2.1.0 to 2.1.2' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `74d3468ccd917a1cfd05ed8070b9e903e7b328fa`, tests, docs
+- **Missing items**: Mandatory rebase against commit `24915ba3355fd91af19a376b12b6df140c2c0e11`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #2029: chore(deps): bump uvicorn from 0.53.0 to 0.54.0
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump uvicorn from 0.53.0 to 0.54.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `74d3468ccd917a1cfd05ed8070b9e903e7b328fa`, tests, docs
+- **Missing items**: Mandatory rebase against commit `24915ba3355fd91af19a376b12b6df140c2c0e11`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #1938: chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump types-pyyaml from 6.0.12.20260815 to 6.0.12.20260906' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `74d3468ccd917a1cfd05ed8070b9e903e7b328fa`, tests, docs
+- **Missing items**: Mandatory rebase against commit `24915ba3355fd91af19a376b12b6df140c2c0e11`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ---
