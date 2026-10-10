@@ -44,6 +44,10 @@ This dashboard provides real-time visibility into the technical health, process 
 | :--- | :--- | :--- |
 | [Enterprise Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md) | Compliance | ✅ Active |
 | [Technical Evidence Index](../audits/README.md) | Navigator | ✅ Active |
+| [Strategy-to-Code Alignment](../audits/ALIGNMENT_REPORT.md) | Governance | ✅ Verified |
+| [Performance & Complexity Analysis](../audits/PERFORMANCE_COMPLEXITY_REPORT.md) | Efficiency | ✅ Verified |
+| [Architecture Decision Records (ADRs)](../audits/ADR_AUDIT_REPORT.md) | Architecture | ✅ Active |
+| [Corrective Action Verification](../audits/CORRECTIVE_ACTION_VERIFICATION.md) | Audit Trail | ✅ Active |
 | [Integration Test Results](../testing/INTEGRATION_TEST_RESULTS.md) | System Quality | ✅ Verified |
 | [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ✅ Verified |
 | [Architecture Quick-Start](../ARCHITECTURE_QUICK.md) | System Map | ✅ Verified |
