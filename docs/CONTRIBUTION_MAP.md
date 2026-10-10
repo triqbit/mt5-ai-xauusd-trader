@@ -6,7 +6,7 @@ This map defines the "Safe Zones" and "Sensitive Zones" of the MT5 AI/ML Trading
 
 | Zone | Path | Risk Level | Review Requirement | Evidence Required |
 | :--- | :--- | :--- | :--- | :--- |
-| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile` | 🟢 Low | Standard Peer Review | Unit Tests / Doc Lint |
+| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile`, `.github/`, `.jules/`, `README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore` | 🟢 Low | Standard Peer Review | Zero-Dep Unit Tests / Doc Lint |
 | **Utility Zone** | `src/utils/`, `src/analytics/` | 🟡 Medium | Domain Expert Review | Integration Tests |
 | **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/` | 🔴 High | Lead + Multi-Signature | Backtests + Stress Tests |
 
@@ -46,9 +46,30 @@ These areas are perfect for new contributors to get familiar with the project an
 - **Improvement Areas:** Increasing coverage for `src/utils/`, adding edge-case unit tests, or performance benchmarks.
 - **Goal:** Strengthen the system's reliability without changing production logic.
 
-### 3. Developer Experience (`scripts/`, `Makefile`)
-- **Improvement Areas:** Improving `make doctor` checks, `bootstrap.sh` robustness, or adding new CLI helpers for developers.
+### 3. Developer Experience (`scripts/`, `Makefile`, `.github/`, `.jules/`)
+- **Improvement Areas:** Improving `make doctor` checks, `bootstrap.sh` robustness, GitHub Actions workflows, or adding new CLI helpers for developers.
 - **Goal:** Reduce the "Time to First Success" for new developers.
+
+### 4. Root Safe Files (`README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore`)
+- **Improvement Areas:** Documentation clarity, developer environment settings, and dependency management configs.
+- **Goal:** Clarify contributor instructions and project metadata without touching production logic.
+
+---
+
+## 🧪 Zero-Dependency Test Verification
+
+New contributors in Safe Zones do **not** need to install heavy machine learning, PyTorch, or trading dependencies to verify their work. The core governance and diagnostic test suites run directly using Python's standard library `unittest` module:
+
+```bash
+# Run doctor diagnostic checks
+PYTHONPATH=. python3 -m unittest tests/test_doctor_diagnostics.py
+
+# Run repository governance vitals check
+PYTHONPATH=. python3 -m unittest tests/test_governance_vitals.py
+
+# Run PR triage dashboard tests
+PYTHONPATH=. python3 -m unittest discover -s tests -p "test_triage*.py"
+```
 
 ---
 
