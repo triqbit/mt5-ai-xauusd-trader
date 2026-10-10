@@ -147,14 +147,17 @@ Open `tests/test_doctor_diagnostics.py` and add:
 
 ### 3. Run and Verify Your Unit Tests Locally
 
-We enforce clean test outcomes before any code is reviewed. All diagnostic and governance tests inherit from `unittest.TestCase` and can be executed with zero external dependencies using Python's built-in `unittest` module:
+We enforce clean test outcomes before any code is reviewed. All diagnostic and governance tests inherit from `unittest.TestCase` and can be executed with zero external dependencies using Python's built-in `unittest` module (no heavy ML/trading libraries required):
 
 ```bash
 # Run doctor diagnostic tests with zero external dependencies
 PYTHONPATH=. python3 -m unittest tests/test_doctor_diagnostics.py
 
-# Or via pytest if installed
-pytest tests/test_doctor_diagnostics.py
+# Run repository governance vitals test
+PYTHONPATH=. python3 -m unittest tests/test_governance_vitals.py
+
+# Run daily PR triage dashboard tests
+PYTHONPATH=. python3 -m unittest discover -s tests -p "test_triage*.py"
 
 # Verify the complete system health via system doctor
 make doctor
