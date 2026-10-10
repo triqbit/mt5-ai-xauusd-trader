@@ -62,11 +62,14 @@ To maintain institutional safety in an automated environment, the repository uti
 
 Use these paths to find technical evidence and audit reports:
 
+- **Audit Center Index:** [docs/audits/README.md](./audits/README.md)
 - **Architecture Decisions:** [docs/audits/ADR_AUDIT_REPORT.md](./audits/ADR_AUDIT_REPORT.md)
+- **Strategy Alignment:** [docs/audits/ALIGNMENT_REPORT.md](./audits/ALIGNMENT_REPORT.md)
 - **Security & Compliance:** [docs/audits/ENTERPRISE_EVIDENCE_SCORECARD.md](./audits/ENTERPRISE_EVIDENCE_SCORECARD.md)
 - **System Health:** [docs/status/PROJECT_HEALTH.md](./status/PROJECT_HEALTH.md)
 - **Performance Benchmarks:** [docs/audits/PERFORMANCE_COMPLEXITY_REPORT.md](./audits/PERFORMANCE_COMPLEXITY_REPORT.md)
-- **Integration Status:** `docs/status/PROCESS_INTEGRITY_LOG.md`
+- **Corrective Actions:** [docs/audits/CORRECTIVE_ACTION_VERIFICATION.md](./audits/CORRECTIVE_ACTION_VERIFICATION.md)
+- **Integration Status:** [docs/status/PROCESS_INTEGRITY_LOG.md](./status/PROCESS_INTEGRITY_LOG.md)
 
 ---
 
