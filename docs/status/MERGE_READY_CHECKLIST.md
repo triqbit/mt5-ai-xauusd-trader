@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `6af5823502dd88c1308a6723c73864252e5e71b5` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `642d0aca342204d41bf33bfbcdd788f443284eb8` is required for all PRs.**
 
-Generated on: 2026-10-11 13:23:15 UTC
+Generated on: 2026-10-11 14:28:16 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Safe Surface update implementing 'DX: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
 - **Domains touched**: infra/scripts, other
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `6af5823502dd88c1308a6723c73864252e5e71b5`
+- **Missing items**: Mandatory rebase against commit `642d0aca342204d41bf33bfbcdd788f443284eb8`
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #2035: chore(deps): bump sqlalchemy from 2.1.0 to 2.1.2
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump sqlalchemy from 2.1.0 to 2.1.2' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `6af5823502dd88c1308a6723c73864252e5e71b5`, tests, docs
+- **Missing items**: Mandatory rebase against commit `642d0aca342204d41bf33bfbcdd788f443284eb8`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #2029: chore(deps): bump uvicorn from 0.53.0 to 0.54.0
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump uvicorn from 0.53.0 to 0.54.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `6af5823502dd88c1308a6723c73864252e5e71b5`, tests, docs
+- **Missing items**: Mandatory rebase against commit `642d0aca342204d41bf33bfbcdd788f443284eb8`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ---
