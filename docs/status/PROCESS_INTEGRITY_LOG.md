@@ -4,10 +4,10 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 
 ## 2026-10-15 18:30 GMT+4
 
-**Summary:** Process invariants are fully holding on `main`. No process drift or risky behavior detected. Safe-surface pull request updating the daily merge-readiness checklist has been integrated since the last process integrity report.
+**Summary:** Process invariants are fully holding on `main`. No process drift or risky behavior detected. Safe-surface pull request updating the daily merge-readiness checklist has been integrated since the last process integrity report. Pre-existing Ruff linter formatting/sorting violations in `src/` and `tests/` cause Fast Validation CI failure on PRs; as Jules06, application source code is untouched to respect hard role boundaries.
 
 **Suspected Process Issues:**
-- **None:** The automated workflow remains stable, controlled, and safe.
+- **Pre-existing CI Linter Failure:** Global CI check 'Fast Validation' fails due to baseline Ruff linting violations (un-sorted `__all__`, unused imports, un-formatted import blocks in `src/models/`, `src/trading/`, `src/utils/`, and `tests/`).
 - **Stale PR Backlog:** Stale open PR backlog remains in place but does not affect current system safety on `main`.
 
 **PRs/Commits Involved:**
@@ -19,9 +19,10 @@ This log tracks the health and safety of the autonomous workflow for the `mt5-ai
 - [x] Risky domains are not being changed casually (Verified: Only documentation/status surfaces were modified. No trading, risk, security, or execution logic files were touched).
 
 **Recommended Follow-ups:**
+- **Ruff Lint Fixes:** Jules02 / Human should run `ruff check --fix` and `ruff format` on `src/` and `tests/` to resolve pre-existing linter violations and restore clean global CI.
 - **Backlog Pruning:** Jules05 should perform a bulk prune/closure of stale open PRs to reduce noise.
 
-**Status:** 🟢 GREEN (Invariants holding, git linear history verified as fully preserved).
+**Status:** 🟢 GREEN (Invariants holding, git linear history verified as fully preserved; pre-existing linter issues flagged for Jules02).
 
 ## 2026-10-15 18:00 GMT+4
 
