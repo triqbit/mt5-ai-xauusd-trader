@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `a4b018e3bea0952ccdf5ad9b4622cb0337116099` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `b0d6b6701fd454e212b273b1ea34c1dcfcbea59e` is required for all PRs.**
 
-Generated on: 2026-10-15 14:10:40 UTC
+Generated on: 2026-10-16 13:32:08 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump sqlalchemy from 2.1.0 to 2.1.4' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `a4b018e3bea0952ccdf5ad9b4622cb0337116099`, tests, docs
+- **Missing items**: Mandatory rebase against commit `b0d6b6701fd454e212b273b1ea34c1dcfcbea59e`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #2065: chore(deps): bump gymnasium from 1.3.0 to 1.4.0
 - **Short scope summary**: Safe Surface update implementing 'chore(deps): bump gymnasium from 1.3.0 to 1.4.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `a4b018e3bea0952ccdf5ad9b4622cb0337116099`
+- **Missing items**: Mandatory rebase against commit `b0d6b6701fd454e212b273b1ea34c1dcfcbea59e`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #2063: chore(deps): bump aiohttp from 3.14.3 to 3.14.4
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump aiohttp from 3.14.3 to 3.14.4' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `a4b018e3bea0952ccdf5ad9b4622cb0337116099`, tests, docs
+- **Missing items**: Mandatory rebase against commit `b0d6b6701fd454e212b273b1ea34c1dcfcbea59e`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ---
