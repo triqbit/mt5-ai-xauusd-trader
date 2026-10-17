@@ -211,6 +211,16 @@ class TestDoctorDiagnostics(unittest.TestCase):
             res = doctor.check_disk_space()
             self.assertEqual(res.status, "FAILED")
 
+    def test_check_contribution_safety_root_safe_files(self):
+        """Verify contribution safety check classifies root docs and setup templates as Safe Zone."""
+        mock_diff = MagicMock(returncode=0, stdout=".env.example\nSECURITY.md\nDEVELOPMENT_PLAN.md\n")
+        mock_empty = MagicMock(returncode=0, stdout="")
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = [mock_diff, mock_empty, mock_empty]
+            res = doctor.check_contribution_safety()
+            self.assertEqual(res.status, "OK")
+            self.assertIn("Safe zones touched", res.message)
+
     def test_get_triage_top_items(self):
         """Verify triage scraping logic."""
         mock_content = """
