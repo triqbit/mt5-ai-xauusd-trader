@@ -50,8 +50,8 @@ Make sure you have run the bootstrap command to initialize your python virtual e
 git checkout main
 git pull origin main
 
-# 2. Create a feature branch with a valid prefix
-git checkout -b feature/doctor-enhancement
+# 2. Create a feature branch with a valid prefix (matching your intended PR title prefix, e.g. docs/ or chore/)
+git checkout -b docs/doctor-enhancement
 ```
 
 ### Step 2: Identify a Diagnostic Gap
@@ -171,7 +171,7 @@ Ensure all tests pass and your new check is outputted cleanly!
 
 Before submitting your PR:
 
-1.  **Branch Prefix:** Ensure your branch has a valid prefix (`feature/`, `bugfix/`, `hotfix/`, `docs/`, `refactor/`, `chore/`, `test/`, `ci/`, `perf/`, `style/`).
+1.  **Branch Prefix:** Ensure your branch has a valid prefix (`docs/`, `chore/`, `feature/`, `bugfix/`, `hotfix/`, `refactor/`, `test/`, `ci/`, `perf/`, `style/`) matching your semantic PR title type.
 2.  **Conventional Commits:** Commit your change with an approved semantic type (e.g., `chore: add workspace directory checks to doctor`).
 3.  **Contributor Safety Audit:** Run `make doctor` (or `python3 scripts/doctor.py`) to execute automated Contributor Readiness checks (`Contribution Safety`, `Branch Naming`, `Graft Alignment`, `Git Configuration`). The `Contribution Safety` check automatically inspects modified files against Safe Zones (`docs/`, `tests/`, `scripts/`, `Makefile`) to verify you stay within low-risk contribution pathways.
 4.  **Run Governance Suite:** Run the project's governance validator to ensure all files match expectations:

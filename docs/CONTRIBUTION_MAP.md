@@ -6,7 +6,7 @@ This map defines the "Safe Zones" and "Sensitive Zones" of the MT5 AI/ML Trading
 
 | Zone | Path | Risk Level | Review Requirement | Evidence Required |
 | :--- | :--- | :--- | :--- | :--- |
-| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile`, `.github/`, `.jules/`, `README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore` | 🟢 Low | Standard Peer Review | Zero-Dep Unit Tests / Doc Lint |
+| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile`, `.github/`, `.jules/`, `README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore`, `.env.example`, `.pre-commit-config.yaml`, `alembic.ini`, `SECURITY.md`, `DEVELOPMENT_PLAN.md`, `DATABASE_STANDARDS.md`, `DEPLOYMENT_GUIDE.md`, `RISK_LIMITS.md`, `TRADING_STANDARDS.md`, `ATTRIBUTIONS.md`, `CHANGELOG.md` | 🟢 Low | Standard Peer Review | Zero-Dep Unit Tests / Doc Lint |
 | **Utility Zone** | `src/utils/`, `src/analytics/` | 🟡 Medium | Domain Expert Review | Integration Tests |
 | **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/` | 🔴 High | Lead + Multi-Signature | Backtests + Stress Tests |
 
@@ -50,9 +50,9 @@ These areas are perfect for new contributors to get familiar with the project an
 - **Improvement Areas:** Improving `make doctor` checks, `bootstrap.sh` robustness, GitHub Actions workflows, or adding new CLI helpers for developers.
 - **Goal:** Reduce the "Time to First Success" for new developers.
 
-### 4. Root Safe Files (`README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore`)
-- **Improvement Areas:** Documentation clarity, developer environment settings, and dependency management configs.
-- **Goal:** Clarify contributor instructions and project metadata without touching production logic.
+### 4. Root Safe Files (`README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore`, `.env.example`, `.pre-commit-config.yaml`, `alembic.ini`, `SECURITY.md`, `DEVELOPMENT_PLAN.md`, `DATABASE_STANDARDS.md`, `DEPLOYMENT_GUIDE.md`, `RISK_LIMITS.md`, `TRADING_STANDARDS.md`, `ATTRIBUTIONS.md`, `CHANGELOG.md`)
+- **Improvement Areas:** Documentation clarity, developer environment templates, database standards, and dependency management configs.
+- **Goal:** Clarify contributor instructions, environmental templates, and project metadata without touching production logic.
 
 ---
 

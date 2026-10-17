@@ -625,6 +625,17 @@ def check_contribution_safety():
             "CONTRIBUTING.md",
             ".gitignore",
             "pyproject.toml",
+            ".env.example",
+            ".pre-commit-config.yaml",
+            "alembic.ini",
+            "SECURITY.md",
+            "DEVELOPMENT_PLAN.md",
+            "DATABASE_STANDARDS.md",
+            "DEPLOYMENT_GUIDE.md",
+            "RISK_LIMITS.md",
+            "TRADING_STANDARDS.md",
+            "ATTRIBUTIONS.md",
+            "CHANGELOG.md",
         ]
 
         safe_files = []
