@@ -50,6 +50,8 @@ This dashboard provides real-time visibility into the technical health, process 
 | [Corrective Action Verification](../audits/CORRECTIVE_ACTION_VERIFICATION.md) | Audit Trail | ✅ Active |
 | [Integration Test Results](../testing/INTEGRATION_TEST_RESULTS.md) | System Quality | ✅ Verified |
 | [Walk-Forward Robustness](../audits/walkforward_verification_report.md) | Strategy Research | ✅ Verified |
+| [Product Coherence Audit](../quality/PRODUCT_COHERENCE_AUDIT.md) | Quality & Interface | ✅ Active |
+| [Pre-Production Deployment Gate](../PREPROD_CHECKLIST.md) | Release Readiness | ✅ Active |
 | [Architecture Quick-Start](../ARCHITECTURE_QUICK.md) | System Map | ✅ Verified |
 
 ---

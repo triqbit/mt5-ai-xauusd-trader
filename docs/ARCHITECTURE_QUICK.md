@@ -69,6 +69,8 @@ Use these paths to find technical evidence and audit reports:
 - **System Health:** [docs/status/PROJECT_HEALTH.md](./status/PROJECT_HEALTH.md)
 - **Performance Benchmarks:** [docs/audits/PERFORMANCE_COMPLEXITY_REPORT.md](./audits/PERFORMANCE_COMPLEXITY_REPORT.md)
 - **Corrective Actions:** [docs/audits/CORRECTIVE_ACTION_VERIFICATION.md](./audits/CORRECTIVE_ACTION_VERIFICATION.md)
+- **Product Coherence Audit:** [docs/quality/PRODUCT_COHERENCE_AUDIT.md](./quality/PRODUCT_COHERENCE_AUDIT.md)
+- **Pre-Production Checklist:** [docs/PREPROD_CHECKLIST.md](./PREPROD_CHECKLIST.md)
 - **Integration Status:** [docs/status/PROCESS_INTEGRITY_LOG.md](./status/PROCESS_INTEGRITY_LOG.md)
 
 ---

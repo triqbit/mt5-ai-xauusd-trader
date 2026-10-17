@@ -13,6 +13,8 @@ This directory serves as the central repository for all technical audits, perfor
 | [**PERFORMANCE_COMPLEXITY_REPORT.md**](./PERFORMANCE_COMPLEXITY_REPORT.md) | Runtime efficiency and computational complexity analysis. | ✅ Verified |
 | [**CORRECTIVE_ACTION_VERIFICATION.md**](./CORRECTIVE_ACTION_VERIFICATION.md) | Post-incident audits and resolution verification. | ✅ Active |
 | [**ADR_AUDIT_REPORT.md**](./ADR_AUDIT_REPORT.md) | Review of key Architecture Decision Records (ADRs). | ✅ Active |
+| [**PRODUCT_COHERENCE_AUDIT.md**](../quality/PRODUCT_COHERENCE_AUDIT.md) | Feature coherence, enum harmonization, and interface consistency audit. | ✅ Active |
+| [**PREPROD_CHECKLIST.md**](../PREPROD_CHECKLIST.md) | Mandatory pre-production release readiness and deployment gate checklist. | ✅ Active |
 
 ---
 
