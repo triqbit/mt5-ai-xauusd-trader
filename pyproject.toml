@@ -56,7 +56,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pre-commit==4.6.2",
+    "pre-commit==4.7.0",
     "ruff==0.17.1",
     "mypy==2.4.0",
     "pip-audit",
