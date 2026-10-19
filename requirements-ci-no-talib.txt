@@ -16,7 +16,7 @@ redis==8.1.0
 
 # -- Pydantic / settings -------------------------------------------
 pydantic==2.14.1
-pydantic-settings==2.15.0
+pydantic-settings==2.16.0
 
 # -- MetaTrader 5 (Cloud Fallback) ---------------------------------
 
