@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `d177e2989d0a68424d0a6ee35ac6336e78566975` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `99617c467ce581b5f0ee7ba04b12034da681174d` is required for all PRs.**
 
-Generated on: 2026-10-21 14:28:45 UTC
+Generated on: 2026-10-22 13:22:39 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump fastapi from 0.143.0 to 0.143.2' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `d177e2989d0a68424d0a6ee35ac6336e78566975`, tests, docs
+- **Missing items**: Mandatory rebase against commit `99617c467ce581b5f0ee7ba04b12034da681174d`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #2084: chore: improve developer onboarding and contribution experience
 - **Short scope summary**: Safe Surface update implementing 'chore: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
 - **Domains touched**: infra/scripts, other
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `d177e2989d0a68424d0a6ee35ac6336e78566975`
+- **Missing items**: Mandatory rebase against commit `99617c467ce581b5f0ee7ba04b12034da681174d`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #2065: chore(deps): bump gymnasium from 1.3.0 to 1.4.0
 - **Short scope summary**: Safe Surface update implementing 'chore(deps): bump gymnasium from 1.3.0 to 1.4.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `d177e2989d0a68424d0a6ee35ac6336e78566975`
+- **Missing items**: Mandatory rebase against commit `99617c467ce581b5f0ee7ba04b12034da681174d`
 - **Recommendation**: Needs CI success before merge
 
 ---
