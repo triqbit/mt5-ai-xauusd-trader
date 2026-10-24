@@ -159,6 +159,9 @@ PYTHONPATH=. python3 -m unittest tests/test_governance_vitals.py
 # Run daily PR triage dashboard tests
 PYTHONPATH=. python3 -m unittest discover -s tests -p "test_triage*.py"
 
+# Alternatively, run via pytest without loading conftest plugins
+PYTHONPATH=. python3 -m pytest tests/test_governance_vitals.py --noconftest
+
 # Verify the complete system health via system doctor
 make doctor
 ```

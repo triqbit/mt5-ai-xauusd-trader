@@ -54,7 +54,9 @@ git rebase origin/main
   - `ci/`: Developer workflow and CI configurations (e.g., `ci/harden-checks`)
   - `perf/`: Performance optimization changes (e.g., `perf/vectorize-sma`)
   - `style/`: Non-functional style, formatting, or lint-only fixes (e.g., `style: run-ruff-formatter`)
-- **Conventional Commits:** All commits must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat:`, `fix:`, `docs:`, `chore:`, `security:`). This enables automated changelog generation and versioning.
+- **Conventional Commits:** All commits and PR titles must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification (e.g., `feat:`, `fix:`, `docs:`, `chore:`, `test:`, `refactor:`, `style:`, `perf:`, `ci:`). This enables automated changelog generation and versioning.
+  - **PR Title Casing:** The subject after the prefix **must start with a lowercase letter** (e.g., `docs: improve developer guide` NOT `docs: Improve developer guide`).
+  - **Notice on DX Prefix:** Do NOT use non-standard prefixes like `DX:` in PR titles or commits; use `docs:` for documentation/onboarding PRs or `chore:` for DX tool scripts.
 - **Standards:** Adhere to [ENTERPRISE_STANDARDS.md](./ENTERPRISE_STANDARDS.md) for linting, typing, and documentation.
 
 ### 3. Pull Request Lifecycle
