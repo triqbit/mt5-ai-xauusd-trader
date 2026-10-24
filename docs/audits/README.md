@@ -15,6 +15,8 @@ This directory serves as the central repository for all technical audits, perfor
 | [**ADR_AUDIT_REPORT.md**](./ADR_AUDIT_REPORT.md) | Review of key Architecture Decision Records (ADRs). | ✅ Active |
 | [**PRODUCT_COHERENCE_AUDIT.md**](../quality/PRODUCT_COHERENCE_AUDIT.md) | Feature coherence, enum harmonization, and interface consistency audit. | ✅ Active |
 | [**PREPROD_CHECKLIST.md**](../PREPROD_CHECKLIST.md) | Mandatory pre-production release readiness and deployment gate checklist. | ✅ Active |
+| [**DEBT_LOG.md**](../technical-debt/DEBT_LOG.md) | Technical debt tracking, quality degradation, and architectural drift log. | ✅ Active |
+| [**SLO_TARGETS.md**](../SLO_TARGETS.md) | Service Level Objectives, error budgets, and reliability targets. | ✅ Active |
 
 ---
 
