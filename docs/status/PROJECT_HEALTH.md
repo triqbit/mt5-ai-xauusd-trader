@@ -36,6 +36,15 @@ This dashboard provides real-time visibility into the technical health, process 
 - **Current Active State:** Linear, unbroken git history is fully preserved, ensuring complete forensic auditiability of all quantitative and trading logic changes.
 - **Reference:** [Process Integrity Log](./PROCESS_INTEGRITY_LOG.md)
 
+### 🧱 Technical Debt & Architectural Drift
+- **Status:** 🟡 **MANAGED**
+- **Overview:** Active technical debt items are tracked and categorized in the [Technical Debt Log](../technical-debt/DEBT_LOG.md).
+- **Key Categories:**
+  - **Quality:** Legacy utcnow temporal markers, Ruff linting/upgrade warnings, raw print statement refactoring.
+  - **Fragmentation:** LSTM attention model centralization, RL agent stubs (Dreamer/PPO), reward function shaping.
+  - **Duplication:** Signal direction index mapping harmonization.
+- **Reference:** [Technical Debt Log](../technical-debt/DEBT_LOG.md)
+
 ---
 
 ## 🔍 Evidence Inventory
@@ -53,6 +62,8 @@ This dashboard provides real-time visibility into the technical health, process 
 | [Product Coherence Audit](../quality/PRODUCT_COHERENCE_AUDIT.md) | Quality & Interface | ✅ Active |
 | [Pre-Production Deployment Gate](../PREPROD_CHECKLIST.md) | Release Readiness | ✅ Active |
 | [Architecture Quick-Start](../ARCHITECTURE_QUICK.md) | System Map | ✅ Verified |
+| [Technical Debt Log](../technical-debt/DEBT_LOG.md) | Quality & Drift | ✅ Active |
+| [SLO & Reliability Targets](../SLO_TARGETS.md) | Reliability | ✅ Active |
 
 ---
 
