@@ -60,7 +60,7 @@ mypy==2.4.0
 
 # ── Utilities ───────────────────────────────────────────────
 python-socketio==5.17.0
-python-dateutil==2.9.0.post0
+python-dateutil==3.0.0
 pytz==2026.5
 click==8.5.0
 tabulate==0.10.0

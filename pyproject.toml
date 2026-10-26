@@ -41,7 +41,7 @@ dependencies = [
     "pydantic==2.14.1",
     "pydantic-settings==2.16.0",
     "tomli==2.5.0",
-    "python-dateutil==2.9.0.post0",
+    "python-dateutil==3.0.0",
     "nest-asyncio==1.6.0",
     "pytz==2026.5",
     "click==8.5.0",
