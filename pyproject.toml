@@ -39,7 +39,7 @@ dependencies = [
     "uvicorn[standard]==0.54.0",
     "python-dotenv==1.2.4",
     "pydantic==2.14.1",
-    "pydantic-settings==2.16.0",
+    "pydantic-settings==2.16.1",
     "tomli==2.5.0",
     "python-dateutil==3.0.0",
     "nest-asyncio==1.6.0",
