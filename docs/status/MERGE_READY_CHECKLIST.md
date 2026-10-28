@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `0b763557ca6c5c5dfbe531d6accbf02a8776a3e4` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `bddc3fa557d8a73ca8406f80e9a072fc246a09cf` is required for all PRs.**
 
-Generated on: 2026-10-27 14:04:45 UTC
+Generated on: 2026-10-28 13:11:23 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump fastapi from 0.143.0 to 0.161.1' (Candidate for re-validation/review)
 - **Domains touched**: chore, dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `0b763557ca6c5c5dfbe531d6accbf02a8776a3e4`, tests, docs
+- **Missing items**: Mandatory rebase against commit `bddc3fa557d8a73ca8406f80e9a072fc246a09cf`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #2116: dx: improve developer onboarding and contribution experience
 - **Short scope summary**: Safe Surface update implementing 'dx: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
 - **Domains touched**: docs, infra/scripts
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `0b763557ca6c5c5dfbe531d6accbf02a8776a3e4`
+- **Missing items**: Mandatory rebase against commit `bddc3fa557d8a73ca8406f80e9a072fc246a09cf`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #2084: chore: improve developer onboarding and contribution experience
 - **Short scope summary**: Safe Surface update implementing 'chore: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
 - **Domains touched**: chore
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `0b763557ca6c5c5dfbe531d6accbf02a8776a3e4`
+- **Missing items**: Mandatory rebase against commit `bddc3fa557d8a73ca8406f80e9a072fc246a09cf`
 - **Recommendation**: Needs CI success before merge
 
 ---
