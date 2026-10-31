@@ -10,10 +10,14 @@ This scorecard provides a direct mapping between system capabilities and technic
 | :--- | :--- | :--- | :--- |
 | **MT5 Connectivity** | 🟢 Production | [Integration Test](../testing/INTEGRATION_TEST_RESULTS.md#test-trading-flow-integration) | [MT5_CONNECTOR](../features/ACCEPTANCE_CRITERIA_MT5_CONNECTOR.md) |
 | **Configuration Engine** | 🟢 Production | [Integration Test](../testing/INTEGRATION_TEST_RESULTS.md#test-configuration-startup) | [CONFIG_VALIDATION](../features/ACCEPTANCE_CRITERIA_CONFIG_VALIDATION.md) |
+| **Execution Filter** | 🟢 Production | [Complexity Analysis](./PERFORMANCE_COMPLEXITY_REPORT.md) | [EXECUTION_FILTER](../features/ACCEPTANCE_CRITERIA_EXECUTION_FILTER.md) |
 | **Risk Management** | 🟢 Production | [8-Layer Cascade Verified](../testing/INTEGRATION_TEST_RESULTS.md#1-data-consistency) | [RISK_MANAGEMENT](../features/ACCEPTANCE_CRITERIA_RISK_MANAGEMENT.md) |
 | **Ensemble Models** | 🟢 Production | [Walk-Forward Report](./walkforward_verification_report.md) | [DYNAMIC_ENSEMBLE](../features/ACCEPTANCE_CRITERIA_DYNAMIC_ENSEMBLE.md) |
 | **Regime Detector** | 🟢 Production | [Intelligence Test Pass](../testing/INTEGRATION_TEST_RESULTS.md#test-intelligence-adaptive-weighting) | [REGIME_DETECTION](../features/ACCEPTANCE_CRITERIA_REGIME_DETECTION.md) |
+| **Decision Support** | 🟢 Production | [Integration Test](../testing/INTEGRATION_TEST_RESULTS.md#test-intelligence-adaptive-weighting) | [DECISION_SUPPORT](../features/ACCEPTANCE_CRITERIA_DECISION_SUPPORT.md) |
 | **Explainability Engine**| 🟢 Production | [Attribution Logging Verified](../testing/INTEGRATION_TEST_RESULTS.md#4-observability) | [EXPLAINABILITY](../features/ACCEPTANCE_CRITERIA_EXPLAINABILITY.md) |
+| **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors | [RL_EVALUATION](../features/ACCEPTANCE_CRITERIA_RL_EVALUATION.md) |
+| **Stress Lab & Rare Event Simulator** | 🔵 Experimental | [Synthetic Scenarios Framework](../testing/SYNTHETIC_DATA.md) | [STRESS_LAB](../features/ACCEPTANCE_CRITERIA_STRESS_LAB.md) |
 
 ---
 
