@@ -30,9 +30,11 @@ This map identifies the production readiness of various subsystems to ensure tra
 | **Execution Filter** | 🟢 Production | [Complexity Analysis](./audits/PERFORMANCE_COMPLEXITY_REPORT.md) |
 | **Risk Management** | 🟢 Production | [8-Layer Cascade Verified](./audits/ENTERPRISE_EVIDENCE_SCORECARD.md) |
 | **Ensemble Models** | 🟢 Production | [Walk-Forward Report](./audits/walkforward_verification_report.md) |
-| **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors. |
+| **Regime Detector** | 🟢 Production | [Intelligence Test Pass](./testing/INTEGRATION_TEST_RESULTS.md#test-intelligence-adaptive-weighting) |
 | **Decision Support** | 🟢 Production | [Integration Test](./testing/INTEGRATION_TEST_RESULTS.md#test-intelligence-adaptive-weighting) |
 | **Explainability Engine** | 🟢 Production | [Attribution Logging Verified](./testing/INTEGRATION_TEST_RESULTS.md#4-observability) |
+| **RL Training Pipeline** | 🔵 Experimental | Active research into Transformer-based actors. |
+| **Stress Lab & Rare Event Simulator** | 🔵 Experimental | [Synthetic Scenarios Framework](./testing/SYNTHETIC_DATA.md) |
 
 ---
 
@@ -71,6 +73,8 @@ Use these paths to find technical evidence and audit reports:
 - **Corrective Actions:** [docs/audits/CORRECTIVE_ACTION_VERIFICATION.md](./audits/CORRECTIVE_ACTION_VERIFICATION.md)
 - **Product Coherence Audit:** [docs/quality/PRODUCT_COHERENCE_AUDIT.md](./quality/PRODUCT_COHERENCE_AUDIT.md)
 - **Pre-Production Checklist:** [docs/PREPROD_CHECKLIST.md](./PREPROD_CHECKLIST.md)
+- **Disaster Recovery Plan:** [docs/DISASTER_RECOVERY.md](./DISASTER_RECOVERY.md)
+- **Operational Runbooks:** [docs/runbooks/README.md](./runbooks/README.md)
 - **Integration Status:** [docs/status/PROCESS_INTEGRITY_LOG.md](./status/PROCESS_INTEGRITY_LOG.md)
 
 ---

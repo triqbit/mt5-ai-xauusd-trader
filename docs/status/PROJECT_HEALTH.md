@@ -7,7 +7,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟡 AMBER | Fast validation linter check flagged 14 Ruff lint/import-order issues across `src/` and `tests/`. |
-| **PR Backlog** | 🔴 562 Stale | 100% of open PRs are stale relative to the latest active commit on `main`. |
+| **PR Backlog** | 🔴 563 Stale | 100% of open PRs are stale relative to the latest active commit on `main`. |
 | **Process Integrity** | 🟢 HEALTHY | Fully linear, intact git history with 1,260+ commits tracing back to root. |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
@@ -64,6 +64,8 @@ This dashboard provides real-time visibility into the technical health, process 
 | [Architecture Quick-Start](../ARCHITECTURE_QUICK.md) | System Map | ✅ Verified |
 | [Technical Debt Log](../technical-debt/DEBT_LOG.md) | Quality & Drift | ✅ Active |
 | [SLO & Reliability Targets](../SLO_TARGETS.md) | Reliability | ✅ Active |
+| [Disaster Recovery Plan](../DISASTER_RECOVERY.md) | Operational Resilience | ✅ Active |
+| [Operational Runbooks](../runbooks/README.md) | Incident Response | ✅ Active |
 
 ---
 
