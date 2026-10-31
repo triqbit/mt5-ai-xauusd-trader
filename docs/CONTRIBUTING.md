@@ -22,7 +22,21 @@ We use a role-based governance model where specific leads oversee different doma
 ### 1. Preparation
 - **Fork and Clone:** Create your own fork and clone it locally.
 - **Setup Environment:** Use Python 3.11+. Follow the [Setup Guide](../SETUP_GUIDE.md).
-- **Consult the [Contribution Map](./CONTRIBUTION_MAP.md):** Identify if your change falls into a **Safe Zone** (docs, tests) or a **Sensitive Zone** (trading logic, models, core).
+- **Consult the [Contribution Map](./CONTRIBUTION_MAP.md):** Identify if your change falls into a **Safe Zone** (docs, tests, scripts), **Utility Zone** (utils, analytics, monitoring), or **Sensitive Zone** (trading logic, models, core, research, data, environment).
+
+---
+
+## 🚦 System Safe Zones & Review Matrix
+
+To help contributors start safely, repository paths are categorized into clear review risk tiers:
+
+| Zone | Path | Risk Level | Review Requirement | Recommended First Contribution |
+| :--- | :--- | :--- | :--- | :--- |
+| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile`, `.github/`, `.jules/`, root safe docs/configs | 🟢 Low | Standard Peer Review | Yes (Documentation, Unit Tests, Developer Scripts) |
+| **Utility Zone** | `src/utils/`, `src/analytics/`, `src/monitoring/` | 🟡 Medium | Domain Lead Review | Secondary (Helpers, Telemetry, Analytics reports) |
+| **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/`, `src/research/`, `src/data/`, `src/environment/`, `main.py` | 🔴 High | Lead + Multi-Signature | No (Core Execution, Models, Risk Engine, Simulation) |
+
+---
 
 ### 🛠️ Git Workflow & Synchronization
 This repository maintains a **100% linear, stable, and intact Git history** on `main`. To keep your pull request clean and easy to review:
@@ -65,7 +79,7 @@ git rebase origin/main
 3.  **Governance Template:** Complete the [.github/PULL_REQUEST_TEMPLATE.md](../.github/PULL_REQUEST_TEMPLATE.md) in full.
 4.  **Evidence:** Attach test logs, coverage reports, and backtest evidence.
 5.  **Review Cycle:** At least one approval from a designated [CODEOWNER](../.github/CODEOWNERS) is required.
-6.  **Multi-Signature Sign-off:** Changes to **Sensitive Zones** (Trading, Models, Core) require mandatory multi-signature approval from both the relevant domain lead and the Release/Governance lead (@andonly1348).
+6.  **Multi-Signature Sign-off:** Changes to **Sensitive Zones** (Trading, Models, Core, Research, Data, Environment, CLI Orchestration) require mandatory multi-signature approval from both the relevant domain lead and the Release/Governance lead (@andonly1348).
 7.  **Merge:** Once all criteria are met, the branch is merged into `main` (or `develop` if applicable).
 
 ---

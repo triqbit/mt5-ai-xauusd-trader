@@ -618,7 +618,14 @@ def check_contribution_safety():
         files = list(all_files)
 
         SAFE_ZONES = ["docs/", "tests/", "scripts/", ".github/", ".jules/"]
-        SENSITIVE_ZONES = ["src/trading/", "src/models/", "src/core/"]
+        SENSITIVE_ZONES = [
+            "src/trading/",
+            "src/models/",
+            "src/core/",
+            "src/research/",
+            "src/data/",
+            "src/environment/",
+        ]
         EXPLICIT_SAFE_FILES = [
             "Makefile",
             "README.md",
@@ -636,6 +643,11 @@ def check_contribution_safety():
             "TRADING_STANDARDS.md",
             "ATTRIBUTIONS.md",
             "CHANGELOG.md",
+            "SETUP_GUIDE.md",
+            ".python-version",
+        ]
+        EXPLICIT_SENSITIVE_FILES = [
+            "main.py",
         ]
 
         safe_files = []
@@ -643,8 +655,8 @@ def check_contribution_safety():
         utility_files = []
 
         for f in files:
+            is_sensitive = any(f.startswith(z) for z in SENSITIVE_ZONES) or f in EXPLICIT_SENSITIVE_FILES
             is_safe = any(f.startswith(z) for z in SAFE_ZONES) or f in EXPLICIT_SAFE_FILES
-            is_sensitive = any(f.startswith(z) for z in SENSITIVE_ZONES)
 
             if is_sensitive:
                 sensitive_files.append(f)
@@ -658,7 +670,7 @@ def check_contribution_safety():
                 "Contribution Safety",
                 "WARNING",
                 f"Sensitive zones touched ({len(sensitive_files)} files)",
-                "Trading/Model logic requires multi-signature approval (Jules01/Jules03/Jules05).",
+                "Trading/Model/Core logic requires multi-signature approval (Jules01/Jules03/Jules04/Jules05).",
             )
         elif utility_files:
             return DiagnosticCheck(

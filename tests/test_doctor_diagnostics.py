@@ -213,13 +213,43 @@ class TestDoctorDiagnostics(unittest.TestCase):
 
     def test_check_contribution_safety_root_safe_files(self):
         """Verify contribution safety check classifies root docs and setup templates as Safe Zone."""
-        mock_diff = MagicMock(returncode=0, stdout=".env.example\nSECURITY.md\nDEVELOPMENT_PLAN.md\n")
+        mock_diff = MagicMock(
+            returncode=0,
+            stdout=".env.example\nSECURITY.md\nDEVELOPMENT_PLAN.md\nSETUP_GUIDE.md\n.python-version\n",
+        )
         mock_empty = MagicMock(returncode=0, stdout="")
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = [mock_diff, mock_empty, mock_empty]
             res = doctor.check_contribution_safety()
             self.assertEqual(res.status, "OK")
             self.assertIn("Safe zones touched", res.message)
+
+    def test_check_contribution_safety_sensitive_zones(self):
+        """Verify contribution safety check classifies research, data, environment, and main.py as Sensitive Zone."""
+        mock_diff = MagicMock(
+            returncode=0,
+            stdout="src/research/hyperopt_walkforward.py\nsrc/data/event_intelligence.py\nsrc/environment/gym_env.py\nmain.py\n",
+        )
+        mock_empty = MagicMock(returncode=0, stdout="")
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = [mock_diff, mock_empty, mock_empty]
+            res = doctor.check_contribution_safety()
+            self.assertEqual(res.status, "WARNING")
+            self.assertIn("Sensitive zones touched", res.message)
+            self.assertIn("multi-signature approval", res.remedy)
+
+    def test_check_contribution_safety_utility_zones(self):
+        """Verify contribution safety check classifies monitoring, utils, and analytics as Utility Zone."""
+        mock_diff = MagicMock(
+            returncode=0,
+            stdout="src/monitoring/dashboards/trading_overview.json\nsrc/utils/security.py\nsrc/analytics/execution_quality.py\n",
+        )
+        mock_empty = MagicMock(returncode=0, stdout="")
+        with patch("subprocess.run") as mock_run:
+            mock_run.side_effect = [mock_diff, mock_empty, mock_empty]
+            res = doctor.check_contribution_safety()
+            self.assertEqual(res.status, "OK")
+            self.assertIn("Utility zones touched", res.message)
 
     def test_get_triage_top_items(self):
         """Verify triage scraping logic."""
