@@ -176,7 +176,7 @@ Before submitting your PR:
 
 1.  **Branch Prefix:** Ensure your branch has a valid prefix (`docs/`, `chore/`, `feature/`, `bugfix/`, `hotfix/`, `refactor/`, `test/`, `ci/`, `perf/`, `style/`) matching your semantic PR title type.
 2.  **Conventional Commits:** Commit your change with an approved semantic type (e.g., `chore: add workspace directory checks to doctor`).
-3.  **Contributor Safety Audit:** Run `make doctor` (or `python3 scripts/doctor.py`) to execute automated Contributor Readiness checks (`Contribution Safety`, `Branch Naming`, `Graft Alignment`, `Git Configuration`). The `Contribution Safety` check automatically inspects modified files against Safe Zones (`docs/`, `tests/`, `scripts/`, `Makefile`) to verify you stay within low-risk contribution pathways.
+3.  **Contributor Safety Audit:** Run `make doctor` (or `python3 scripts/doctor.py`) to execute automated Contributor Readiness checks (`Contribution Safety`, `Branch Naming`, `Graft Alignment`, `Git Configuration`). The `Contribution Safety` check automatically inspects modified files against Safe Zones (`docs/`, `tests/`, `scripts/`, `.github/`, `.jules/`, and explicit root safe files) to verify you stay within low-risk contribution pathways.
 4.  **Run Governance Suite:** Run the project's governance validator to ensure all files match expectations:
     ```bash
     PYTHONPATH=. python3 -m unittest tests/test_governance_vitals.py

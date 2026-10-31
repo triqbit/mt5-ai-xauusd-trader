@@ -6,9 +6,9 @@ This map defines the "Safe Zones" and "Sensitive Zones" of the MT5 AI/ML Trading
 
 | Zone | Path | Risk Level | Review Requirement | Evidence Required |
 | :--- | :--- | :--- | :--- | :--- |
-| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile`, `.github/`, `.jules/`, `README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore`, `.env.example`, `.pre-commit-config.yaml`, `alembic.ini`, `SECURITY.md`, `DEVELOPMENT_PLAN.md`, `DATABASE_STANDARDS.md`, `DEPLOYMENT_GUIDE.md`, `RISK_LIMITS.md`, `TRADING_STANDARDS.md`, `ATTRIBUTIONS.md`, `CHANGELOG.md` | 🟢 Low | Standard Peer Review | Zero-Dep Unit Tests / Doc Lint |
-| **Utility Zone** | `src/utils/`, `src/analytics/` | 🟡 Medium | Domain Expert Review | Integration Tests |
-| **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/` | 🔴 High | Lead + Multi-Signature | Backtests + Stress Tests |
+| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile`, `.github/`, `.jules/`, `README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore`, `.env.example`, `.pre-commit-config.yaml`, `alembic.ini`, `SECURITY.md`, `DEVELOPMENT_PLAN.md`, `DATABASE_STANDARDS.md`, `DEPLOYMENT_GUIDE.md`, `RISK_LIMITS.md`, `TRADING_STANDARDS.md`, `ATTRIBUTIONS.md`, `CHANGELOG.md`, `SETUP_GUIDE.md`, `.python-version` | 🟢 Low | Standard Peer Review | Zero-Dep Unit Tests / Doc Lint |
+| **Utility Zone** | `src/utils/`, `src/analytics/`, `src/monitoring/` | 🟡 Medium | Domain Expert Review | Integration Tests |
+| **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/`, `src/research/`, `src/data/`, `src/environment/`, `main.py` | 🔴 High | Lead + Multi-Signature | Backtests + Stress Tests |
 
 ---
 
@@ -50,8 +50,8 @@ These areas are perfect for new contributors to get familiar with the project an
 - **Improvement Areas:** Improving `make doctor` checks, `bootstrap.sh` robustness, GitHub Actions workflows, or adding new CLI helpers for developers.
 - **Goal:** Reduce the "Time to First Success" for new developers.
 
-### 4. Root Safe Files (`README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore`, `.env.example`, `.pre-commit-config.yaml`, `alembic.ini`, `SECURITY.md`, `DEVELOPMENT_PLAN.md`, `DATABASE_STANDARDS.md`, `DEPLOYMENT_GUIDE.md`, `RISK_LIMITS.md`, `TRADING_STANDARDS.md`, `ATTRIBUTIONS.md`, `CHANGELOG.md`)
-- **Improvement Areas:** Documentation clarity, developer environment templates, database standards, and dependency management configs.
+### 4. Root Safe Files (`README.md`, `CONTRIBUTING.md`, `pyproject.toml`, `.gitignore`, `.env.example`, `.pre-commit-config.yaml`, `alembic.ini`, `SECURITY.md`, `DEVELOPMENT_PLAN.md`, `DATABASE_STANDARDS.md`, `DEPLOYMENT_GUIDE.md`, `RISK_LIMITS.md`, `TRADING_STANDARDS.md`, `ATTRIBUTIONS.md`, `CHANGELOG.md`, `SETUP_GUIDE.md`, `.python-version`)
+- **Improvement Areas:** Documentation clarity, developer environment templates, setup guides, runtime version declarations, database standards, and dependency management configs.
 - **Goal:** Clarify contributor instructions, environmental templates, and project metadata without touching production logic.
 
 ---
@@ -83,6 +83,9 @@ These areas require a deeper understanding of the system's data structures but d
 ### 2. Analytics (`src/analytics/`)
 - **Improvement Areas:** Post-trade analysis reports, visualization of backtest results, or journal mining logic.
 
+### 3. Monitoring & Telemetry (`src/monitoring/`)
+- **Improvement Areas:** Grafana dashboard JSON configurations (`trading_overview.json`), telemetry metrics definitions, and health status indicators.
+
 ---
 
 ## 🔴 Sensitive Zones (High-Stake Areas)
@@ -100,6 +103,22 @@ Changes to these directories affect the core financial and operational safety of
 ### 3. Core Engine (`src/core/`)
 - **Modules:** `config.py`, `health.py`, `constants.py`.
 - **Constraint:** Affects system-wide invariants and startup safety.
+
+### 4. Quant Research & Simulation (`src/research/`)
+- **Modules:** `stress_lab.py`, `hyperopt_walkforward.py`, `rare_event_simulator.py`, `rl_evaluation.py`.
+- **Constraint:** Owned by Jules04; changes require quantitative evaluation metrics and validation of experimental realism.
+
+### 5. Event Intelligence & Market Feeds (`src/data/`)
+- **Modules:** `event_intelligence.py`, `event_models.py`.
+- **Constraint:** Feeds real-time event signals into execution and feature pipelines.
+
+### 6. Gym Simulation Environment (`src/environment/`)
+- **Modules:** `gym_env.py`.
+- **Constraint:** Core reinforcement learning simulation, state transitions, and reward penalties.
+
+### 7. CLI Entrypoint & System Orchestration (`main.py`)
+- **Modules:** `main.py`.
+- **Constraint:** Central entrypoint for trading modes, CLI safety gates, and component lifecycle initialization.
 
 ---
 
