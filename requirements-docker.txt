@@ -50,7 +50,7 @@ tomli==2.5.0
 python-socketio==5.17.0
 python-dateutil==3.0.0
 nest-asyncio==1.6.0
-pytz==2026.5
+pytz==2026.6
 click==8.5.0
 tabulate==0.10.0
 joblib==1.6.0
