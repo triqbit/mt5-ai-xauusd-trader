@@ -16,7 +16,7 @@ classifiers = [
 ]
 dependencies = [
     "torch==2.14.1+cpu",
-    "stable-baselines3==2.9.0",
+    "stable-baselines3==2.9.2",
     "gymnasium==1.4.0",
     "numpy==2.4.6",
     "scipy==1.17.1",
