@@ -24,7 +24,7 @@ pydantic-settings==2.16.1
 python-socketio==5.17.0
 optuna==5.0.0
 pytest==9.1.1
-pytest-asyncio==1.4.0
+pytest-asyncio==1.4.1
 pytest-cov==7.1.0
 pytest-mock==3.17.0
 python-telegram-bot==22.8
