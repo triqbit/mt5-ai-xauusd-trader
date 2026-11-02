@@ -121,6 +121,16 @@ else
     echo ".env already exists, skipping."
 fi
 
+# 5. Validate environment configuration template
+echo "Validating environment configuration template..."
+if [ -f "venv/bin/python" ]; then
+    PYTHONPATH=. venv/bin/python scripts/validate_env.py
+elif [ -f "venv/Scripts/python.exe" ]; then
+    PYTHONPATH=. venv/Scripts/python.exe scripts/validate_env.py
+else
+    PYTHONPATH=. python3 scripts/validate_env.py
+fi
+
 echo "=========================================="
 echo "Bootstrap COMPLETE."
 echo "CRITICAL: Run 'make doctor' or 'python3 scripts/doctor.py' to verify your installation."
