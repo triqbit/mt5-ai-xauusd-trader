@@ -1,9 +1,9 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `5196c3ddad823850de7f26143fed5a959d5b0baf` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `7a07f13baf47423d21a2d0f3da704028f0d3e3dc` is required for all PRs.**
 
-Generated on: 2026-11-04 14:05:26 UTC
+Generated on: 2026-11-05 13:04:46 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
@@ -11,21 +11,21 @@ This checklist identifies top promising PRs for immediate review.
 - **Short scope summary**: Medium Risk update implementing 'chore(deps): bump hypothesis from 6.170.8 to 6.170.13' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `5196c3ddad823850de7f26143fed5a959d5b0baf`, tests, docs
+- **Missing items**: Mandatory rebase against commit `7a07f13baf47423d21a2d0f3da704028f0d3e3dc`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
 ## 2. PR #2170: chore(deps): bump pytest-asyncio from 1.4.0 to 1.4.1
 - **Short scope summary**: Safe Surface update implementing 'chore(deps): bump pytest-asyncio from 1.4.0 to 1.4.1' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `5196c3ddad823850de7f26143fed5a959d5b0baf`
+- **Missing items**: Mandatory rebase against commit `7a07f13baf47423d21a2d0f3da704028f0d3e3dc`
 - **Recommendation**: Needs CI success before merge
 
 ## 3. PR #2169: chore(deps): bump pytest from 9.1.1 to 9.2.0
 - **Short scope summary**: Safe Surface update implementing 'chore(deps): bump pytest from 9.1.1 to 9.2.0' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `5196c3ddad823850de7f26143fed5a959d5b0baf`
+- **Missing items**: Mandatory rebase against commit `7a07f13baf47423d21a2d0f3da704028f0d3e3dc`
 - **Recommendation**: Needs CI success before merge
 
 ---
