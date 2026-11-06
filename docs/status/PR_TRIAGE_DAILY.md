@@ -1,6 +1,6 @@
 # Daily PR Triage Dashboard
 
-**Date:** 2026-11-06 13:12:21 UTC
+**Date:** 2026-11-06 14:26:19 UTC
 **Status:** 🔴 HIGH TURBULENCE
 
 ### Turbulence Factors:
@@ -10,15 +10,15 @@
 
 ## 🔝 Top 3 Items That Matter Right Now
 
-1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `ac23dada000b2d256e7bb8ad19ebc82871f5c2ba` to ensure compatibility.
+1. **Mandatory Rebase:** All open PRs require a mandatory rebase against commit `02c58aed65b25f409acb560e0a60a32d60fc2a04` to ensure compatibility.
 2. **Address Turbulence:** High number of open PRs (567)
-3. **Re-validate Stale:** Review Safe Surface PR #2171 (chore(deps): bump hypothesis from 6.170.8 to 6.170.13)
+3. **Re-validate Stale:** Review Safe Surface PR #2170 (chore(deps): bump pytest-asyncio from 1.4.0 to 1.4.1)
 
 ## 📋 Summary Table
 
 | PR # | Title | Author | Branch | Labels | CI Status | Risk Class | Status Flag |
 |------|-------|--------|--------|--------|-----------|------------|-------------|
-| [2171](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/2171) | chore(deps): bump hypothesis from 6.170.8 to 6.170.13 | dependabot[bot] | `dependabot/pip/hypothesis-6.170.13` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
+| [2171](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/2171) | chore(deps): bump hypothesis from 6.170.8 to 6.170.13 | dependabot[bot] | `dependabot/pip/hypothesis-6.170.13` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
 | [2170](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/2170) | chore(deps): bump pytest-asyncio from 1.4.0 to 1.4.1 | dependabot[bot] | `dependabot/pip/pytest-asyncio-1.4.1` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [2169](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/2169) | chore(deps): bump pytest from 9.1.1 to 9.2.0 | dependabot[bot] | `dependabot/pip/pytest-9.2.0` | none | pending | Safe Surface | ⚠️ Stale (Pre-Big-Bang) |
 | [2164](https://github.com/triqbit/mt5-ai-xauusd-trader/pull/2164) | chore(deps): bump fastapi from 0.143.0 to 0.162.0 | dependabot[bot] | `dependabot/pip/fastapi-0.162.0` | none | pending | Medium Risk | ⚠️ Stale (Pre-Big-Bang) |
@@ -596,7 +596,7 @@
 
 ## ✨ Good Candidates for Review Today
 
-- **PR #2171**: chore(deps): bump hypothesis from 6.170.8 to 6.170.13 (dependabot[bot]) [CI: pending] - *Safe Surface*
+- **PR #2171**: chore(deps): bump hypothesis from 6.170.8 to 6.170.13 (dependabot[bot]) [CI: pending] - *Medium Risk*
 - **PR #2170**: chore(deps): bump pytest-asyncio from 1.4.0 to 1.4.1 (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #2169**: chore(deps): bump pytest from 9.1.1 to 9.2.0 (dependabot[bot]) [CI: pending] - *Safe Surface*
 - **PR #2164**: chore(deps): bump fastapi from 0.143.0 to 0.162.0 (dependabot[bot]) [CI: pending] - *Medium Risk*
