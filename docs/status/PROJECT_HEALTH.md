@@ -7,7 +7,7 @@ This dashboard provides real-time visibility into the technical health, process 
 | Metric | Status | Note |
 | :--- | :--- | :--- |
 | **CI Success Rate** | 🟡 AMBER | Fast validation linter check flagged 14 Ruff lint/import-order issues across `src/` and `tests/`. |
-| **PR Backlog** | 🔴 563 Stale | 100% of open PRs are stale relative to the latest active commit on `main`. |
+| **PR Backlog** | 🔴 567 Stale | 100% of open PRs are stale relative to latest `main` commit; tracked in [Daily PR Triage](./PR_TRIAGE_DAILY.md). |
 | **Process Integrity** | 🟢 HEALTHY | Fully linear, intact git history with 1,260+ commits tracing back to root. |
 | **Evidence Maturity** | 🟢 **Active Verification** | Verified subsystem maturity in [Evidence Scorecard](../audits/ENTERPRISE_EVIDENCE_SCORECARD.md). |
 
