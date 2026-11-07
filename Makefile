@@ -22,6 +22,9 @@ PIP_EXEC := $(shell if [ -f $(PIP) ]; then echo $(PIP); else echo pip3; fi)
 # Environment variables for execution
 RUN_PY := PYTHONPATH=. $(PYTHON_EXEC)
 
+# Resilient linter executable detection (prefers venv/python module, falls back to standalone CLI)
+RUFF_EXEC := $(shell if $(PYTHON_EXEC) -m ruff --version >/dev/null 2>&1; then echo "$(RUN_PY) -m ruff"; elif command -v ruff >/dev/null 2>&1; then echo "ruff"; else echo "$(RUN_PY) -m ruff"; fi)
+
 .PHONY: help bootstrap resync doctor test lint audit demo demo-synthetic demo-rl clean init setup validate-config backtest report status emergency-stop daily-summary analytics
 
 help:
@@ -62,8 +65,8 @@ test:
 	$(RUN_PY) -m pytest tests/
 
 lint:
-	$(RUN_PY) -m ruff check .
-	$(RUN_PY) -m ruff format --check .
+	$(RUFF_EXEC) check .
+	$(RUFF_EXEC) format --check .
 
 audit:
 	@echo "Running dependency audit..."
