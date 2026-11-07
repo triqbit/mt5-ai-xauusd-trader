@@ -15,9 +15,9 @@ Fixes # (issue)
 Before submitting, please categorize your PR based on the [Contribution Map](../docs/CONTRIBUTION_MAP.md):
 
 - [ ] **Safety Zone:** I have verified my PR falls into:
-  - [ ] 🟢 **Safe Zone** (docs, tests, scripts)
-  - [ ] 🟡 **Utility Zone** (utils, analytics)
-  - [ ] 🔴 **Sensitive Zone** (trading, models, core) - *Requires Multi-Signature Approval*
+  - [ ] 🟢 **Safe Zone** (`docs/`, `tests/`, `scripts/`, `Makefile`, `.github/`, `.jules/`, root docs/configs)
+  - [ ] 🟡 **Utility Zone** (`src/utils/`, `src/analytics/`, `src/monitoring/`)
+  - [ ] 🔴 **Sensitive Zone** (`src/trading/`, `src/models/`, `src/core/`, `src/research/`, `src/data/`, `src/environment/`, `main.py`) - *Requires Multi-Signature Approval*
 - [ ] **History Alignment:** I have rebased my branch onto the latest `main` commit.
 - [ ] **Rebase Check:** `git fetch origin main && git rebase origin/main` (Command executed and passed)
 

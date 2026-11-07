@@ -189,9 +189,9 @@ class TestDoctorDiagnostics(unittest.TestCase):
             patch("sys.real_prefix", create=True),
             patch(
                 "scripts.doctor.hasattr",
-                side_effect=lambda obj, attr: False
-                if attr == "real_prefix"
-                else hasattr(obj, attr),
+                side_effect=lambda obj, attr: (
+                    False if attr == "real_prefix" else hasattr(obj, attr)
+                ),
             ),
         ):
             res = doctor.check_venv()
@@ -215,7 +215,7 @@ class TestDoctorDiagnostics(unittest.TestCase):
         """Verify contribution safety check classifies root docs and setup templates as Safe Zone."""
         mock_diff = MagicMock(
             returncode=0,
-            stdout=".env.example\nSECURITY.md\nDEVELOPMENT_PLAN.md\nSETUP_GUIDE.md\n.python-version\n",
+            stdout=".env.example\nSECURITY.md\nDEVELOPMENT_PLAN.md\nSETUP_GUIDE.md\n.python-version\nDockerfile\ndocker-compose.yml\nrequirements.txt\n.pip-audit.ignore\n",
         )
         mock_empty = MagicMock(returncode=0, stdout="")
         with patch("subprocess.run") as mock_run:

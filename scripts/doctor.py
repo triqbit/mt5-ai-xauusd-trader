@@ -645,6 +645,16 @@ def check_contribution_safety():
             "CHANGELOG.md",
             "SETUP_GUIDE.md",
             ".python-version",
+            "Dockerfile",
+            "docker-compose.yml",
+            ".pip-audit.ignore",
+            "requirements.txt",
+            "requirements-test.txt",
+            "requirements-ci.txt",
+            "requirements-ci-no-talib.txt",
+            "requirements-linux.txt",
+            "requirements-docker.txt",
+            "requirements-temp.txt",
         ]
         EXPLICIT_SENSITIVE_FILES = [
             "main.py",
@@ -655,7 +665,9 @@ def check_contribution_safety():
         utility_files = []
 
         for f in files:
-            is_sensitive = any(f.startswith(z) for z in SENSITIVE_ZONES) or f in EXPLICIT_SENSITIVE_FILES
+            is_sensitive = (
+                any(f.startswith(z) for z in SENSITIVE_ZONES) or f in EXPLICIT_SENSITIVE_FILES
+            )
             is_safe = any(f.startswith(z) for z in SAFE_ZONES) or f in EXPLICIT_SAFE_FILES
 
             if is_sensitive:
