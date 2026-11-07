@@ -32,9 +32,9 @@ To help contributors start safely, repository paths are categorized into clear r
 
 | Zone | Path | Risk Level | Review Requirement | Recommended First Contribution |
 | :--- | :--- | :--- | :--- | :--- |
-| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile`, `.github/`, `.jules/`, root safe docs/configs | 🟢 Low | Standard Peer Review | Yes (Documentation, Unit Tests, Developer Scripts) |
+| **Safe Zone** | `docs/`, `tests/`, `scripts/`, `Makefile`, `.github/`, `.jules/`, root safe docs/configs (`Dockerfile`, `docker-compose.yml`, `.pip-audit.ignore`, `requirements*.txt`, root guides) | 🟢 Low | Standard Peer Review | Yes (Documentation, Unit Tests, Developer Scripts, Container & Manifest Configs) |
 | **Utility Zone** | `src/utils/`, `src/analytics/`, `src/monitoring/` | 🟡 Medium | Domain Lead Review | Secondary (Helpers, Telemetry, Analytics reports) |
-| **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/`, `src/research/`, `src/data/`, `src/environment/`, `main.py` | 🔴 High | Lead + Multi-Signature | No (Core Execution, Models, Risk Engine, Simulation) |
+| **Sensitive Zone** | `src/trading/`, `src/models/`, `src/core/`, `src/research/`, `src/data/`, `src/environment/`, `main.py` | 🔴 High | Lead + Multi-Signature | No (Core Execution, Models, Risk Engine, Simulation, CLI Orchestration) |
 
 ---
 

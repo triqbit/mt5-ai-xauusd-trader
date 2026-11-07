@@ -645,6 +645,16 @@ def check_contribution_safety():
             "CHANGELOG.md",
             "SETUP_GUIDE.md",
             ".python-version",
+            "Dockerfile",
+            "docker-compose.yml",
+            ".pip-audit.ignore",
+            "requirements.txt",
+            "requirements-test.txt",
+            "requirements-ci.txt",
+            "requirements-ci-no-talib.txt",
+            "requirements-linux.txt",
+            "requirements-docker.txt",
+            "requirements-temp.txt",
         ]
         EXPLICIT_SENSITIVE_FILES = [
             "main.py",
