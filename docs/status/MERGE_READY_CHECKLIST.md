@@ -1,31 +1,31 @@
 # Merge-Readiness Checklist
 
 > [!IMPORTANT]
-> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `f4873298bd168e4a12c356ccbea42671a3e72a0e` is required for all PRs.**
+> **Critical Repository State Notice:** The `main` branch is currently operating under a linear git history model. All merges must be carefully audited to ensure they do not accidentally overwrite or regress core logic from other active modules. **Mandatory rebase against commit `5dbf20b413040aaefc8bc892aa63bdf2a5b5bcb5` is required for all PRs.**
 
-Generated on: 2026-11-08 14:21:26 UTC
+Generated on: 2026-11-09 13:29:24 UTC
 
 This checklist identifies top promising PRs for immediate review.
 
-## 1. PR #2171: chore(deps): bump hypothesis from 6.170.8 to 6.170.13
-- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump hypothesis from 6.170.8 to 6.170.13' (Candidate for re-validation/review)
+## 1. PR #2201: chore(deps): bump types-requests from 2.33.0.20261006 to 2.33.0.20261030
+- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump types-requests from 2.33.0.20261006 to 2.33.0.20261030' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `f4873298bd168e4a12c356ccbea42671a3e72a0e`, tests, docs
+- **Missing items**: Mandatory rebase against commit `5dbf20b413040aaefc8bc892aa63bdf2a5b5bcb5`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
-## 2. PR #2170: chore(deps): bump pytest-asyncio from 1.4.0 to 1.4.1
-- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump pytest-asyncio from 1.4.0 to 1.4.1' (Candidate for re-validation/review)
+## 2. PR #2200: chore(deps): bump types-setuptools from 84.0.0.20261006 to 84.2.0.20261104
+- **Short scope summary**: Medium Risk update implementing 'chore(deps): bump types-setuptools from 84.0.0.20261006 to 84.2.0.20261104' (Candidate for re-validation/review)
 - **Domains touched**: dependencies
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `f4873298bd168e4a12c356ccbea42671a3e72a0e`
+- **Missing items**: Mandatory rebase against commit `5dbf20b413040aaefc8bc892aa63bdf2a5b5bcb5`, tests, docs
 - **Recommendation**: Needs CI success before merge
 
-## 3. PR #2169: chore(deps): bump pytest from 9.1.1 to 9.2.0
-- **Short scope summary**: Safe Surface update implementing 'chore(deps): bump pytest from 9.1.1 to 9.2.0' (Candidate for re-validation/review)
-- **Domains touched**: dependencies
+## 3. PR #2116: dx: improve developer onboarding and contribution experience
+- **Short scope summary**: Safe Surface update implementing 'dx: improve developer onboarding and contribution experience' (Candidate for re-validation/review)
+- **Domains touched**: infra/scripts, other
 - **CI status**: pending
-- **Missing items**: Mandatory rebase against commit `f4873298bd168e4a12c356ccbea42671a3e72a0e`
+- **Missing items**: Mandatory rebase against commit `5dbf20b413040aaefc8bc892aa63bdf2a5b5bcb5`
 - **Recommendation**: Needs CI success before merge
 
 ---
