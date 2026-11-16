@@ -61,7 +61,7 @@ ruff==0.17.4
 mypy==2.4.1
 
 # ── Utilities ───────────────────────────────────────────────
-python-socketio==5.17.0
+python-socketio==5.18.1
 python-dateutil==4.0.0
 pytz==2026.6
 click==8.5.0

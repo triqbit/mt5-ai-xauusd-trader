@@ -47,7 +47,7 @@ pydantic-settings==2.16.2
 tomli==2.5.0
 
 # -- Utilities -----------------------------------------------
-python-socketio==5.17.0
+python-socketio==5.18.1
 python-dateutil==4.0.0
 nest-asyncio==1.6.0
 pytz==2026.6
